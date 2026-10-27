@@ -2803,7 +2803,7 @@
             const valBtn = document.createElement('img');
             valBtn.src = 'journe 1/continuer.png';
             valBtn.style.cursor = 'pointer';
-            valBtn.style.width = 'calc(var(--img-width) * 0.20)';
+            valBtn.style.width = activity.valBtnPos.width ? (activity.valBtnPos.width + '%') : 'calc(var(--img-width) * 0.20)';
             valBtn.style.height = 'auto';
             valBtn.style.display = 'block';
             valBtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
@@ -7591,7 +7591,11 @@
               "Avec ses camarades, elle parle, rit et s’amuse."
             ],
             needsValidation: true,
-            valBtnPos: { left: 50, top: 81.5 }
+            valBtnPos: { left: 51.05, top: 95.9, width: 16.0 },
+            navPos: {
+              back: { top: '6.55%', left: '1.7%', transform: 'translate(-50%, -50%)' },
+              home: { top: '5.1%', left: '93.3%', transform: 'translate(-50%, -50%)', width: 'clamp(55px, 6.5vw, 84px)', height: 'clamp(55px, 6.5vw, 84px)' }
+            }
           },
           {
             src: 'journe 2/end journe 2.png',
@@ -8044,7 +8048,7 @@
           valBtn.id = 'j2-val-btn';
           valBtn.draggable = false;
           valBtn.style.cursor = 'pointer';
-          valBtn.style.width = 'calc(var(--img-width) * 0.20)';
+          valBtn.style.width = activity.valBtnPos.width ? (activity.valBtnPos.width + '%') : 'calc(var(--img-width) * 0.20)';
           valBtn.style.height = 'auto';
           valBtn.style.display = 'block';
           valBtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
