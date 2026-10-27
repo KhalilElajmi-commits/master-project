@@ -7517,10 +7517,10 @@
               { id: 9, group: 3, left: 72.7, top: 72.4, width: 3.0, height: 2.6, box: { left: 70.5, top: 68.5, width: 25.0, height: 10.5 }, correct: false }
             ],
             needsValidation: true,
-            valBtnPos: { left: 50, top: 96 },
+            valBtnPos: { left: 49.2, top: 101.8 },
             navPos: {
-              back: { top: '6.9%', left: '0.7%' },
-              home: { top: '3.6%', left: '94.3%' }
+              back: { top: '6.85%', left: '-2.4%', transform: 'translate(-50%, -50%)' },
+              home: { top: '7.4%', left: '94.8%', transform: 'translate(-50%, -50%)', width: 'clamp(60px, 7.2vw, 92px)', height: 'clamp(60px, 7.2vw, 92px)' }
             }
           },
           {
@@ -8071,16 +8071,17 @@
         btnBack.style.position = 'absolute';
         btnBack.style.top = navBackPos.top;
         btnBack.style.left = navBackPos.left;
-        btnBack.style.width = 'clamp(44px, 5.2vw, 68px)';
-        btnBack.style.height = 'clamp(44px, 5.2vw, 68px)';
+        if (navBackPos.transform) btnBack.style.transform = navBackPos.transform;
+        btnBack.style.width = navBackPos.width || 'clamp(44px, 5.2vw, 68px)';
+        btnBack.style.height = navBackPos.height || 'clamp(44px, 5.2vw, 68px)';
         btnBack.style.objectFit = 'contain';
         btnBack.style.cursor = 'pointer';
         btnBack.style.zIndex = '30';
         btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))';
         btnBack.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
-        btnBack.onmouseenter = () => { btnBack.style.transform = 'scale(1.1) translateY(-2px)'; btnBack.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
-        btnBack.onmouseleave = () => { btnBack.style.transform = 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
-        btnBack.onmousedown = () => { btnBack.style.transform = 'scale(0.95) translateY(1px)'; };
+        btnBack.onmouseenter = () => { btnBack.style.transform = (navBackPos.transform ? navBackPos.transform + ' ' : '') + 'scale(1.1) translateY(-2px)'; btnBack.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
+        btnBack.onmouseleave = () => { btnBack.style.transform = navBackPos.transform || 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
+        btnBack.onmousedown = () => { btnBack.style.transform = (navBackPos.transform ? navBackPos.transform + ' ' : '') + 'scale(0.95) translateY(1px)'; };
         btnBack.onclick = (e) => {
           e.stopPropagation();
           if (this.currentExIndex > 0) {
@@ -8101,8 +8102,9 @@
         btnHome.style.top = navHomePos.top;
         btnHome.style.right = navHomePos.right || 'auto';
         if (navHomePos.left) btnHome.style.left = navHomePos.left;
-        btnHome.style.width = 'clamp(44px, 5.2vw, 68px)';
-        btnHome.style.height = 'clamp(44px, 5.2vw, 68px)';
+        if (navHomePos.transform) btnHome.style.transform = navHomePos.transform;
+        btnHome.style.width = navHomePos.width || 'clamp(44px, 5.2vw, 68px)';
+        btnHome.style.height = navHomePos.height || 'clamp(44px, 5.2vw, 68px)';
         btnHome.style.objectFit = 'contain';
         btnHome.style.cursor = 'pointer';
         btnHome.style.zIndex = '30';
