@@ -7340,9 +7340,9 @@
         btnHome.style.zIndex = '30';
         btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))';
         btnHome.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
-        btnHome.onmouseenter = () => { btnHome.style.transform = 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
-        btnHome.onmouseleave = () => { btnHome.style.transform = 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
-        btnHome.onmousedown = () => { btnHome.style.transform = 'scale(0.95) translateY(1px)'; };
+        btnHome.onmouseenter = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
+        btnHome.onmouseleave = () => { btnHome.style.transform = navHomePos.transform || 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
+        btnHome.onmousedown = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(0.95) translateY(1px)'; };
         btnHome.onclick = (e) => {
           e.stopPropagation();
           this.close();
@@ -7497,7 +7497,11 @@
                 action: 'next'
               }
             ],
-            needsValidation: false
+            needsValidation: false,
+            navPos: {
+              back: { top: '9.2%', left: '8.75%', transform: 'translate(-50%, -50%)', width: 'clamp(58px, 6.8vw, 86px)', height: 'clamp(58px, 6.8vw, 86px)' },
+              home: { top: '7.75%', left: '94.15%', transform: 'translate(-50%, -50%)', width: 'clamp(58px, 6.8vw, 86px)', height: 'clamp(58px, 6.8vw, 86px)' }
+            }
           },
           {
             src: 'journe 2/2.png',
@@ -8127,9 +8131,9 @@
         btnHome.style.zIndex = '30';
         btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))';
         btnHome.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
-        btnHome.onmouseenter = () => { btnHome.style.transform = 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
-        btnHome.onmouseleave = () => { btnHome.style.transform = 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
-        btnHome.onmousedown = () => { btnHome.style.transform = 'scale(0.95) translateY(1px)'; };
+        btnHome.onmouseenter = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
+        btnHome.onmouseleave = () => { btnHome.style.transform = navHomePos.transform || 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
+        btnHome.onmousedown = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(0.95) translateY(1px)'; };
         btnHome.onclick = (e) => {
           e.stopPropagation();
           this.close();
@@ -9751,9 +9755,9 @@
         btnHome.style.zIndex = '30';
         btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))';
         btnHome.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
-        btnHome.onmouseenter = () => { btnHome.style.transform = 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
-        btnHome.onmouseleave = () => { btnHome.style.transform = 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
-        btnHome.onmousedown = () => { btnHome.style.transform = 'scale(0.95) translateY(1px)'; };
+        btnHome.onmouseenter = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
+        btnHome.onmouseleave = () => { btnHome.style.transform = navHomePos.transform || 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
+        btnHome.onmousedown = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(0.95) translateY(1px)'; };
         btnHome.onclick = (e) => {
           e.stopPropagation();
           this.close();
@@ -10390,9 +10394,9 @@
         btnHome.style.zIndex = '30';
         btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))';
         btnHome.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
-        btnHome.onmouseenter = () => { btnHome.style.transform = 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
-        btnHome.onmouseleave = () => { btnHome.style.transform = 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
-        btnHome.onmousedown = () => { btnHome.style.transform = 'scale(0.95) translateY(1px)'; };
+        btnHome.onmouseenter = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
+        btnHome.onmouseleave = () => { btnHome.style.transform = navHomePos.transform || 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
+        btnHome.onmousedown = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(0.95) translateY(1px)'; };
         btnHome.onclick = (e) => {
           e.stopPropagation();
           this.close();
