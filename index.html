@@ -6461,23 +6461,24 @@
             src: 'journe 1/6.png',
             type: 'sentence',
             labels: [
-              { text: 'Au soux', left: 51, top: 38, width: 13, height: 7 },
+              { text: 'Au souk', left: 51, top: 38, width: 13, height: 7 },
               { text: 'Aziza', left: 65, top: 38, width: 11, height: 7 },
               { text: 'du raisin', left: 77, top: 38, width: 14, height: 7 },
-              { text: 'achte', left: 51, top: 47, width: 13, height: 7 },
+              { text: 'achète', left: 51, top: 47, width: 13, height: 7 },
               { text: 'et', left: 65, top: 47, width: 11, height: 7 },
-              { text: 'un zbre', left: 77, top: 47, width: 14, height: 7 },
+              { text: 'un zèbre', left: 77, top: 47, width: 14, height: 7 },
               { text: 'des fraises', left: 51, top: 56, width: 27, height: 7 }
             ],
             textBox: { left: 14, top: 69, width: 59, height: 7 },
             validSentences: [
-              "Au soux Aziza achte du raisin et des fraises",
-              "Aziza achte du raisin et des fraises Au soux",
-              "Au soux Aziza achte des fraises et du raisin",
-              "Aziza achte des fraises et du raisin Au soux"
+              "Au souk Aziza achète du raisin et des fraises",
+              "Aziza achète du raisin et des fraises Au souk",
+              "Au souk Aziza achète des fraises et du raisin",
+              "Aziza achète des fraises et du raisin Au souk"
             ],
             needsValidation: true,
-            valBtnPos: { left: 50, top: 86 }
+            valBtnPos: { left: 50, top: 86 },
+            backBtnPos: { left: 6.4, top: 7.2, width: 8.7, height: 8.6, box: true }
           },
           {
             src: 'journe 1/end journe 1.png',
@@ -7286,10 +7287,25 @@
         btnBack.title = 'Précédent';
         btnBack.draggable = false;
         btnBack.style.position = 'absolute';
-        btnBack.style.top = '3%';
-        btnBack.style.left = '3%';
-        btnBack.style.width = 'clamp(44px, 5.2vw, 68px)';
-        btnBack.style.height = 'clamp(44px, 5.2vw, 68px)';
+        if (activity.backBtnPos) {
+          if (activity.backBtnPos.box) {
+            btnBack.style.left = activity.backBtnPos.left + '%';
+            btnBack.style.top = activity.backBtnPos.top + '%';
+            btnBack.style.width = activity.backBtnPos.width + '%';
+            btnBack.style.height = activity.backBtnPos.height + '%';
+          } else {
+            btnBack.style.left = activity.backBtnPos.left + '%';
+            btnBack.style.top = activity.backBtnPos.top + '%';
+            btnBack.style.transform = 'translate(-50%, -50%)';
+            btnBack.style.width = activity.backBtnPos.width ? activity.backBtnPos.width + '%' : 'clamp(44px, 5.2vw, 68px)';
+            btnBack.style.height = activity.backBtnPos.height ? activity.backBtnPos.height + '%' : 'clamp(44px, 5.2vw, 68px)';
+          }
+        } else {
+          btnBack.style.top = '3%';
+          btnBack.style.left = '3%';
+          btnBack.style.width = 'clamp(44px, 5.2vw, 68px)';
+          btnBack.style.height = 'clamp(44px, 5.2vw, 68px)';
+        }
         btnBack.style.objectFit = 'contain';
         btnBack.style.cursor = 'pointer';
         btnBack.style.zIndex = '30';
