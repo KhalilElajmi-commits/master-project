@@ -6971,28 +6971,53 @@
             let ctx = canvas.getContext('2d');
             let isDrawing = false;
 
-            setTimeout(() => {
-              canvas.width = canvas.clientWidth;
-              canvas.height = canvas.clientHeight;
-              ctx.lineCap = 'round';
-              ctx.lineJoin = 'round';
-              ctx.lineWidth = 6;
-              ctx.strokeStyle = '#2d3436';
-            }, 50);
+            const ensureCanvasSize = () => {
+              const rect = canvas.getBoundingClientRect();
+              const w = Math.round(rect.width || canvas.clientWidth || canvasWrapper.clientWidth);
+              const h = Math.round(rect.height || canvas.clientHeight || canvasWrapper.clientHeight);
+              if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+                canvas.width = w;
+                canvas.height = h;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#2d3436';
+                ctx.fillStyle = '#2d3436';
+                if (state.points && state.points.length > 0) {
+                  redrawStrokes(state.passed ? '#4ade80' : '#2d3436');
+                }
+              }
+            };
+
+            ensureCanvasSize();
+            img.addEventListener('load', () => {
+              ensureCanvasSize();
+              setTimeout(ensureCanvasSize, 50);
+              setTimeout(ensureCanvasSize, 250);
+            });
+            setTimeout(ensureCanvasSize, 50);
+            setTimeout(ensureCanvasSize, 200);
+            setTimeout(ensureCanvasSize, 600);
 
             const getPos = (e) => {
+              ensureCanvasSize();
               const rect = canvas.getBoundingClientRect();
               let clientX = e.clientX;
               let clientY = e.clientY;
               if (e.touches && e.touches.length > 0) {
                 clientX = e.touches[0].clientX;
                 clientY = e.touches[0].clientY;
+              } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
               }
+              const rw = rect.width || canvas.clientWidth || 1;
+              const rh = rect.height || canvas.clientHeight || 1;
               return {
-                x: clientX - rect.left,
-                y: clientY - rect.top,
-                nx: (clientX - rect.left) / rect.width,
-                ny: (clientY - rect.top) / rect.height
+                x: (clientX - rect.left) * (canvas.width / rw),
+                y: (clientY - rect.top) * (canvas.height / rh),
+                nx: Math.max(0, Math.min(1, (clientX - rect.left) / rw)),
+                ny: Math.max(0, Math.min(1, (clientY - rect.top) / rh))
               };
             };
 
@@ -7000,12 +7025,19 @@
               ctx.clearRect(0, 0, canvas.width, canvas.height);
               if (state.points.length === 0) return;
               ctx.strokeStyle = color;
+              ctx.lineWidth = 6;
+              ctx.lineCap = 'round';
+              ctx.lineJoin = 'round';
               ctx.beginPath();
-              ctx.moveTo(state.points[0].nx * canvas.width, state.points[0].ny * canvas.height);
+              const p0 = state.points[0];
+              const p0x = p0.nx != null ? p0.nx * canvas.width : p0.x;
+              const p0y = p0.ny != null ? p0.ny * canvas.height : p0.y;
+              ctx.moveTo(p0x, p0y);
               for (let i = 1; i < state.points.length; i++) {
-                // For simplicity in auto-eval, if points jump drastically it might be a new stroke.
-                // But connecting them is fine for the visual feedback of passing.
-                ctx.lineTo(state.points[i].nx * canvas.width, state.points[i].ny * canvas.height);
+                const pi = state.points[i];
+                const pix = pi.nx != null ? pi.nx * canvas.width : pi.x;
+                const piy = pi.ny != null ? pi.ny * canvas.height : pi.y;
+                ctx.lineTo(pix, piy);
               }
               ctx.stroke();
             };
@@ -7013,19 +7045,34 @@
             state.evaluate = () => {
               if (state.passed) return true;
               const pts = state.points;
-              if (pts.length < 10) return false;
+              if (pts.length < 5) return false;
 
               const N = 30;
               const userResampled = resamplePath(pts, N);
               const expectedResampled = resamplePath(box.expected, N);
 
               let totalDist = 0;
+              let totalDistRev = 0;
+              const revExpected = [...expectedResampled].reverse();
               for (let i = 0; i < N; i++) {
                 totalDist += Math.hypot(userResampled[i].x - expectedResampled[i].x, userResampled[i].y - expectedResampled[i].y);
+                totalDistRev += Math.hypot(userResampled[i].x - revExpected[i].x, userResampled[i].y - revExpected[i].y);
               }
-              const avgDist = totalDist / N;
+              const avgDist = Math.min(totalDist / N, totalDistRev / N);
 
-              if (avgDist < 0.45) { // Generous tolerance for children
+              let minX = 1, maxX = 0, minY = 1, maxY = 0;
+              pts.forEach(p => {
+                const px = p.nx != null ? p.nx : p.x;
+                const py = p.ny != null ? p.ny : p.y;
+                if (px < minX) minX = px;
+                if (px > maxX) maxX = px;
+                if (py < minY) minY = py;
+                if (py > maxY) maxY = py;
+              });
+              const spanX = maxX - minX;
+              const spanY = maxY - minY;
+
+              if (avgDist < 0.48 || (spanX > 0.20 && spanY > 0.20 && pts.length >= 8)) {
                 state.passed = true;
                 btnClear.style.display = 'none';
                 redrawStrokes('#4ade80');
@@ -7036,276 +7083,45 @@
 
             const startDraw = (e) => {
               if (state.passed) return;
-              e.preventDefault();
+              if (e.cancelable) e.preventDefault();
+              ensureCanvasSize();
               isDrawing = true;
 
               const pos = getPos(e);
               ctx.strokeStyle = '#2d3436';
-              ctx.beginPath();
-              ctx.moveTo(pos.x, pos.y);
-              state.points.push({ x: pos.nx, y: pos.ny });
-            };
-
-            const moveDraw = (e) => {
-              if (!isDrawing || state.passed) return;
-              e.preventDefault();
-              const pos = getPos(e);
-              ctx.lineTo(pos.x, pos.y);
-              ctx.stroke();
-              state.points.push({ x: pos.nx, y: pos.ny });
-            };
-
-            const endDraw = (e) => {
-              if (isDrawing) {
-                e.preventDefault();
-                isDrawing = false;
-              }
-            };
-
-            canvas.addEventListener('mousedown', startDraw);
-            canvas.addEventListener('mousemove', moveDraw);
-            window.addEventListener('mouseup', endDraw);
-
-            canvas.addEventListener('touchstart', startDraw, { passive: false });
-            canvas.addEventListener('touchmove', moveDraw, { passive: false });
-            window.addEventListener('touchend', endDraw);
-
-            btnClear.onclick = () => {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              state.points = [];
-              state.passed = false;
-              const fb = document.getElementById('j1-feedback');
-              if (fb) fb.textContent = '';
-            };
-          });
-        }
-
-        if (activity.type === 'sentence') {
-          const overlayText = document.createElement('div');
-          overlayText.style.position = 'absolute';
-          overlayText.style.left = activity.textBox.left + '%';
-          overlayText.style.top = activity.textBox.top + '%';
-          overlayText.style.width = activity.textBox.width + '%';
-          overlayText.style.height = activity.textBox.height + '%';
-          overlayText.style.display = 'flex';
-          overlayText.style.alignItems = 'center';
-          overlayText.style.padding = '0 2%';
-          overlayText.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-          overlayText.style.fontSize = 'calc(var(--img-width) * 0.025)';
-          overlayText.style.fontWeight = '700';
-          overlayText.style.color = '#1b305f';
-          overlayText.style.whiteSpace = 'nowrap';
-          overlayText.style.pointerEvents = 'none';
-          imgContainer.appendChild(overlayText);
-
-          activity.labels.forEach(lbl => {
-            const btn = document.createElement('div');
-            btn.style.position = 'absolute';
-            btn.style.left = lbl.left + '%'; btn.style.top = lbl.top + '%';
-            btn.style.width = lbl.width + '%'; btn.style.height = lbl.height + '%';
-            btn.style.cursor = 'pointer';
-            btn.style.transition = 'transform 0.2s ease, background 0.2s ease';
-
-            btn.onmouseenter = () => { if (!this.currentActivityState.sentence.includes(lbl.text)) btn.style.transform = 'scale(1.05)'; };
-            btn.onmouseleave = () => { if (!this.currentActivityState.sentence.includes(lbl.text)) btn.style.transform = 'scale(1)'; };
-
-            btn.onclick = () => {
-              if (this.currentActivityState.sentence.includes(lbl.text)) {
-                this.currentActivityState.sentence = this.currentActivityState.sentence.filter(t => t !== lbl.text);
-                btn.style.background = 'transparent';
-                btn.style.transform = 'scale(1)';
-              } else {
-                this.currentActivityState.sentence.push(lbl.text);
-                btn.style.background = 'rgba(0,0,0,0.1)';
-                btn.style.borderRadius = '10px';
-                btn.style.transform = 'scale(1.05)';
-                btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)' }], { duration: 200 });
-              }
-              overlayText.textContent = this.currentActivityState.sentence.join(' ');
-              overlayText.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
-            };
-            imgContainer.appendChild(btn);
-          });
-        }
-
-        wrapper.appendChild(imgContainer);
-
-        // Add UI components on top if needed
-        var feedbackMsg = document.createElement('div');
-        feedbackMsg.id = 'j1-feedback';
-        feedbackMsg.style.fontFamily = 'Nunito, sans-serif';
-        feedbackMsg.style.fontSize = '24px';
-        feedbackMsg.style.fontWeight = 'bold';
-        feedbackMsg.style.height = '35px';
-        feedbackMsg.style.marginTop = '15px';
-        feedbackMsg.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
-        wrapper.appendChild(feedbackMsg);
-
-        if (activity.type === 'drawing' || activity.type === 'mixed') {
-          this.currentActivityState.drawings = {};
-
-          const resamplePath = (points, numPoints) => {
-            if (points.length === 0) return [];
-            if (points.length === 1) return Array(numPoints).fill(points[0]);
-            let totalLength = 0;
-            for (let i = 1; i < points.length; i++) {
-              totalLength += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
-            }
-            const step = totalLength / (numPoints - 1);
-            const newPoints = [points[0]];
-            let currentD = 0;
-            for (let i = 1; i < points.length; i++) {
-              let p0 = points[i - 1];
-              let p1 = points[i];
-              let dist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-              while (currentD + dist >= step && newPoints.length < numPoints - 1) {
-                let t = (step - currentD) / dist;
-                let nx = p0.x + t * (p1.x - p0.x);
-                let ny = p0.y + t * (p1.y - p0.y);
-                newPoints.push({ x: nx, y: ny });
-                p0 = { x: nx, y: ny };
-                dist -= (step - currentD);
-                currentD = 0;
-              }
-              currentD += dist;
-            }
-            while (newPoints.length < numPoints) newPoints.push(points[points.length - 1]);
-            return newPoints;
-          };
-
-
-
-          activity.boxes.forEach(box => {
-            this.currentActivityState.drawings[box.id] = { points: [], passed: false, evalTimeout: null };
-            const state = this.currentActivityState.drawings[box.id];
-
-            const canvasWrapper = document.createElement('div');
-            canvasWrapper.style.position = 'absolute';
-            canvasWrapper.style.left = box.left + '%';
-            canvasWrapper.style.top = box.top + '%';
-            canvasWrapper.style.width = box.width + '%';
-            canvasWrapper.style.height = box.height + '%';
-            canvasWrapper.style.borderRadius = '10px';
-
-            const canvas = document.createElement('canvas');
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
-            canvas.style.touchAction = 'none';
-            canvas.style.cursor = 'crosshair';
-            canvasWrapper.appendChild(canvas);
-
-            const btnClear = document.createElement('button');
-            btnClear.textContent = '✖';
-            btnClear.title = 'Effacer';
-            btnClear.style.position = 'absolute';
-            btnClear.style.top = '5px';
-            btnClear.style.right = '5px';
-            btnClear.style.width = '30px';
-            btnClear.style.height = '30px';
-            btnClear.style.borderRadius = '50%';
-            btnClear.style.border = '2px solid white';
-            btnClear.style.background = '#d63031';
-            btnClear.style.color = 'white';
-            btnClear.style.fontWeight = 'bold';
-            btnClear.style.cursor = 'pointer';
-            btnClear.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
-            canvasWrapper.appendChild(btnClear);
-
-            imgContainer.appendChild(canvasWrapper);
-
-            let ctx = canvas.getContext('2d');
-            let isDrawing = false;
-
-            setTimeout(() => {
-              canvas.width = canvas.clientWidth;
-              canvas.height = canvas.clientHeight;
+              ctx.fillStyle = '#2d3436';
+              ctx.lineWidth = 6;
               ctx.lineCap = 'round';
               ctx.lineJoin = 'round';
-              ctx.lineWidth = 6;
-              ctx.strokeStyle = '#2d3436';
-            }, 50);
-
-            const getPos = (e) => {
-              const rect = canvas.getBoundingClientRect();
-              let clientX = e.clientX;
-              let clientY = e.clientY;
-              if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-              }
-              return {
-                x: clientX - rect.left,
-                y: clientY - rect.top,
-                nx: (clientX - rect.left) / rect.width,
-                ny: (clientY - rect.top) / rect.height
-              };
-            };
-
-            const redrawStrokes = (color) => {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              if (state.points.length === 0) return;
-              ctx.strokeStyle = color;
               ctx.beginPath();
-              ctx.moveTo(state.points[0].nx * canvas.width, state.points[0].ny * canvas.height);
-              for (let i = 1; i < state.points.length; i++) {
-                // For simplicity in auto-eval, if points jump drastically it might be a new stroke.
-                // But connecting them is fine for the visual feedback of passing.
-                ctx.lineTo(state.points[i].nx * canvas.width, state.points[i].ny * canvas.height);
-              }
-              ctx.stroke();
-            };
+              ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
+              ctx.fill();
 
-            state.evaluate = () => {
-              if (state.passed) return true;
-              const pts = state.points;
-              if (pts.length < 10) return false;
-
-              const N = 30;
-              const userResampled = resamplePath(pts, N);
-              const expectedResampled = resamplePath(box.expected, N);
-
-              let totalDist = 0;
-              for (let i = 0; i < N; i++) {
-                totalDist += Math.hypot(userResampled[i].x - expectedResampled[i].x, userResampled[i].y - expectedResampled[i].y);
-              }
-              const avgDist = totalDist / N;
-
-              if (avgDist < 0.45) { // Generous tolerance for children
-                state.passed = true;
-                btnClear.style.display = 'none';
-                redrawStrokes('#4ade80');
-                return true;
-              }
-              return false;
-            };
-
-            const startDraw = (e) => {
-              if (state.passed) return;
-              e.preventDefault();
-              isDrawing = true;
-
-              const pos = getPos(e);
-              ctx.strokeStyle = '#2d3436';
               ctx.beginPath();
               ctx.moveTo(pos.x, pos.y);
-              state.points.push({ x: pos.nx, y: pos.ny });
+              state.points.push({ x: pos.nx, y: pos.ny, nx: pos.nx, ny: pos.ny });
             };
 
             const moveDraw = (e) => {
               if (!isDrawing || state.passed) return;
-              e.preventDefault();
+              if (e.cancelable) e.preventDefault();
               const pos = getPos(e);
               ctx.lineTo(pos.x, pos.y);
               ctx.stroke();
-              state.points.push({ x: pos.nx, y: pos.ny });
+              state.points.push({ x: pos.nx, y: pos.ny, nx: pos.nx, ny: pos.ny });
             };
 
             const endDraw = (e) => {
               if (isDrawing) {
-                e.preventDefault();
+                if (e && e.cancelable) e.preventDefault();
                 isDrawing = false;
               }
             };
+
+            canvas.addEventListener('pointerdown', startDraw);
+            canvas.addEventListener('pointermove', moveDraw);
+            window.addEventListener('pointerup', endDraw);
+            window.addEventListener('pointercancel', endDraw);
 
             canvas.addEventListener('mousedown', startDraw);
             canvas.addEventListener('mousemove', moveDraw);
