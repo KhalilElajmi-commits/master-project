@@ -6,10 +6,10 @@
  * ╚══════════════════════════════════════════════╝
  * 
  * USAGE:
- *   1. Navigate to an exercise page (with an image showing)
+ *   1. Navigate to an exercise or map page
  *   2. Press X to activate the overlay
  *   3. Select a tool type from the sidebar
- *   4. Click & drag on the image to place an element
+ *   4. Click & drag anywhere (inside or outside the box) to place an element
  *   5. Type a label for the element (optional)
  *   6. Export JSON when done → share with the developer
  *   7. Press X again to deactivate
@@ -53,6 +53,7 @@
   // DOM refs
   let sidebarEl = null;
   let overlayEl = null;
+  let screenCaptureEl = null;
   let targetImg = null;
   let overlayParent = null;
   let listContainerEl = null;
@@ -66,7 +67,10 @@
   const getToolConfig = id => TOOLS.find(t => t.id === id) || TOOLS[0];
 
   function getRelativePos(e) {
-    const rect = overlayEl.getBoundingClientRect();
+    const ref = targetImg || overlayEl;
+    if (!ref) return { x: 0, y: 0 };
+    const rect = ref.getBoundingClientRect();
+    if (!rect.width || !rect.height) return { x: 0, y: 0 };
     return {
       x: round1(((e.clientX - rect.left) / rect.width) * 100),
       y: round1(((e.clientY - rect.top) / rect.height) * 100)
@@ -88,14 +92,17 @@
     const area = document.getElementById('exercise-content-area');
     if (area) {
       const img = area.querySelector('img');
-      if (img && img.naturalWidth > 0) return img;
+      if (img && (img.naturalWidth > 0 || img.offsetWidth > 50)) return img;
     }
     // 2. Look for any exercise image (journe/JOURNE paths)
     const allImgs = document.querySelectorAll('img');
     for (const img of allImgs) {
       if (img.src && /journe/i.test(img.src) && img.offsetWidth > 100) return img;
     }
-    // 3. Largest visible image
+    // 3. Map background or largest visible image
+    const bgMap = document.getElementById('initial-bg');
+    if (bgMap && bgMap.offsetWidth > 200 && bgMap.style.display !== 'none') return bgMap;
+
     let best = null, bestArea = 0;
     allImgs.forEach(img => {
       const a = img.offsetWidth * img.offsetHeight;
@@ -173,7 +180,6 @@
     navigator.clipboard.writeText(json).then(() => {
       showStatus('✓ JSON copied to clipboard!');
     }).catch(() => {
-      // Fallback: show in prompt
       prompt('Copy this JSON:', json);
     });
   }
@@ -207,6 +213,7 @@
         font-size: 13px; overflow-y: auto; overflow-x: hidden;
         box-shadow: -4px 0 30px rgba(0,0,0,0.5);
         transition: transform 0.3s ease; transform: translateX(0);
+        user-select: none;
       }
       #dev-overlay-sidebar.hidden { transform: translateX(100%); pointer-events: none; }
       
@@ -298,10 +305,17 @@
         transition: opacity 0.3s; }
       .dov-status.error { background: rgba(231,76,60,0.15); color: #e74c3c; }
       
-      /* Overlay canvas */
+      /* Fullscreen capture layer to allow drawing outside the box */
+      #dev-overlay-screen-capture {
+        position: fixed; inset: 0; width: 100vw; height: 100vh;
+        z-index: 99990; cursor: crosshair; pointer-events: auto;
+      }
+
+      /* Overlay canvas on image */
       #dev-overlay-canvas {
         position: absolute; left: 0; top: 0; width: 100%; height: 100%;
-        z-index: 99998; cursor: crosshair;
+        z-index: 99998; cursor: crosshair; overflow: visible !important;
+        pointer-events: auto;
       }
       
       .dov-placed-el {
@@ -309,17 +323,18 @@
         display: flex; align-items: center; justify-content: center;
         font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.9);
         text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: auto;
-        cursor: pointer; transition: box-shadow 0.15s;
+        cursor: grab; transition: box-shadow 0.15s;
         user-select: none; -webkit-user-select: none;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        overflow: visible; white-space: nowrap; z-index: 10;
       }
-      .dov-placed-el:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.5); }
-      .dov-placed-el.selected { box-shadow: 0 0 0 3px #fff, 0 0 15px rgba(52,152,219,0.5); }
+      .dov-placed-el:active { cursor: grabbing; }
+      .dov-placed-el:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.6); z-index: 15; }
+      .dov-placed-el.selected { box-shadow: 0 0 0 3px #fff, 0 0 15px rgba(52,152,219,0.6); z-index: 20; }
       
       .dov-placed-el .dov-el-id-badge {
         position: absolute; top: 2px; left: 2px; font-size: 9px;
         background: rgba(0,0,0,0.6); padding: 1px 5px; border-radius: 3px;
-        color: #fff; font-weight: 700;
+        color: #fff; font-weight: 700; pointer-events: none;
       }
       
       .dov-preview-rect {
@@ -383,8 +398,8 @@
         <kbd>1</kbd>-<kbd>7</kbd> Select tool<br>
         <kbd>Del</kbd> Remove selected<br>
         <kbd>Esc</kbd> Deselect<br>
-        Click + drag on image to place<br>
-        Click element to select & move
+        Click + drag anywhere to place<br>
+        Drag even outside box to capture margins!
       </div>
     `;
 
@@ -443,18 +458,21 @@
   function updateSidebar() {
     if (!listContainerEl) return;
 
-    // Image name
     imageNameEl.textContent = getImageName() || '—';
-
-    // Element count
     elementCountEl.textContent = elements.length;
-
-    // Element list
     listContainerEl.innerHTML = '';
+
+    if (elements.length === 0) {
+      listContainerEl.innerHTML = '<div style="color:rgba(255,255,255,0.3);padding:12px 0;text-align:center;font-size:12px;">No elements placed yet.<br>Click & drag on image to create one.</div>';
+      return;
+    }
+
     elements.forEach(el => {
       const tool = getToolConfig(el.type);
       const item = document.createElement('div');
       item.className = 'dov-el-item' + (el.id === selectedId ? ' selected' : '');
+      item.dataset.elId = el.id;
+
       item.innerHTML = `
         <div class="dov-el-type" style="color:${tool.color}">
           ${tool.label} #${el.id}
@@ -477,7 +495,6 @@
       listContainerEl.appendChild(item);
     });
 
-    // Scroll to selected
     const sel = listContainerEl.querySelector('.selected');
     if (sel) sel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
@@ -492,28 +509,37 @@
       return false;
     }
 
-    // Ensure parent has relative positioning
+    // Ensure parent has relative positioning and allows overflow
     overlayParent = targetImg.parentElement;
     const parentPos = getComputedStyle(overlayParent).position;
     if (parentPos === 'static' || parentPos === '') {
       overlayParent.style.position = 'relative';
     }
+    overlayParent.style.overflow = 'visible';
 
+    // 1. Overlay container directly on the image/card
     overlayEl = document.createElement('div');
     overlayEl.id = 'dev-overlay-canvas';
     overlayParent.appendChild(overlayEl);
 
-    // Attach mouse events
+    // 2. Fullscreen capture layer to allow starting/finishing clicks outside the activity box
+    screenCaptureEl = document.createElement('div');
+    screenCaptureEl.id = 'dev-overlay-screen-capture';
+    document.body.appendChild(screenCaptureEl);
+
+    // Attach listeners
+    screenCaptureEl.addEventListener('mousedown', onMouseDown);
     overlayEl.addEventListener('mousedown', onMouseDown);
-    overlayEl.addEventListener('mousemove', onMouseMove);
-    overlayEl.addEventListener('mouseup', onMouseUp);
-    overlayEl.addEventListener('click', e => e.stopPropagation());
-    overlayEl.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Global window listeners so dragging outside the box NEVER drops the event!
+    window.addEventListener('mousemove', onMouseMove, true);
+    window.addEventListener('mouseup', onMouseUp, true);
 
     // Touch support
+    screenCaptureEl.addEventListener('touchstart', onTouchStart, { passive: false });
     overlayEl.addEventListener('touchstart', onTouchStart, { passive: false });
-    overlayEl.addEventListener('touchmove', onTouchMove, { passive: false });
-    overlayEl.addEventListener('touchend', onTouchEnd, { passive: false });
+    window.addEventListener('touchmove', onTouchMove, { passive: false, capture: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: false, capture: true });
 
     // Load existing data
     loadData();
@@ -523,6 +549,15 @@
   }
 
   function removeOverlay() {
+    window.removeEventListener('mousemove', onMouseMove, true);
+    window.removeEventListener('mouseup', onMouseUp, true);
+    window.removeEventListener('touchmove', onTouchMove, true);
+    window.removeEventListener('touchend', onTouchEnd, true);
+
+    if (screenCaptureEl) {
+      screenCaptureEl.remove();
+      screenCaptureEl = null;
+    }
     if (overlayEl) {
       overlayEl.remove();
       overlayEl = null;
@@ -535,9 +570,7 @@
   function renderAllElements() {
     if (!overlayEl) return;
 
-    // Clear existing rendered elements (keep preview if drawing)
     overlayEl.querySelectorAll('.dov-placed-el').forEach(e => e.remove());
-
     elements.forEach(el => renderSingleElement(el));
   }
 
@@ -571,28 +604,18 @@
       lbl.textContent = el.label;
       lbl.style.zIndex = '1';
       lbl.style.fontSize = '12px';
+      lbl.style.padding = '0 4px';
       div.appendChild(lbl);
     }
 
-    // Click to select
+    // Click to select & move
     div.addEventListener('mousedown', (e) => {
       e.stopPropagation();
       selectElement(el.id);
 
-      // Start moving
       const pos = getRelativePos(e);
       mode = 'moving';
       moveOffset = { x: pos.x - el.left, y: pos.y - el.top };
-    });
-
-    div.addEventListener('mouseup', (e) => {
-      e.stopPropagation();
-      if (mode === 'moving') {
-        mode = 'idle';
-        saveData();
-        renderAllElements();
-        updateSidebar();
-      }
     });
 
     overlayEl.appendChild(div);
@@ -612,8 +635,7 @@
 
   // ═══════════════════ ELEMENT MANAGEMENT ═══════════════════
   function addElement(type, label, left, top, width, height) {
-    // Don't add tiny elements (accidental clicks)
-    if (width < 1 && height < 1) return;
+    if (width < 0.3 && height < 0.3) return;
 
     const el = {
       id: nextId++,
@@ -645,39 +667,38 @@
   function moveElement(id, newLeft, newTop) {
     const el = elements.find(e => e.id === id);
     if (!el) return;
-    el.left = round1(Math.max(0, Math.min(100 - el.width, newLeft)));
-    el.top = round1(Math.max(0, Math.min(100 - el.height, newTop)));
+    // Allow positioning outside the box (-100% to 200%)
+    el.left = round1(Math.max(-100, Math.min(200, newLeft)));
+    el.top = round1(Math.max(-100, Math.min(200, newTop)));
 
-    // Update the DOM element directly for smooth movement
-    const div = overlayEl.querySelector(`[data-el-id="${id}"]`);
+    const div = overlayEl ? overlayEl.querySelector(`[data-el-id="${id}"]`) : null;
     if (div) {
       div.style.left = el.left + '%';
       div.style.top = el.top + '%';
     }
   }
 
-  // ═══════════════════ MOUSE HANDLERS ═══════════════════
+  // ═══════════════════ MOUSE / TOUCH HANDLERS ═══════════════════
   function onMouseDown(e) {
     if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
+    if (e.target && e.target.closest('#dev-overlay-sidebar')) return;
 
-    // Check if clicking on an existing element (handled by element's own handler)
-    const clickedEl = e.target.closest('.dov-placed-el');
+    // Check if clicking on an existing element (handled by element's own mousedown)
+    const clickedEl = e.target && e.target.closest('.dov-placed-el');
     if (clickedEl) return;
 
-    // Deselect if clicking empty space with a selection
+    e.preventDefault();
+
     if (selectedId !== null) {
       deselectAll();
     }
 
-    // Start drawing new element
     const pos = getRelativePos(e);
     mode = 'drawing';
     drawStart = pos;
 
-    // Create preview rectangle
     const tool = getToolConfig(currentTool);
+    if (previewDiv) previewDiv.remove();
     previewDiv = document.createElement('div');
     previewDiv.className = 'dov-preview-rect';
     previewDiv.style.borderColor = tool.color;
@@ -687,14 +708,15 @@
     previewDiv.style.width = '0%';
     previewDiv.style.height = '0%';
     if (currentTool === 'circle') previewDiv.style.borderRadius = '50%';
-    overlayEl.appendChild(previewDiv);
+    
+    if (overlayEl) overlayEl.appendChild(previewDiv);
   }
 
   function onMouseMove(e) {
-    e.preventDefault();
-    e.stopPropagation();
+    if (mode === 'idle') return;
 
     if (mode === 'drawing' && previewDiv && drawStart) {
+      e.preventDefault();
       const pos = getRelativePos(e);
       const rect = normalizeRect(drawStart.x, drawStart.y, pos.x, pos.y);
       previewDiv.style.left = rect.left + '%';
@@ -704,29 +726,23 @@
     }
 
     if (mode === 'moving' && selectedId !== null && moveOffset) {
+      e.preventDefault();
       const pos = getRelativePos(e);
       moveElement(selectedId, pos.x - moveOffset.x, pos.y - moveOffset.y);
     }
   }
 
   function onMouseUp(e) {
-    e.preventDefault();
-    e.stopPropagation();
-
     if (mode === 'drawing' && drawStart) {
+      e.preventDefault();
       const pos = getRelativePos(e);
       const rect = normalizeRect(drawStart.x, drawStart.y, pos.x, pos.y);
 
-      // Remove preview
       if (previewDiv) { previewDiv.remove(); previewDiv = null; }
 
-      // Get label from input
       const label = labelInputEl ? labelInputEl.value.trim() : '';
-
-      // Add the element
       addElement(currentTool, label, rect.left, rect.top, rect.width, rect.height);
 
-      // Clear label input
       if (labelInputEl) labelInputEl.value = '';
 
       drawStart = null;
@@ -735,27 +751,26 @@
 
     if (mode === 'moving') {
       mode = 'idle';
+      moveOffset = null;
       saveData();
+      renderAllElements();
       updateSidebar();
     }
   }
 
   // Touch event adapters
   function touchToMouse(e) {
-    if (e.touches.length === 0 && e.changedTouches.length > 0) {
-      return { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY,
-               button: 0, preventDefault: () => e.preventDefault(),
-               stopPropagation: () => e.stopPropagation(),
-               target: document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY) || e.target };
-    }
-    if (e.touches.length > 0) {
-      return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY,
-               button: 0, preventDefault: () => e.preventDefault(),
-               stopPropagation: () => e.stopPropagation(),
-               target: document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY) || e.target };
-    }
-    return null;
+    const t = (e.touches && e.touches.length > 0) ? e.touches[0] : (e.changedTouches && e.changedTouches.length > 0 ? e.changedTouches[0] : null);
+    if (!t) return null;
+    return {
+      clientX: t.clientX, clientY: t.clientY,
+      button: 0,
+      preventDefault: () => { if (e.cancelable) e.preventDefault(); },
+      stopPropagation: () => e.stopPropagation(),
+      target: document.elementFromPoint(t.clientX, t.clientY) || e.target
+    };
   }
+
   function onTouchStart(e) { const m = touchToMouse(e); if (m) onMouseDown(m); }
   function onTouchMove(e) { const m = touchToMouse(e); if (m) onMouseMove(m); }
   function onTouchEnd(e) { const m = touchToMouse(e); if (m) onMouseUp(m); }
@@ -769,14 +784,13 @@
 
     const ok = createOverlay();
     if (!ok) {
-      // Still show sidebar with an error message
+      // Sidebar shows status
     }
 
     sidebarEl.classList.remove('hidden');
     active = true;
     updateSidebar();
 
-    // Remove hint
     const hint = document.getElementById('dev-overlay-hint');
     if (hint) hint.style.display = 'none';
   }
@@ -786,6 +800,7 @@
 
     mode = 'idle';
     drawStart = null;
+    moveOffset = null;
     selectedId = null;
     if (previewDiv) { previewDiv.remove(); previewDiv = null; }
 
@@ -794,7 +809,6 @@
     if (sidebarEl) sidebarEl.classList.add('hidden');
     active = false;
 
-    // Show hint again
     const hint = document.getElementById('dev-overlay-hint');
     if (hint) hint.style.display = '';
   }
@@ -811,7 +825,6 @@
       if (!active) return;
       const newImg = findExerciseImage();
       if (newImg && newImg !== targetImg) {
-        // Image changed! Re-create overlay
         removeOverlay();
         createOverlay();
         updateSidebar();
@@ -822,7 +835,6 @@
 
   // ═══════════════════ KEYBOARD ═══════════════════
   document.addEventListener('keydown', (e) => {
-    // Don't capture when typing in inputs
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' ||
         e.target.isContentEditable) return;
 
@@ -852,7 +864,6 @@
       }
     }
 
-    // Number keys for quick tool select
     const num = parseInt(e.key);
     if (num >= 1 && num <= TOOLS.length) {
       selectTool(TOOLS[num - 1].id);
@@ -862,13 +873,11 @@
   // ═══════════════════ INIT ═══════════════════
   injectStyles();
 
-  // Show activation hint
   const hint = document.createElement('div');
   hint.id = 'dev-overlay-hint';
   hint.innerHTML = 'Press <kbd>X</kbd> to open Dev Overlay';
   document.body.appendChild(hint);
 
-  // Start watching for image changes
   startImageWatch();
 
   console.log('%c🔧 Dev Overlay loaded — Press X to activate', 
