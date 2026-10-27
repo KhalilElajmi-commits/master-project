@@ -254,6 +254,11 @@
         background: rgba(255,255,255,0.03);
       }
       .dov-header h2 { margin: 0; font-size: 16px; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
+      .dov-collapse-btn { background: #34495e; border: none; color: #ecf0f1; width: 28px; height: 28px;
+        border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold;
+        display: flex; align-items: center; justify-content: center;
+        transition: background 0.15s; }
+      .dov-collapse-btn:hover { background: #2c3e50; color: #3498db; }
       .dov-close { background: #e74c3c; border: none; color: white; width: 28px; height: 28px;
         border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
         display: flex; align-items: center; justify-content: center;
@@ -400,7 +405,10 @@
       <button id="dov-retract-btn" title="Retract / Expand Sidebar (Click to work under sidebar)">▶</button>
       <div class="dov-header">
         <h2>🔧 Dev Overlay</h2>
-        <button class="dov-close" id="dov-close-btn" title="Close (X)">✕</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="dov-collapse-btn" id="dov-collapse-header-btn" title="Collapse / Hide Sidebar (Press H or Tab)">─</button>
+          <button class="dov-close" id="dov-close-btn" title="Close (X)">✕</button>
+        </div>
       </div>
       <div id="dov-status-bar" class="dov-status" style="display:none"></div>
       <div class="dov-section">
@@ -428,6 +436,7 @@
       </div>
       <div class="dov-footer">
         <kbd>X</kbd> Toggle overlay<br>
+        <kbd>H</kbd> / <kbd>Tab</kbd> Collapse sidebar<br>
         <kbd>1</kbd>-<kbd>7</kbd> Select tool<br>
         <kbd>Del</kbd> Remove selected<br>
         <kbd>Esc</kbd> Deselect<br>
@@ -458,15 +467,30 @@
     elementCountEl = document.getElementById('dov-el-count');
     statusEl = document.getElementById('dov-status-bar');
 
-    // Retract button handler
+    function toggleSidebarCollapse() {
+      if (!sidebarEl) return;
+      const isCollapsed = sidebarEl.classList.toggle('collapsed');
+      const retractBtn = document.getElementById('dov-retract-btn');
+      if (retractBtn) {
+        retractBtn.textContent = isCollapsed ? '◀' : '▶';
+        retractBtn.title = isCollapsed ? 'Expand Sidebar (H or Tab)' : 'Retract Sidebar (H or Tab)';
+      }
+      showStatus(isCollapsed ? 'Sidebar collapsed (Press H or Tab to show)' : 'Sidebar expanded');
+    }
+
     const retractBtn = document.getElementById('dov-retract-btn');
     if (retractBtn) {
       retractBtn.onclick = (e) => {
         e.stopPropagation();
-        const isCollapsed = sidebarEl.classList.toggle('collapsed');
-        retractBtn.textContent = isCollapsed ? '◀' : '▶';
-        retractBtn.title = isCollapsed ? 'Expand Sidebar' : 'Retract Sidebar (Hide to work underneath)';
-        showStatus(isCollapsed ? 'Sidebar retracted (hidden)' : 'Sidebar expanded');
+        toggleSidebarCollapse();
+      };
+    }
+
+    const collapseHdrBtn = document.getElementById('dov-collapse-header-btn');
+    if (collapseHdrBtn) {
+      collapseHdrBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleSidebarCollapse();
       };
     }
 
@@ -915,6 +939,21 @@
     }
 
     if (!active) return;
+
+    // H or Tab to collapse / expand sidebar
+    if (e.key.toLowerCase() === 'h' || e.key === 'Tab') {
+      e.preventDefault();
+      if (sidebarEl) {
+        const isCollapsed = sidebarEl.classList.toggle('collapsed');
+        const retractBtn = document.getElementById('dov-retract-btn');
+        if (retractBtn) {
+          retractBtn.textContent = isCollapsed ? '◀' : '▶';
+          retractBtn.title = isCollapsed ? 'Expand Sidebar (H or Tab)' : 'Retract Sidebar (H or Tab)';
+        }
+        showStatus(isCollapsed ? 'Sidebar collapsed (hidden)' : 'Sidebar expanded');
+      }
+      return;
+    }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (selectedId !== null) {
