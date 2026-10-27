@@ -210,12 +210,43 @@
         border-left: 2px solid rgba(255,255,255,0.1);
         z-index: 100000; color: #e0e0e0;
         font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
-        font-size: 13px; overflow-y: auto; overflow-x: hidden;
+        font-size: 13px; overflow-y: auto; overflow-x: visible;
         box-shadow: -4px 0 30px rgba(0,0,0,0.5);
-        transition: transform 0.3s ease; transform: translateX(0);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); transform: translateX(0);
         user-select: none;
       }
       #dev-overlay-sidebar.hidden { transform: translateX(100%); pointer-events: none; }
+      #dev-overlay-sidebar.collapsed { transform: translateX(100%); }
+
+      /* Retract / collapse tab button sticking out to the left of the sidebar */
+      #dov-retract-btn {
+        position: absolute;
+        left: -38px;
+        top: 14px;
+        width: 38px;
+        height: 42px;
+        background: #1f2430;
+        border: 2px solid rgba(255,255,255,0.2);
+        border-right: none;
+        border-radius: 10px 0 0 10px;
+        color: #3498db;
+        cursor: pointer;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: -4px 2px 12px rgba(0,0,0,0.4);
+        transition: background 0.2s, color 0.2s, transform 0.2s;
+        z-index: 100001;
+        pointer-events: auto !important;
+      }
+      #dov-retract-btn:hover {
+        background: #3498db;
+        color: #ffffff;
+      }
+      #dev-overlay-sidebar.collapsed #dov-retract-btn {
+        color: #2ecc71;
+      }
       
       .dov-header {
         padding: 16px 18px; display: flex; align-items: center; justify-content: space-between;
@@ -365,6 +396,8 @@
     sidebarEl.classList.add('hidden');
 
     sidebarEl.innerHTML = `
+      <!-- Retract Tab Button -->
+      <button id="dov-retract-btn" title="Retract / Expand Sidebar (Click to work under sidebar)">▶</button>
       <div class="dov-header">
         <h2>🔧 Dev Overlay</h2>
         <button class="dov-close" id="dov-close-btn" title="Close (X)">✕</button>
@@ -424,6 +457,18 @@
     imageNameEl = document.getElementById('dov-image-name');
     elementCountEl = document.getElementById('dov-el-count');
     statusEl = document.getElementById('dov-status-bar');
+
+    // Retract button handler
+    const retractBtn = document.getElementById('dov-retract-btn');
+    if (retractBtn) {
+      retractBtn.onclick = (e) => {
+        e.stopPropagation();
+        const isCollapsed = sidebarEl.classList.toggle('collapsed');
+        retractBtn.textContent = isCollapsed ? '◀' : '▶';
+        retractBtn.title = isCollapsed ? 'Expand Sidebar' : 'Retract Sidebar (Hide to work underneath)';
+        showStatus(isCollapsed ? 'Sidebar retracted (hidden)' : 'Sidebar expanded');
+      };
+    }
 
     // Button handlers
     document.getElementById('dov-close-btn').onclick = deactivate;
@@ -608,15 +653,34 @@
       div.appendChild(lbl);
     }
 
-    // Click to select & move
-    div.addEventListener('mousedown', (e) => {
+    // Click & Drag to select and move
+    function startElementDrag(e) {
       e.stopPropagation();
-      selectElement(el.id);
+      e.preventDefault();
+
+      // Highlight selected without full re-render (which would destroy the DOM node mid-drag)
+      selectedId = el.id;
+      if (overlayEl) {
+        overlayEl.querySelectorAll('.dov-placed-el').forEach(d => {
+          if (parseInt(d.dataset.elId, 10) === el.id) {
+            d.classList.add('selected');
+          } else {
+            d.classList.remove('selected');
+          }
+        });
+      }
+      updateSidebar();
 
       const pos = getRelativePos(e);
       mode = 'moving';
       moveOffset = { x: pos.x - el.left, y: pos.y - el.top };
-    });
+    }
+
+    div.addEventListener('mousedown', startElementDrag);
+    div.addEventListener('touchstart', (e) => {
+      const m = touchToMouse(e);
+      if (m) startElementDrag(m);
+    }, { passive: false });
 
     overlayEl.appendChild(div);
   }
@@ -788,6 +852,12 @@
     }
 
     sidebarEl.classList.remove('hidden');
+    sidebarEl.classList.remove('collapsed');
+    const retractBtn = document.getElementById('dov-retract-btn');
+    if (retractBtn) {
+      retractBtn.textContent = '▶';
+      retractBtn.title = 'Retract Sidebar (Hide to work underneath)';
+    }
     active = true;
     updateSidebar();
 
