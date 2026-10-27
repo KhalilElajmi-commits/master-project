@@ -6431,7 +6431,8 @@
               { id: 'maison', left: 31, top: 53, width: 16, height: 5, correct: true }
             ],
             needsValidation: true,
-            valBtnPos: { left: 80, top: 86 }
+            valBtnPos: { left: 80, top: 86 },
+            homeBtnPos: { left: 85.8, top: 5.1, width: 9.1, height: 9.0, box: true }
           },
           {
             src: 'journe 1/5.png',
@@ -6454,7 +6455,7 @@
             ],
             matches: { 'l0': 'r4', 'l1': 'r2', 'l2': 'r5', 'l3': 'r0', 'l4': 'r1', 'l5': 'r3' },
             needsValidation: true,
-            valBtnPos: { left: 50, top: 87 }
+            valBtnPos: { left: 40.6, top: 93.9, width: 19.9, height: 5.5, box: true }
           },
           {
             src: 'journe 1/6.png',
@@ -7314,10 +7315,25 @@
         btnHome.title = 'Retour à la carte';
         btnHome.draggable = false;
         btnHome.style.position = 'absolute';
-        btnHome.style.top = '3%';
-        btnHome.style.right = '3%';
-        btnHome.style.width = 'clamp(44px, 5.2vw, 68px)';
-        btnHome.style.height = 'clamp(44px, 5.2vw, 68px)';
+        if (activity.homeBtnPos) {
+          if (activity.homeBtnPos.box) {
+            btnHome.style.left = activity.homeBtnPos.left + '%';
+            btnHome.style.top = activity.homeBtnPos.top + '%';
+            btnHome.style.width = activity.homeBtnPos.width + '%';
+            btnHome.style.height = activity.homeBtnPos.height + '%';
+          } else {
+            btnHome.style.left = activity.homeBtnPos.left + '%';
+            btnHome.style.top = activity.homeBtnPos.top + '%';
+            btnHome.style.transform = 'translate(-50%, -50%)';
+            btnHome.style.width = activity.homeBtnPos.width ? activity.homeBtnPos.width + '%' : 'clamp(44px, 5.2vw, 68px)';
+            btnHome.style.height = activity.homeBtnPos.height ? activity.homeBtnPos.height + '%' : 'clamp(44px, 5.2vw, 68px)';
+          }
+        } else {
+          btnHome.style.top = '3%';
+          btnHome.style.right = '3%';
+          btnHome.style.width = 'clamp(44px, 5.2vw, 68px)';
+          btnHome.style.height = 'clamp(44px, 5.2vw, 68px)';
+        }
         btnHome.style.objectFit = 'contain';
         btnHome.style.cursor = 'pointer';
         btnHome.style.zIndex = '30';
