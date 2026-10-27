@@ -6432,7 +6432,7 @@
             ],
             needsValidation: true,
             valBtnPos: { left: 80, top: 86 },
-            homeBtnPos: { left: 85.8, top: 5.1, width: 9.1, height: 9.0, box: true }
+            homeBtnPos: { left: 90.35, top: 9.6 }
           },
           {
             src: 'journe 1/5.png',
@@ -6478,7 +6478,7 @@
             ],
             needsValidation: true,
             valBtnPos: { left: 50, top: 86 },
-            backBtnPos: { left: 6.4, top: 7.2, width: 8.7, height: 8.6, box: true }
+            backBtnPos: { left: 10.75, top: 11.5 }
           },
           {
             src: 'journe 1/end journe 1.png',
@@ -7287,24 +7287,15 @@
         btnBack.title = 'Précédent';
         btnBack.draggable = false;
         btnBack.style.position = 'absolute';
+        btnBack.style.width = 'clamp(44px, 5.2vw, 68px)';
+        btnBack.style.height = 'clamp(44px, 5.2vw, 68px)';
         if (activity.backBtnPos) {
-          if (activity.backBtnPos.box) {
-            btnBack.style.left = activity.backBtnPos.left + '%';
-            btnBack.style.top = activity.backBtnPos.top + '%';
-            btnBack.style.width = activity.backBtnPos.width + '%';
-            btnBack.style.height = activity.backBtnPos.height + '%';
-          } else {
-            btnBack.style.left = activity.backBtnPos.left + '%';
-            btnBack.style.top = activity.backBtnPos.top + '%';
-            btnBack.style.transform = 'translate(-50%, -50%)';
-            btnBack.style.width = activity.backBtnPos.width ? activity.backBtnPos.width + '%' : 'clamp(44px, 5.2vw, 68px)';
-            btnBack.style.height = activity.backBtnPos.height ? activity.backBtnPos.height + '%' : 'clamp(44px, 5.2vw, 68px)';
-          }
+          btnBack.style.left = activity.backBtnPos.left + '%';
+          btnBack.style.top = activity.backBtnPos.top + '%';
+          btnBack.style.transform = 'translate(-50%, -50%)';
         } else {
           btnBack.style.top = '3%';
           btnBack.style.left = '3%';
-          btnBack.style.width = 'clamp(44px, 5.2vw, 68px)';
-          btnBack.style.height = 'clamp(44px, 5.2vw, 68px)';
         }
         btnBack.style.objectFit = 'contain';
         btnBack.style.cursor = 'pointer';
@@ -7331,24 +7322,15 @@
         btnHome.title = 'Retour à la carte';
         btnHome.draggable = false;
         btnHome.style.position = 'absolute';
+        btnHome.style.width = 'clamp(44px, 5.2vw, 68px)';
+        btnHome.style.height = 'clamp(44px, 5.2vw, 68px)';
         if (activity.homeBtnPos) {
-          if (activity.homeBtnPos.box) {
-            btnHome.style.left = activity.homeBtnPos.left + '%';
-            btnHome.style.top = activity.homeBtnPos.top + '%';
-            btnHome.style.width = activity.homeBtnPos.width + '%';
-            btnHome.style.height = activity.homeBtnPos.height + '%';
-          } else {
-            btnHome.style.left = activity.homeBtnPos.left + '%';
-            btnHome.style.top = activity.homeBtnPos.top + '%';
-            btnHome.style.transform = 'translate(-50%, -50%)';
-            btnHome.style.width = activity.homeBtnPos.width ? activity.homeBtnPos.width + '%' : 'clamp(44px, 5.2vw, 68px)';
-            btnHome.style.height = activity.homeBtnPos.height ? activity.homeBtnPos.height + '%' : 'clamp(44px, 5.2vw, 68px)';
-          }
+          btnHome.style.left = activity.homeBtnPos.left + '%';
+          btnHome.style.top = activity.homeBtnPos.top + '%';
+          btnHome.style.transform = 'translate(-50%, -50%)';
         } else {
           btnHome.style.top = '3%';
           btnHome.style.right = '3%';
-          btnHome.style.width = 'clamp(44px, 5.2vw, 68px)';
-          btnHome.style.height = 'clamp(44px, 5.2vw, 68px)';
         }
         btnHome.style.objectFit = 'contain';
         btnHome.style.cursor = 'pointer';
