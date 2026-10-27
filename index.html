@@ -6941,6 +6941,8 @@
             canvasWrapper.style.width = box.width + '%';
             canvasWrapper.style.height = box.height + '%';
             canvasWrapper.style.borderRadius = '10px';
+            canvasWrapper.style.zIndex = '25';
+            canvasWrapper.style.touchAction = 'none';
 
             const canvas = document.createElement('canvas');
             canvas.style.width = '100%';
@@ -7118,18 +7120,20 @@
               }
             };
 
-            canvas.addEventListener('pointerdown', startDraw);
-            canvas.addEventListener('pointermove', moveDraw);
-            window.addEventListener('pointerup', endDraw);
-            window.addEventListener('pointercancel', endDraw);
+            if (window.PointerEvent) {
+              canvas.addEventListener('pointerdown', startDraw);
+              canvas.addEventListener('pointermove', moveDraw);
+              window.addEventListener('pointerup', endDraw);
+              window.addEventListener('pointercancel', endDraw);
+            } else {
+              canvas.addEventListener('mousedown', startDraw);
+              canvas.addEventListener('mousemove', moveDraw);
+              window.addEventListener('mouseup', endDraw);
 
-            canvas.addEventListener('mousedown', startDraw);
-            canvas.addEventListener('mousemove', moveDraw);
-            window.addEventListener('mouseup', endDraw);
-
-            canvas.addEventListener('touchstart', startDraw, { passive: false });
-            canvas.addEventListener('touchmove', moveDraw, { passive: false });
-            window.addEventListener('touchend', endDraw);
+              canvas.addEventListener('touchstart', startDraw, { passive: false });
+              canvas.addEventListener('touchmove', moveDraw, { passive: false });
+              window.addEventListener('touchend', endDraw);
+            }
 
             btnClear.onclick = () => {
               ctx.clearRect(0, 0, canvas.width, canvas.height);
