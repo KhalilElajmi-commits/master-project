@@ -6417,6 +6417,10 @@
           {
             src: 'journe 1/4.png',
             type: 'underline',
+            audioButton: {
+              left: 11.3, top: 45.4, width: 7.5, height: 8.1,
+              audio: 'journe 1/Zied et Aziza mangent des fraises à la maison.mp3'
+            },
             options: [
               { id: 'zied', left: 21, top: 45, width: 10, height: 5, correct: true },
               { id: 'et', left: 32, top: 45, width: 4.5, height: 5, correct: false },
@@ -6549,6 +6553,39 @@
 
         // UI OVERLAYS FOR INTERACTION
 
+        // Instruction / speaker audio button if defined for any activity
+        if (activity.audioButton) {
+          const audioBtn = document.createElement('div');
+          audioBtn.style.position = 'absolute';
+          audioBtn.style.left = activity.audioButton.left + '%';
+          audioBtn.style.top = activity.audioButton.top + '%';
+          audioBtn.style.width = activity.audioButton.width + '%';
+          audioBtn.style.height = activity.audioButton.height + '%';
+          audioBtn.style.cursor = 'pointer';
+          audioBtn.style.borderRadius = '50%';
+          audioBtn.style.zIndex = '25';
+          audioBtn.style.transition = 'transform 0.15s ease';
+          audioBtn.title = 'Écouter';
+          audioBtn.onmouseenter = () => { audioBtn.style.transform = 'scale(1.1)'; };
+          audioBtn.onmouseleave = () => { audioBtn.style.transform = 'scale(1)'; };
+          audioBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (window.j1CurrentAudio) {
+              window.j1CurrentAudio.pause();
+              window.j1CurrentAudio.currentTime = 0;
+            }
+            const sound = new Audio(encodeURI(activity.audioButton.audio));
+            window.j1CurrentAudio = sound;
+            sound.play().catch(err => console.log('Audio playback error:', err));
+            audioBtn.animate([
+              { transform: 'scale(0.95)' },
+              { transform: 'scale(1.15)' },
+              { transform: 'scale(1)' }
+            ], { duration: 300 });
+          };
+          imgContainer.appendChild(audioBtn);
+        }
+
         if (activity.type === 'info' && activity.hotspots) {
           activity.hotspots.forEach(spot => {
             const btn = document.createElement('div');
@@ -6562,38 +6599,6 @@
         }
 
         if (activity.type === 'multiple-choice' || activity.type === 'mixed') {
-          // Top instruction speaker audio button if defined
-          if (activity.audioButton) {
-            const audioBtn = document.createElement('div');
-            audioBtn.style.position = 'absolute';
-            audioBtn.style.left = activity.audioButton.left + '%';
-            audioBtn.style.top = activity.audioButton.top + '%';
-            audioBtn.style.width = activity.audioButton.width + '%';
-            audioBtn.style.height = activity.audioButton.height + '%';
-            audioBtn.style.cursor = 'pointer';
-            audioBtn.style.borderRadius = '50%';
-            audioBtn.style.zIndex = '25';
-            audioBtn.style.transition = 'transform 0.15s ease';
-            audioBtn.title = 'Écouter la consigne';
-            audioBtn.onmouseenter = () => { audioBtn.style.transform = 'scale(1.1)'; };
-            audioBtn.onmouseleave = () => { audioBtn.style.transform = 'scale(1)'; };
-            audioBtn.onclick = (e) => {
-              e.stopPropagation();
-              if (window.j1CurrentAudio) {
-                window.j1CurrentAudio.pause();
-                window.j1CurrentAudio.currentTime = 0;
-              }
-              const sound = new Audio(encodeURI(activity.audioButton.audio));
-              window.j1CurrentAudio = sound;
-              sound.play().catch(err => console.log('Audio playback error:', err));
-              audioBtn.animate([
-                { transform: 'scale(0.95)' },
-                { transform: 'scale(1.15)' },
-                { transform: 'scale(1)' }
-              ], { duration: 300 });
-            };
-            imgContainer.appendChild(audioBtn);
-          }
 
           activity.options.forEach(opt => {
             // Box clickable area to play item audio and/or select
