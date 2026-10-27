@@ -6340,7 +6340,9 @@
             src: 'journe 1/1.png',
             type: 'info',
             hotspots: [{ left: 49, top: 76, width: 31, height: 11, action: 'next' }],
-            needsValidation: false
+            needsValidation: false,
+            valBtnSrc: 'journe 1/valider.png',
+            valBtnPos: { left: -39.2, top: 78.7, width: 13.6, height: 11.6, box: true }
           },
           {
             src: 'journe 1/2.png',
@@ -7211,19 +7213,33 @@
           const btnWrapper = document.createElement('div');
           btnWrapper.id = 'j1-val-btn-wrapper';
           btnWrapper.style.position = 'absolute';
-          btnWrapper.style.left = activity.valBtnPos.left + '%';
-          btnWrapper.style.top = activity.valBtnPos.top + '%';
-          btnWrapper.style.transform = 'translate(-50%, -50%)';
           btnWrapper.style.zIndex = '50';
 
           const valBtn = document.createElement('img');
           valBtn.id = 'j1-val-btn';
           valBtn.draggable = false;
           valBtn.style.cursor = 'pointer';
-          valBtn.style.width = 'calc(var(--img-width) * 0.20)'; // Proportional size
-          valBtn.style.height = 'auto';
           valBtn.style.display = 'block';
           valBtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+
+          if (activity.valBtnPos.box) {
+            btnWrapper.style.left = activity.valBtnPos.left + '%';
+            btnWrapper.style.top = activity.valBtnPos.top + '%';
+            btnWrapper.style.width = activity.valBtnPos.width + '%';
+            btnWrapper.style.height = activity.valBtnPos.height + '%';
+            btnWrapper.style.display = 'flex';
+            btnWrapper.style.alignItems = 'center';
+            btnWrapper.style.justifyContent = 'center';
+            valBtn.style.width = '100%';
+            valBtn.style.height = '100%';
+            valBtn.style.objectFit = 'contain';
+          } else {
+            btnWrapper.style.left = activity.valBtnPos.left + '%';
+            btnWrapper.style.top = activity.valBtnPos.top + '%';
+            btnWrapper.style.transform = 'translate(-50%, -50%)';
+            valBtn.style.width = activity.valBtnPos.width ? activity.valBtnPos.width + '%' : 'calc(var(--img-width) * 0.20)';
+            valBtn.style.height = 'auto';
+          }
 
           valBtn.onmouseenter = () => { valBtn.style.transform = 'scale(1.03)'; valBtn.style.filter = 'brightness(1.05)'; };
           valBtn.onmouseleave = () => { valBtn.style.transform = 'scale(1)'; valBtn.style.filter = 'brightness(1)'; };
@@ -7242,7 +7258,11 @@
           btnWrapper.appendChild(valBtn);
           imgContainer.appendChild(btnWrapper);
 
-          if (activity.needsValidation) {
+          if (activity.valBtnSrc) {
+            valBtn.src = activity.valBtnSrc;
+            valBtn.setAttribute('data-action', 'next');
+            btnWrapper.style.display = 'block';
+          } else if (activity.needsValidation) {
             valBtn.src = 'journe 1/valider.png';
             valBtn.setAttribute('data-action', 'validate');
             btnWrapper.style.display = 'block';
