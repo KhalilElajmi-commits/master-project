@@ -5238,7 +5238,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
@@ -5514,7 +5514,11 @@
                 displayBox: { left: 11.5, top: 74.0, width: 75.0, height: 4.8 }
               }
             ],
-            valBtnPos: { left: 50.0, top: 98.0 }
+            valBtnPos: { left: 50.7, top: 100.75, width: 20.0 },
+            navPos: {
+              back: { top: '6.55%', left: '1.15%', transform: 'translate(-50%, -50%)', width: 'clamp(68px, 8.0vw, 102px)', height: 'clamp(68px, 8.0vw, 102px)' },
+              home: { top: '5.2%', left: '93.45%', transform: 'translate(-50%, -50%)', width: 'clamp(68px, 8.0vw, 102px)', height: 'clamp(68px, 8.0vw, 102px)' }
+            }
           },
           {
             src: 'journe 8/4.png',
@@ -5753,7 +5757,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.35))';
@@ -5943,7 +5947,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.35))';
@@ -6113,7 +6117,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.35))';
@@ -6246,7 +6250,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.35))';
