@@ -4276,7 +4276,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
@@ -4480,7 +4480,7 @@
                 ]
               }
             ],
-            valBtnPos: { left: 50.0, top: 92.5 }
+            valBtnPos: { left: 50.9, top: 101.3, width: 17.4 }
           },
           {
             src: 'journe 7/2.png',
