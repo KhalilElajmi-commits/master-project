@@ -3485,7 +3485,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
@@ -3632,7 +3632,11 @@
             ],
             displayBox: { left: 63.8, top: 28.5, width: 29.8, height: 8.0 },
             feedbackBox: { left: 62.0, top: 40.0, width: 33.5, height: 21.5 },
-            valBtnPos: { left: 50.0, top: 82.0, width: 20.0, height: 7.5 }
+            valBtnPos: { left: 50.05, top: 89.9, width: 15.9 },
+            navPos: {
+              back: { top: '10.25%', left: '2.2%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' },
+              home: { top: '9.3%', left: '94.35%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
+            }
           },
           {
             src: 'journe 6/4.png',
