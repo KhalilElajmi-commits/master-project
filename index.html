@@ -5459,7 +5459,11 @@
                 hint: 'Elles arrivent à l\'école, travaillent, jouent puis rentrent.'
               }
             ],
-            valBtnPos: { left: 50.0, top: 98.0 }
+            valBtnPos: { left: 50.0, top: 98.0 },
+            navPos: {
+              back: { top: '6.1%', left: '1.2%', transform: 'translate(-50%, -50%)', width: 'clamp(60px, 7.0vw, 92px)', height: 'clamp(60px, 7.0vw, 92px)' },
+              home: { top: '5.95%', left: '95.85%', transform: 'translate(-50%, -50%)', width: 'clamp(60px, 7.0vw, 92px)', height: 'clamp(60px, 7.0vw, 92px)' }
+            }
           },
           {
             src: 'journe 8/3.png',
@@ -5788,7 +5792,7 @@
               }
             });
 
-            // If everything is already correct
+            // If everything is already completely correct
             if (emptyQuestions.length === 0 && incorrectQuestions.length === 0) {
               isAnswerCorrect = true;
               vbtn.src = 'journe 1/continuer.png';
@@ -5811,89 +5815,43 @@
               return;
             }
 
-            validateAttempts++;
+            // User answered wrong or left empty: immediately show directly the right answers!
+            activity.questions.forEach(q => {
+              const el = inputElements[q.id];
+              if (el) {
+                el.value = q.answer;
+                el.style.borderColor = '#16a34a';
+                el.style.background = '#f0fdf4';
+                el.style.color = '#15803d';
+                inputValues[q.id] = q.answer;
+              }
+            });
 
-            // If the student has clicked validate multiple times (e.g. 3 attempts or more), reveal the correct answers right away
-            if (validateAttempts >= 3) {
-              activity.questions.forEach(q => {
-                const el = inputElements[q.id];
-                if (el) {
-                  el.value = q.answer;
-                  el.style.borderColor = '#16a34a';
-                  el.style.background = '#f0fdf4';
-                  el.style.color = '#15803d';
-                  inputValues[q.id] = q.answer;
-                }
-              });
+            isAnswerCorrect = true;
+            vbtn.src = 'journe 1/continuer.png';
+            vbtn.animate([
+              { transform: 'scale(0.85)' },
+              { transform: 'scale(1.2)' },
+              { transform: 'scale(1)' }
+            ], { duration: 320 });
 
-              isAnswerCorrect = true;
-              vbtn.src = 'journe 1/continuer.png';
-              vbtn.animate([
-                { transform: 'scale(0.85)' },
-                { transform: 'scale(1.2)' },
-                { transform: 'scale(1)' }
-              ], { duration: 320 });
+            fb.textContent = 'Voici les bonnes réponses directes ! Tu peux maintenant continuer.';
+            fb.style.color = '#0284c7';
 
-              fb.textContent = 'Voici les bonnes réponses complètes ! Tu peux maintenant continuer.';
-              fb.style.color = '#0284c7';
-
-              aideBox.innerHTML = `
-                <div style="font-size: calc(var(--img-width) * 0.016); font-weight: 800; color: #0284c7; margin-bottom: 3px;">
-                  ✨ Réponses complétées !
-                </div>
-                <div style="font-size: calc(var(--img-width) * 0.0135); font-weight: 700; color: #1e3a8a; line-height: 1.35;">
-                  Les réponses ont été écrites pour t'aider à bien retenir l'histoire. Clique sur <strong>Continuer</strong> !
-                </div>
-              `;
-              aideBox.animate([
-                { transform: 'scale(0.95)' },
-                { transform: 'scale(1.05)' },
-                { transform: 'scale(1)' }
-              ], { duration: 240 });
-              return;
-            }
-
-            // Normal guidance on attempts 1 and 2
-            if (emptyQuestions.length > 0) {
-              const remaining = 3 - validateAttempts;
-              fb.textContent = `Complète toutes les réponses ! (Encore ${remaining} essai${remaining > 1 ? 's' : ''} avant l'aide complète)`;
-              fb.style.color = '#ea580c';
-              if (window.j1GentleShake) window.j1GentleShake(fb);
-
-              const firstEmpty = emptyQuestions[0];
-              aideBox.innerHTML = `
-                <div style="font-size: calc(var(--img-width) * 0.015); font-weight: 800; color: #ea580c; margin-bottom: 3px;">
-                  ⚠️ Question ${firstEmpty.id} incomplète
-                </div>
-                <div style="font-size: calc(var(--img-width) * 0.0135); font-weight: 700; color: #1e293b; line-height: 1.3;">
-                  ${firstEmpty.hint}
-                </div>
-              `;
-              return;
-            }
-
-            if (incorrectQuestions.length > 0) {
-              const remaining = 3 - validateAttempts;
-              fb.textContent = `Regarde l'Aide ! (Encore ${remaining} essai${remaining > 1 ? 's' : ''} avant la solution)`;
-              fb.style.color = '#dc2626';
-              if (window.j1GentleShake) window.j1GentleShake(fb);
-
-              const firstWrong = incorrectQuestions[0];
-              aideBox.innerHTML = `
-                <div style="font-size: calc(var(--img-width) * 0.015); font-weight: 800; color: #dc2626; margin-bottom: 3px;">
-                  💡 Indice Question ${firstWrong.id} :
-                </div>
-                <div style="font-size: calc(var(--img-width) * 0.0135); font-weight: 700; color: #1e3a8a; line-height: 1.35;">
-                  ${firstWrong.hint}
-                </div>
-              `;
-              aideBox.animate([
-                { transform: 'scale(0.95)' },
-                { transform: 'scale(1.05)' },
-                { transform: 'scale(1)' }
-              ], { duration: 240 });
-              return;
-            }
+            aideBox.innerHTML = `
+              <div style="font-size: calc(var(--img-width) * 0.016); font-weight: 800; color: #0284c7; margin-bottom: 3px;">
+                ✨ Réponses affichées !
+              </div>
+              <div style="font-size: calc(var(--img-width) * 0.0135); font-weight: 700; color: #1e3a8a; line-height: 1.35;">
+                Voici les bonnes réponses complètes. Retiens-les bien et clique sur <strong>Continuer</strong> !
+              </div>
+            `;
+            aideBox.animate([
+              { transform: 'scale(0.95)' },
+              { transform: 'scale(1.05)' },
+              { transform: 'scale(1)' }
+            ], { duration: 240 });
+            return;
           };
 
           btnWrapper.appendChild(vbtn);
