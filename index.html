@@ -4518,7 +4518,11 @@
                 displayBox: { left: 7.5, top: 69.2, width: 56.0, height: 3.5 }
               }
             ],
-            valBtnPos: { left: 50.0, top: 92.5 }
+            valBtnPos: { left: 50.1, top: 103.05, width: 16.0 },
+            navPos: {
+              back: { top: '3.0%', left: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' },
+              home: { top: '3.0%', right: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' }
+            }
           },
           {
             src: 'journe 7/3.png',
@@ -4691,7 +4695,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
@@ -5316,24 +5320,28 @@
         }
 
         // --- NAVIGATION BUTTONS: BESIDE THE ACTIVITY OUTSIDE (TOP-LEFT & TOP-RIGHT) ---
+        const navBackPos = (activity.navPos && activity.navPos.back) || { top: '2%', left: '-3.5%' };
+        const navHomePos = (activity.navPos && activity.navPos.home) || { top: '2%', right: '-3.5%' };
+
         const btnBack = document.createElement('img');
         btnBack.src = 'journe 1/back botten.png';
         btnBack.alt = 'Précédent';
         btnBack.title = 'Précédent';
         btnBack.draggable = false;
         btnBack.style.position = 'absolute';
-        btnBack.style.top = '2%';
-        btnBack.style.left = '-3.5%';
-        btnBack.style.width = 'clamp(48px, 5.5vw, 76px)';
-        btnBack.style.height = 'clamp(48px, 5.5vw, 76px)';
+        btnBack.style.top = navBackPos.top;
+        btnBack.style.left = navBackPos.left;
+        if (navBackPos.transform) btnBack.style.transform = navBackPos.transform;
+        btnBack.style.width = navBackPos.width || 'clamp(48px, 5.5vw, 76px)';
+        btnBack.style.height = navBackPos.height || 'clamp(48px, 5.5vw, 76px)';
         btnBack.style.objectFit = 'contain';
         btnBack.style.cursor = 'pointer';
         btnBack.style.zIndex = '40';
         btnBack.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.45))';
         btnBack.style.transition = 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease';
-        btnBack.onmouseenter = () => { btnBack.style.transform = 'scale(1.15) translateY(-3px)'; btnBack.style.filter = 'drop-shadow(0 8px 18px rgba(0,0,0,0.55)) brightness(1.1)'; };
-        btnBack.onmouseleave = () => { btnBack.style.transform = 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.45))'; };
-        btnBack.onmousedown = () => { btnBack.style.transform = 'scale(0.92) translateY(2px)'; };
+        btnBack.onmouseenter = () => { btnBack.style.transform = (navBackPos.transform ? navBackPos.transform + ' ' : '') + 'scale(1.15) translateY(-3px)'; btnBack.style.filter = 'drop-shadow(0 8px 18px rgba(0,0,0,0.55)) brightness(1.1)'; };
+        btnBack.onmouseleave = () => { btnBack.style.transform = navBackPos.transform || 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.45))'; };
+        btnBack.onmousedown = () => { btnBack.style.transform = (navBackPos.transform ? navBackPos.transform + ' ' : '') + 'scale(0.92) translateY(2px)'; };
         btnBack.onclick = (e) => {
           e.stopPropagation();
           if (this.currentExIndex > 0) {
@@ -5351,10 +5359,12 @@
         btnHome.title = 'Retour à la carte';
         btnHome.draggable = false;
         btnHome.style.position = 'absolute';
-        btnHome.style.top = '2%';
-        btnHome.style.right = '-3.5%';
-        btnHome.style.width = 'clamp(48px, 5.5vw, 76px)';
-        btnHome.style.height = 'clamp(48px, 5.5vw, 76px)';
+        btnHome.style.top = navHomePos.top;
+        btnHome.style.right = navHomePos.right || 'auto';
+        if (navHomePos.left) btnHome.style.left = navHomePos.left;
+        if (navHomePos.transform) btnHome.style.transform = navHomePos.transform;
+        btnHome.style.width = navHomePos.width || 'clamp(48px, 5.5vw, 76px)';
+        btnHome.style.height = navHomePos.height || 'clamp(48px, 5.5vw, 76px)';
         btnHome.style.objectFit = 'contain';
         btnHome.style.cursor = 'pointer';
         btnHome.style.zIndex = '40';
