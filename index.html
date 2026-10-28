@@ -10679,7 +10679,11 @@
               { id: 'slot_ils_elles', pronoun: 'Ils / Elles', correctVerb: 'sont', left: 33.5, top: 77.0, width: 46.7, height: 4.7 }
             ],
             needsValidation: true,
-            valBtnPos: { left: 50, top: 96 }
+            valBtnPos: { left: 49.65, top: 101.85, width: 20.5 },
+            navPos: {
+              back: { top: '6.3%', left: '3.75%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' },
+              home: { top: '6.75%', left: '94.65%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
+            }
           },
           {
             src: 'journe 5/3.png',
@@ -11222,7 +11226,7 @@
           valBtn.id = 'j5-val-btn';
           valBtn.draggable = false;
           valBtn.style.cursor = 'pointer';
-          valBtn.style.width = 'calc(var(--img-width) * 0.17)';
+          valBtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.17)';
           valBtn.style.height = 'auto';
           valBtn.style.display = 'block';
           valBtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
@@ -11251,23 +11255,27 @@
         }
 
         // Navigation buttons: Back & Home
+        const navBackPos = (activity.navPos && activity.navPos.back) || { top: '3%', left: '3%' };
+        const navHomePos = (activity.navPos && activity.navPos.home) || { top: '3%', right: '3%' };
+
         const btnBack = document.createElement('img');
         btnBack.src = 'journe 1/back botten.png';
         btnBack.alt = 'Précédent';
         btnBack.title = 'Précédent';
         btnBack.draggable = false;
         btnBack.style.position = 'absolute';
-        btnBack.style.top = '3%';
-        btnBack.style.left = '3%';
-        btnBack.style.width = 'clamp(44px, 5.2vw, 68px)';
-        btnBack.style.height = 'clamp(44px, 5.2vw, 68px)';
+        btnBack.style.top = navBackPos.top;
+        btnBack.style.left = navBackPos.left;
+        if (navBackPos.transform) btnBack.style.transform = navBackPos.transform;
+        btnBack.style.width = navBackPos.width || 'clamp(44px, 5.2vw, 68px)';
+        btnBack.style.height = navBackPos.height || 'clamp(44px, 5.2vw, 68px)';
         btnBack.style.objectFit = 'contain';
         btnBack.style.cursor = 'pointer';
         btnBack.style.zIndex = '30';
         btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))';
         btnBack.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
-        btnBack.onmouseenter = () => { btnBack.style.transform = 'scale(1.1) translateY(-2px)'; btnBack.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
-        btnBack.onmouseleave = () => { btnBack.style.transform = 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
+        btnBack.onmouseenter = () => { btnBack.style.transform = (navBackPos.transform ? navBackPos.transform + ' ' : '') + 'scale(1.1) translateY(-2px)'; btnBack.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
+        btnBack.onmouseleave = () => { btnBack.style.transform = navBackPos.transform || 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
         btnBack.onclick = (e) => {
           e.stopPropagation();
           if (this.currentExIndex > 0) {
@@ -11285,17 +11293,19 @@
         btnHome.title = 'Retour à la carte';
         btnHome.draggable = false;
         btnHome.style.position = 'absolute';
-        btnHome.style.top = '3%';
-        btnHome.style.right = '3%';
-        btnHome.style.width = 'clamp(44px, 5.2vw, 68px)';
-        btnHome.style.height = 'clamp(44px, 5.2vw, 68px)';
+        btnHome.style.top = navHomePos.top;
+        btnHome.style.right = navHomePos.right || 'auto';
+        if (navHomePos.left) btnHome.style.left = navHomePos.left;
+        if (navHomePos.transform) btnHome.style.transform = navHomePos.transform;
+        btnHome.style.width = navHomePos.width || 'clamp(44px, 5.2vw, 68px)';
+        btnHome.style.height = navHomePos.height || 'clamp(44px, 5.2vw, 68px)';
         btnHome.style.objectFit = 'contain';
         btnHome.style.cursor = 'pointer';
         btnHome.style.zIndex = '30';
         btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))';
         btnHome.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
-        btnHome.onmouseenter = () => { btnHome.style.transform = 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
-        btnHome.onmouseleave = () => { btnHome.style.transform = 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
+        btnHome.onmouseenter = () => { btnHome.style.transform = (navHomePos.transform ? navHomePos.transform + ' ' : '') + 'scale(1.1) translateY(-2px)'; btnHome.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.45))'; };
+        btnHome.onmouseleave = () => { btnHome.style.transform = navHomePos.transform || 'scale(1)'; btnHome.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
         btnHome.onclick = (e) => {
           e.stopPropagation();
           this.close();
