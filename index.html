@@ -3653,7 +3653,11 @@
               { id: 7, targetSentence: 3, left: 28.4, top: 47.0, width: 11.1, height: 4.0, correctText: 'Enfin' },
               { id: 8, targetSentence: 4, left: 28.1, top: 54.9, width: 11.4, height: 4.8, correctText: 'Ensuite' }
             ],
-            valBtnPos: { left: 50.0, top: 79.5, width: 20.0, height: 7.5 }
+            valBtnPos: { left: 49.85, top: 92.65, width: 18.9 },
+            navPos: {
+              back: { top: '8.6%', left: '3.8%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' },
+              home: { top: '6.85%', left: '93.8%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
+            }
           },
           {
             src: 'journe 6/popup end.png',
@@ -4054,7 +4058,7 @@
 
           const vbtn = document.createElement('img');
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = 'calc(var(--img-width) * 0.18)';
+          vbtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
           vbtn.style.cursor = 'pointer';
           vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
