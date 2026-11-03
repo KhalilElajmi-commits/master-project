@@ -1147,6 +1147,96 @@
     .word-label.in-pool:hover {
       transform: translateY(-3px);
     }
+  
+/* --- CELEBRATION MODAL STYLES (UNIVERSAL FOR ALL JOURNEYS) --- */
+    @keyframes j1CardPop {
+      0% { transform: scale(0.5); opacity: 0; }
+      60% { transform: scale(1.05); opacity: 1; }
+      80% { transform: scale(0.98); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .j1-success-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(10, 18, 36, 0.68);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 999999;
+      opacity: 0;
+      transition: opacity 0.3s ease-out;
+      overflow: hidden;
+      pointer-events: auto;
+    }
+    .j1-success-modal.show {
+      opacity: 1;
+    }
+    .j1-success-card-box {
+      position: relative;
+      display: inline-block;
+      width: clamp(400px, 62vw, 840px);
+      max-width: 92vw;
+      max-height: 82vh;
+      z-index: 10;
+      animation: j1CardPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    .j1-end-card-box {
+      position: relative;
+      display: inline-block;
+      width: clamp(440px, 68vw, 920px);
+      max-width: 94vw;
+      max-height: 85vh;
+      z-index: 10;
+      animation: j1CardPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    .j1-end-finish-btn {
+      position: absolute;
+      left: 32%;
+      top: 75%;
+      width: 36%;
+      height: 18%;
+      border-radius: 9999px;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      outline: none;
+      box-shadow: none;
+      transition: transform 0.1s ease;
+    }
+    .j1-end-finish-btn:active {
+      transform: scale(0.97);
+    }
+    .j1-success-card-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0 20px 45px rgba(0, 0, 0, 0.7));
+    }
+    .j1-success-continue-btn {
+      position: absolute;
+      left: 36.9%;
+      top: 79.3%;
+      width: 33%;
+      height: 15.8%;
+      border-radius: 9999px;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      outline: none;
+      box-shadow: none;
+      transition: transform 0.1s ease;
+    }
+    .j1-success-continue-btn:hover {
+      cursor: pointer;
+      background: transparent;
+      box-shadow: none;
+    }
+    .j1-success-continue-btn:active {
+      transform: scale(0.97);
+      background: transparent;
+      box-shadow: none;
+    }
   </style>
 </head>
 
@@ -1363,6 +1453,7 @@
         step: 1,
         text: "Bonjour ! Je suis ton guide dans \u00AB Royaume des Connaissances \u00BB.",
         asset: 'fnake buttom left.png',
+        audio: 'contiuer/ttsreader_Bonjour!_Je_suis_ton_guide_dans_Royaume_des_Connaissances.mp3',
         containerPos: { bottom: '3%', left: '0', top: 'auto', right: 'auto' },
         containerSize: 'clamp(300px, 32vw, 500px)',
         // Refined bubble mapping for bottom left
@@ -1373,6 +1464,7 @@
         step: 2,
         text: "Ensemble, nous allons partir \u00E0 la d\u00E9couverte des mots et des histoires.",
         asset: 'fnake top right.png',
+        audio: 'contiuer/Ensemble, nous allons partir \u00E0 la d\u00E9couverte des mots et des histoires.mp3',
         containerPos: { top: '8%', right: '0', bottom: 'auto', left: 'auto' },
         containerSize: 'clamp(280px, 30vw, 480px)',
         // SHIFTED FAR DOWN! The bubble is in the bottom half of the image.
@@ -1383,6 +1475,7 @@
         step: 3,
         text: "Tu vas observer, \u00E9couter, lire, jouer avec les mots et r\u00E9aliser de petites activit\u00E9s pour progresser.",
         asset: 'buttom center.png',
+        audio: 'contiuer/Tu vas observer, \u00E9couter, lire, jouer avec les mots et r\u00E9aliser de petites activit\u00E9s pour progresser.mp3',
         containerPos: { bottom: '2%', left: '50%', top: 'auto', right: 'auto' },
         containerSize: 'clamp(280px, 29vw, 450px)',
         // Exactly mapped to the circular bubble interior (left: 48%..63.7%, top: 48.4%..68.9% on screen)
@@ -1393,16 +1486,18 @@
         step: 4,
         text: "Petit \u00E0 petit, tu apprendras \u00E0 organiser tes id\u00E9es, construire de belles phrases et raconter ce que tu imagines.",
         asset: 'fanke buttom right.png',
+        audio: 'contiuer/Petit \u00E0 petit, tu apprendras \u00E0 organiser tes id\u00E9es, construire de belles phrases et raconter ce que tu imagines.mp3',
         containerPos: { bottom: '3%', right: '0', top: 'auto', left: 'auto' },
         containerSize: 'clamp(300px, 32vw, 500px)',
-        // Centered inside the speech bubble oval (X: 6%..58%, Y: 15%..75%)
-        bubbleArea: { top: '15%', left: '6%', width: '52%', height: '60%' },
+        // Centered cleanly inside the speech bubble oval (X: 5%..56%, Y: 38%..82%)
+        bubbleArea: { top: '38%', left: '5%', width: '51%', height: '44%' },
         enterFrom: 'translateX(130%) scale(0.85)', enterTo: 'translateX(0) scale(1)', exitTo: 'translateX(130%) scale(0.85)'
       },
       {
         step: 5,
         text: "Et lorsque tu seras pr\u00EAt, tu passeras \u00E0 la derni\u00E8re \u00E9tape : \u00E9crire ton propre texte.",
         asset: 'fnake buttom left.png',
+        audio: 'contiuer/Et lorsque tu seras pr\u00EAt, tu passeras \u00E0 la derni\u00E8re \u00E9tape  \u00E9crire ton propre texte.mp3',
         containerPos: { bottom: '3%', left: '0', top: 'auto', right: 'auto' },
         containerSize: 'clamp(300px, 32vw, 500px)',
         bubbleArea: { top: '8.5%', left: '42.5%', width: '60%', height: '40%' },
@@ -1412,6 +1507,7 @@
         step: 6,
         text: "N\u2019oublie pas : chaque activit\u00E9 est une petite \u00E9tape qui t\u2019aide \u00E0 devenir un meilleur \u00E9crivain.",
         asset: 'fnake top right.png',
+        audio: 'contiuer/N\'oublie pas chaque activit\u00E9 est une petite \u00E9tape qui t\'aide \u00E0 devenir un meilleur \u00E9crivain.mp3',
         containerPos: { top: '8%', right: '0', bottom: 'auto', left: 'auto' },
         containerSize: 'clamp(280px, 30vw, 480px)',
         bubbleArea: { top: '55%', left: '3%', width: '54%', height: '36%' },
@@ -1421,6 +1517,7 @@
         step: 7,
         text: "Alors, ouvre bien tes yeux, pr\u00E9pare tes id\u00E9es\u2026 et commen\u00E7ons !",
         asset: 'fanke buttom enter 2.png',
+        audio: 'contiuer/Alors, ouvre bien tes yeux, pr\u00E9pare tes id\u00E9es... et commen\u00E7ons.mp3',
         containerPos: { bottom: '2%', left: '50%', top: 'auto', right: 'auto' },
         containerSize: 'clamp(260px, 27vw, 420px)',
         // Refined bubble mapping for final fneck - below character
@@ -1491,6 +1588,32 @@
       fneckBubbleText.style.height = scene.bubbleArea.height;
     }
 
+    let fneckCurrentAudio = null;
+
+    function stopFneckAudio() {
+      if (fneckCurrentAudio) {
+        try {
+          fneckCurrentAudio.pause();
+          fneckCurrentAudio.currentTime = 0;
+        } catch (e) {}
+        fneckCurrentAudio = null;
+      }
+    }
+
+    function playFneckAudio(audioSrc) {
+      stopFneckAudio();
+      if (!audioSrc) return;
+      try {
+        const audio = new Audio(encodeURI(audioSrc));
+        fneckCurrentAudio = audio;
+        audio.play().catch(err => {
+          console.log('Fneck audio playback deferred or blocked by browser policy:', err);
+        });
+      } catch (err) {
+        console.warn('Fneck audio creation error:', err);
+      }
+    }
+
     function showFneckScene(index) {
       const scene = SCENES[index];
       currentSceneIndex = index;
@@ -1515,6 +1638,9 @@
         setTimeout(() => {
           fneckDialogue.textContent = scene.text;
           fneckDialogue.style.opacity = '1';
+          if (scene.audio) {
+            playFneckAudio(scene.audio);
+          }
           if (scene.isFinal) {
             btnAdventureStart.style.display = 'inline-flex';
             tapStage.style.display = 'none'; // Hide the invisible overlay so the button can be clicked!
@@ -1526,6 +1652,7 @@
     }
 
     function hideFneck(callback) {
+      stopFneckAudio();
       if (currentSceneIndex < 0 || currentSceneIndex >= SCENES.length) {
         if (callback) callback();
         return;
@@ -1563,6 +1690,7 @@
     const btnSkipIntro = document.getElementById('btn-skip-intro');
 
     function skipToMap() {
+      stopFneckAudio();
       // Hide skip button
       if (btnSkipIntro) {
         btnSkipIntro.classList.remove('visible');
@@ -1680,6 +1808,7 @@
 
     btnAdventureStart.addEventListener('click', (e) => {
       e.stopPropagation();
+      stopFneckAudio();
       if (btnSkipIntro) {
         btnSkipIntro.classList.remove('visible');
         btnSkipIntro.style.display = 'none';
@@ -2199,6 +2328,96 @@
             border-radius: 9999px; pointer-events: none;
           }
           .j1-btn-text { position: relative; z-index: 5; }
+
+          @keyframes j1CardPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            60% { transform: scale(1.05); opacity: 1; }
+            80% { transform: scale(0.98); }
+            100% { transform: scale(1); opacity: 1; }
+          }
+          .j1-success-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100vw; height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(10, 18, 36, 0.68);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 999999;
+            opacity: 0;
+            transition: opacity 0.3s ease-out;
+            overflow: hidden;
+            pointer-events: auto;
+          }
+          .j1-success-modal.show {
+            opacity: 1;
+          }
+          .j1-success-card-box {
+            position: relative;
+            display: inline-block;
+            width: clamp(400px, 62vw, 840px);
+            max-width: 92vw;
+            max-height: 82vh;
+            z-index: 10;
+            animation: j1CardPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+          }
+          .j1-end-card-box {
+            position: relative;
+            display: inline-block;
+            width: clamp(440px, 68vw, 920px);
+            max-width: 94vw;
+            max-height: 85vh;
+            z-index: 10;
+            animation: j1CardPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+          }
+          .j1-end-finish-btn {
+            position: absolute;
+            left: 32%;
+            top: 75%;
+            width: 36%;
+            height: 18%;
+            border-radius: 9999px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            outline: none;
+            box-shadow: none;
+            transition: transform 0.1s ease;
+          }
+          .j1-end-finish-btn:active {
+            transform: scale(0.97);
+          }
+          .j1-success-card-img {
+            width: 100%;
+            height: auto;
+            display: block;
+            filter: drop-shadow(0 20px 45px rgba(0, 0, 0, 0.7));
+          }
+          .j1-success-continue-btn {
+            position: absolute;
+            left: 36.9%;
+            top: 79.3%;
+            width: 33%;
+            height: 15.8%;
+            border-radius: 9999px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            outline: none;
+            box-shadow: none;
+            transition: transform 0.1s ease;
+          }
+          .j1-success-continue-btn:hover {
+            cursor: pointer;
+            background: transparent;
+            box-shadow: none;
+          }
+          .j1-success-continue-btn:active {
+            transform: scale(0.97);
+            background: transparent;
+            box-shadow: none;
+          }
+
         `;
             document.head.appendChild(style);
           }
@@ -2209,16 +2428,11 @@
           document.getElementById('exercise-footer').style.display = 'none';
           document.getElementById('exercise-bg').src = 'journe 1/backbround of journe 1.png';
           this.loadJourney1Activity();
+          if (this.currentExIndex === 0 && typeof this.playJourney1IntroAudio === 'function') {
+            this.playJourney1IntroAudio();
+          }
           return;
         } else if (levelId === 2) {
-          if (!document.getElementById('j2-custom-style')) {
-            const style = document.createElement('style');
-            style.id = 'j2-custom-style';
-            style.textContent = `
-          .j2-premium-btn { /* reusing j1 styles conceptually if needed */ }
-        `;
-            document.head.appendChild(style);
-          }
           this.currentLevelId = 2;
           this.currentExIndex = 0;
           document.getElementById('exercise-stage').classList.add('active');
@@ -2226,6 +2440,9 @@
           document.getElementById('exercise-footer').style.display = 'none';
           document.getElementById('exercise-bg').src = 'journe 2/background journe 2_upscayl_2x_upscayl-standard-4x.png';
           this.loadJourney2Activity();
+          if (this.currentExIndex === 0 && typeof this.playJourney2IntroAudio === 'function') {
+            this.playJourney2IntroAudio();
+          }
           return;
         } else if (levelId === 3) {
           if (!document.getElementById('j3-custom-style')) {
@@ -2241,6 +2458,9 @@
           document.getElementById('exercise-footer').style.display = 'none';
           document.getElementById('exercise-bg').src = 'JOURNE 3/BACKGROUND JOURNE 3_upscayl_2x_upscayl-standard-4x.png';
           this.loadJourney3Activity();
+          if (this.currentExIndex === 0 && typeof this.playJourney3IntroAudio === 'function') {
+            this.playJourney3IntroAudio();
+          }
           return;
         } else if (levelId === 4) {
           this.currentLevelId = levelId;
@@ -2376,7 +2596,7 @@
             src: 'journe 4/end pop up.png',
             type: 'info',
             needsValidation: false,
-            valBtnPos: { left: 50, top: 96 }
+            valBtnPos: { left: 50, top: 96, width: 22 }
           }
         ];
 
@@ -6404,10 +6624,350 @@
         this.loadJourney8Activity();
       },
       close() {
+        if (window.j3CurrentAudio) {
+          try {
+            window.j3CurrentAudio.pause();
+            window.j3CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j3CurrentAudio = null;
+        }
+        if (window.j2CurrentAudio) {
+          try {
+            window.j2CurrentAudio.pause();
+            window.j2CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j2CurrentAudio = null;
+        }
+        if (window.j1CurrentAudio) {
+          try {
+            window.j1CurrentAudio.pause();
+            window.j1CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j1CurrentAudio = null;
+        }
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
         document.getElementById('exercise-stage').classList.remove('active');
         document.getElementById('exercise-header').style.display = '';
         document.getElementById('exercise-footer').style.display = '';
         document.getElementById('exercise-content-area').innerHTML = '';
+      },
+
+      playJourney1IntroAudio() {
+        if (window.j1CurrentAudio) {
+          try {
+            window.j1CurrentAudio.pause();
+            window.j1CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j1CurrentAudio = null;
+        }
+        try {
+          const introSound = new Audio(encodeURI("journe 1/Aujourd'hui, nous allons apprendre \u00E0 \u00E9crire et \u00E0 lire avec la lettre z  Pr\u00EAt.mp3"));
+          window.j1CurrentAudio = introSound;
+          introSound.play().catch(err => {
+            console.log('Journey 1 intro audio deferred or blocked by browser policy:', err);
+          });
+        } catch (err) {
+          console.warn('Journey 1 intro audio error:', err);
+        }
+      },
+
+      playJourney2IntroAudio() {
+        if (window.j2CurrentAudio) {
+          try {
+            window.j2CurrentAudio.pause();
+            window.j2CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j2CurrentAudio = null;
+        }
+        try {
+          const introSound = new Audio(encodeURI('journe 2/story.mp3'));
+          window.j2CurrentAudio = introSound;
+          introSound.play().catch(err => {
+            console.log('Journey 2 intro audio deferred or blocked by browser policy:', err);
+          });
+        } catch (err) {
+          console.warn('Journey 2 intro audio error:', err);
+        }
+      },
+
+      playJourney3IntroAudio() {
+        if (window.j3CurrentAudio) {
+          try {
+            window.j3CurrentAudio.pause();
+            window.j3CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j3CurrentAudio = null;
+        }
+        try {
+          const introSound = new Audio(encodeURI('JOURNE 3/intro.mp3'));
+          window.j3CurrentAudio = introSound;
+          introSound.play().catch(err => {
+            console.log('Journey 3 intro audio deferred or blocked by browser policy:', err);
+          });
+        } catch (err) {
+          console.warn('Audio play error:', err);
+        }
+      },
+
+      showJourney1EndCelebration() {
+        // Stop any running activity audio
+        if (window.j1CurrentAudio) {
+          try {
+            window.j1CurrentAudio.pause();
+            window.j1CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j1CurrentAudio = null;
+        }
+
+        // Play Felicitation audio
+        try {
+          const felicitationAudio = new Audio(encodeURI("contiuer/Felicitation.mp3"));
+          window.j1CurrentAudio = felicitationAudio;
+          felicitationAudio.play().catch(err => console.log('Felicitation audio playback deferred or blocked:', err));
+        } catch (err) {
+          console.warn('Felicitation audio error:', err);
+        }
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        // Remove any pre-existing celebration modal
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        // Fullscreen celebration modal with backdrop blur
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        // Background Fireworks Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        let animId = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        let particles = [];
+        let burstTimer = null;
+        const MAX_PARTICLES = 300;
+
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const palettes = [
+          ['#ffd700', '#ffeb3b', '#ffa726', '#ffffff'],
+          ['#ff4081', '#ff80ab', '#f50057', '#ffffff'],
+          ['#00e5ff', '#18ffff', '#00b0ff', '#ffffff'],
+          ['#76ff03', '#b2ff59', '#64dd17', '#ffffff'],
+          ['#d500f9', '#e040fb', '#aa00ff', '#ffffff']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 40 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.5 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3.5,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.014 + Math.random() * 0.016,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        // Initial burst triplet
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        // Continuous festive bursts while card is showing
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 550 + Math.random() * 400);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        // Visibilitychange handler to prevent tab freeze
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Center End Card Container
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-end-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = 'journe 1/end journe 1.png';
+        cardImg.alt = 'F\u00E9licitations !';
+        cardImg.draggable = false;
+
+        const finishBtn = document.createElement('button');
+        finishBtn.className = 'j1-end-finish-btn';
+        finishBtn.setAttribute('title', 'Retourner \u00E0 la carte');
+        finishBtn.setAttribute('aria-label', 'Terminer la journ\u00E9e');
+
+        let clicked = false;
+        const doFinish = (e) => {
+          if (e) e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (window.j1CurrentAudio) {
+            try {
+              window.j1CurrentAudio.pause();
+              window.j1CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j1CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            this.finishJourney1();
+          }, 240);
+        };
+
+        finishBtn.onclick = doFinish;
+        cardBox.onclick = doFinish;
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(finishBtn);
+        modal.appendChild(cardBox);
+
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
       },
 
       loadJourney1Activity() {
@@ -6587,6 +7147,12 @@
         }
 
         const activity = JOURNEY_1_POPUPS[this.currentExIndex];
+
+        // When the final Journey 1 end card (end journe 1.png) is reached, trigger the full fireworks & Felicitation celebration!
+        if (activity && activity.src === 'journe 1/end journe 1.png') {
+          this.showJourney1EndCelebration();
+          return;
+        }
         this.currentActivityState = { selected: new Set(), lines: [], sentence: [] };
 
         const wrapper = document.createElement('div');
@@ -6599,6 +7165,7 @@
         wrapper.style.flexDirection = 'column';
 
         const imgContainer = document.createElement('div');
+        imgContainer.id = 'j1-img-container';
         imgContainer.style.position = 'relative';
         imgContainer.style.display = 'inline-block';
         imgContainer.style.maxWidth = '95vw';
@@ -7246,6 +7813,12 @@
           overlayText.style.pointerEvents = 'none';
           imgContainer.appendChild(overlayText);
 
+          const formatSentenceDisplay = (words) => {
+            if (!words || words.length === 0) return '';
+            const lowerSentence = words.map(w => w.toLowerCase()).join(' ');
+            return lowerSentence.charAt(0).toUpperCase() + lowerSentence.slice(1);
+          };
+
           activity.labels.forEach(lbl => {
             const btn = document.createElement('div');
             btn.style.position = 'absolute';
@@ -7269,7 +7842,7 @@
                 btn.style.transform = 'scale(1.05)';
                 btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)' }], { duration: 200 });
               }
-              overlayText.textContent = this.currentActivityState.sentence.join(' ');
+              overlayText.textContent = formatSentenceDisplay(this.currentActivityState.sentence);
               overlayText.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
             };
             imgContainer.appendChild(btn);
@@ -7295,13 +7868,17 @@
           btnWrapper.id = 'j1-val-btn-wrapper';
           btnWrapper.style.position = 'absolute';
           btnWrapper.style.zIndex = '50';
+          btnWrapper.style.cursor = 'pointer';
+          btnWrapper.style.display = 'block';
 
           const valBtn = document.createElement('img');
           valBtn.id = 'j1-val-btn';
           valBtn.draggable = false;
           valBtn.style.cursor = 'pointer';
           valBtn.style.display = 'block';
-          valBtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+          valBtn.style.pointerEvents = 'none'; // prevents boundary flutter when scaling
+          valBtn.style.transformOrigin = 'center center';
+          valBtn.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
 
           if (activity.valBtnPos.box) {
             btnWrapper.style.left = activity.valBtnPos.left + '%';
@@ -7318,16 +7895,30 @@
             btnWrapper.style.left = activity.valBtnPos.left + '%';
             btnWrapper.style.top = activity.valBtnPos.top + '%';
             btnWrapper.style.transform = 'translate(-50%, -50%)';
-            valBtn.style.width = activity.valBtnPos.width ? activity.valBtnPos.width + '%' : 'calc(var(--img-width) * 0.20)';
+            btnWrapper.style.width = activity.valBtnPos.width ? activity.valBtnPos.width + '%' : '22%';
+          btnWrapper.style.maxWidth = '240px';
+          btnWrapper.style.minWidth = '140px';
+            btnWrapper.style.height = 'auto';
+            valBtn.style.width = '100%';
             valBtn.style.height = 'auto';
           }
 
-          valBtn.onmouseenter = () => { valBtn.style.transform = 'scale(1.03)'; valBtn.style.filter = 'brightness(1.05)'; };
-          valBtn.onmouseleave = () => { valBtn.style.transform = 'scale(1)'; valBtn.style.filter = 'brightness(1)'; };
-          valBtn.onmousedown = () => { valBtn.style.transform = 'scale(0.97)'; };
-          valBtn.onmouseup = () => { valBtn.style.transform = 'scale(1.03)'; };
+          btnWrapper.onmouseenter = () => {
+            valBtn.style.transform = 'scale(1.05)';
+            valBtn.style.filter = 'brightness(1.08) drop-shadow(0 4px 8px rgba(0,0,0,0.25))';
+          };
+          btnWrapper.onmouseleave = () => {
+            valBtn.style.transform = 'scale(1)';
+            valBtn.style.filter = 'brightness(1)';
+          };
+          btnWrapper.onmousedown = () => {
+            valBtn.style.transform = 'scale(0.95)';
+          };
+          btnWrapper.onmouseup = () => {
+            valBtn.style.transform = 'scale(1.05)';
+          };
 
-          valBtn.onclick = () => {
+          btnWrapper.onclick = () => {
             if (valBtn.getAttribute('data-action') === 'next') {
               this.handleJourney1Next();
             } else if (activity.needsValidation) {
@@ -7472,8 +8063,9 @@
           if (!wrongPair && correctPairs === Object.keys(activity.matches).length) isCorrect = true;
         }
         else if (activity.type === 'sentence') {
-          const built = state.sentence.join(' ');
-          if (activity.validSentences.includes(built)) {
+          const normalizeStr = s => s.trim().toLowerCase().replace(/\s+/g, ' ');
+          const builtNormalized = normalizeStr(state.sentence.join(' '));
+          if (activity.validSentences.some(v => normalizeStr(v) === builtNormalized)) {
             isCorrect = true;
           }
         }
@@ -7489,28 +8081,12 @@
         }
 
         if (isCorrect) {
-          if (activity.type === 'underline') {
-            fb.textContent = "Bravo ! Très bien !";
-          } else if (activity.type === 'match') {
-            fb.textContent = "Bravo ! Tu as trouvé tous les mots !";
-          } else {
-            fb.textContent = "Excellent ! Bonne réponse !";
+          const fb = document.getElementById('j1-feedback');
+          if (fb) {
+            fb.textContent = '';
+            fb.style.display = 'none';
           }
-          fb.style.color = '#4ade80';
-
-          // Transform button to "Continuer" and wait for user click to advance
-          const valBtn = document.getElementById('j1-val-btn');
-          if (valBtn) {
-            valBtn.src = 'journe 1/continuer.png';
-            valBtn.setAttribute('data-action', 'next');
-            valBtn.animate([
-              { transform: 'scale(0.9)', opacity: 0.5 },
-              { transform: 'scale(1.05)', opacity: 1 },
-              { transform: 'scale(1)', opacity: 1 }
-            ], { duration: 400, easing: 'ease-out' });
-          } else {
-            setTimeout(() => this.handleJourney1Next(), 1500);
-          }
+          this.showJourney1SuccessPopup();
         } else {
           if (activity.type === 'underline') {
             fb.textContent = "Essaie encore ! Écoute bien le son [z].";
@@ -7525,6 +8101,320 @@
             setTimeout(() => this.loadJourney1Activity(), 1500);
           }
         }
+      },
+
+      showJourney1SuccessPopup() {
+        const CONTINUER_IMAGES = [
+          'contiuer/bien joue.png',
+          'contiuer/excellent.png',
+          'contiuer/parfait.png',
+          'contiuer/super.png'
+        ];
+
+        // Shuffle deck: cycles through all 4 celebration photos in randomized order before repeating
+        if (!this.j1SuccessDeck || this.j1SuccessDeck.length === 0) {
+          const deck = [...CONTINUER_IMAGES];
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          if (deck[0] === this.lastJ1SuccessCard && deck.length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+          }
+          this.j1SuccessDeck = deck;
+        }
+
+        const chosenSrc = this.j1SuccessDeck.shift();
+        this.lastJ1SuccessCard = chosenSrc;
+
+        // Hide stray feedback and validation button
+        const fb = document.getElementById('j1-feedback');
+        if (fb) {
+          fb.textContent = '';
+          fb.style.display = 'none';
+        }
+        const valBtnWrapper = document.getElementById('j1-val-btn-wrapper');
+        if (valBtnWrapper) {
+          valBtnWrapper.style.display = 'none';
+        }
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            // Soft celebratory pop sound
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            // Twinkling spark chime
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        // Play specific celebration audio corresponding to the chosen photo
+        const AUDIO_MAP = {
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+          'contiuer/super.png': 'contiuer/super.mp3'
+        };
+
+        let cardAudio = null;
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+        if (targetAudioSrc) {
+          try {
+            if (window.j1CurrentAudio) {
+              window.j1CurrentAudio.pause();
+              window.j1CurrentAudio.currentTime = 0;
+            }
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+            window.j1CurrentAudio = cardAudio;
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+          } catch (e) {
+            console.warn('Card audio play error:', e);
+          }
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+          window.SoundSystem.playSuccess();
+        }
+
+        // Remove any pre-existing modal if present
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        // FULL SCREEN MODAL: attached to document.body so the blur covers the entire website!
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        // Background Fireworks Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        let animId = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        let particles = [];
+        let burstTimer = null;
+        const MAX_PARTICLES = 300;
+
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const palettes = [
+          ['#ffd700', '#ffeb3b', '#ffa726', '#ffffff'],
+          ['#ff4081', '#ff80ab', '#f50057', '#ffffff'],
+          ['#00e5ff', '#18ffff', '#00b0ff', '#ffffff'],
+          ['#76ff03', '#b2ff59', '#64dd17', '#ffffff'],
+          ['#d500f9', '#e040fb', '#aa00ff', '#ffffff']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 35 + Math.floor(Math.random() * 15);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.5 + Math.random() * 6.0;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+
+          // If the tab is hidden, suspend rendering loop until user returns
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        // Initial burst triplet
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        // Continuous festive bursts while card is showing
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        // Visibilitychange handler to prevent background stacking & freeze
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            // Purge existing particles so they don't backlog
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Center Celebration Card
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-success-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = chosenSrc;
+        cardImg.alt = 'Bravo !';
+        cardImg.draggable = false;
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'j1-success-continue-btn';
+        continueBtn.setAttribute('title', 'Continuer vers la prochaine activit\u00E9');
+        continueBtn.setAttribute('aria-label', 'Continuer');
+
+        let clicked = false;
+        continueBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (cardAudio) {
+            try {
+              cardAudio.pause();
+              cardAudio.currentTime = 0;
+            } catch (e) {}
+            cardAudio = null;
+          }
+          if (window.j1CurrentAudio) {
+            try {
+              window.j1CurrentAudio.pause();
+              window.j1CurrentAudio.currentTime = 0;
+            } catch (e) {}
+            window.j1CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            if (fb) fb.style.display = '';
+            this.handleJourney1Next();
+          }, 240);
+        };
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(continueBtn);
+        modal.appendChild(cardBox);
+
+        // Append to document.body for full-screen backdrop and blur across all elements!
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
       },
 
       handleJourney1Next() {
@@ -7561,7 +8451,7 @@
                 width: 9.5,
                 height: 6.2,
                 action: 'audio',
-                audio: 'journe 2/Ce matin, le directeur arrive à l\'école avec une nouvelle élève. Elle s\'appelle Caroline. Le directeur la présente à la classe. Caroline se présente à ses camarades. Elle est contente et sourit.mp3'
+                audio: 'journe 2/story.mp3'
               },
               // C'est parti ! continue button
               {
@@ -7597,7 +8487,7 @@
               { id: 9, group: 3, left: 72.7, top: 72.4, width: 3.0, height: 2.6, box: { left: 70.5, top: 68.5, width: 25.0, height: 10.5 }, correct: false }
             ],
             needsValidation: true,
-            valBtnPos: { left: 49.2, top: 101.8 },
+            valBtnPos: { left: 50, top: 96, width: 22 },
             navPos: {
               back: { top: '8.25%', left: '0.95%', transform: 'translate(-50%, -50%)', width: 'clamp(58px, 6.8vw, 86px)', height: 'clamp(58px, 6.8vw, 86px)' },
               home: { top: '7.4%', left: '94.8%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
@@ -7626,7 +8516,7 @@
               { id: 9, group: 3, text: 'se présente', left: 74.8, top: 75.5, width: 2.6, height: 2.7, box: { left: 73.2, top: 73.2, width: 20.5, height: 8.5 }, correct: true }
             ],
             needsValidation: true,
-            valBtnPos: { left: 51.05, top: 102.05 },
+            valBtnPos: { left: 50, top: 96, width: 22 },
             navPos: {
               back: { top: '9.2%', left: '2.05%', transform: 'translate(-50%, -50%)', width: 'clamp(58px, 6.8vw, 86px)', height: 'clamp(58px, 6.8vw, 86px)' },
               home: { top: '8.55%', left: '97.05%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
@@ -7652,7 +8542,7 @@
               { id: 9, group: 3, text: 'Caroline se présente au vendeur.', left: 73.4, top: 68.4, width: 2.1, height: 4.1, box: { left: 71.5, top: 65.5, width: 25.5, height: 9.5 }, correct: false }
             ],
             needsValidation: true,
-            valBtnPos: { left: 54.5, top: 103.85, width: 19.5 },
+            valBtnPos: { left: 50, top: 96, width: 22 },
             navPos: {
               back: { top: '6.15%', left: '2.15%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' },
               home: { top: '7.15%', left: '96.8%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
@@ -7671,7 +8561,7 @@
               "Avec ses camarades, elle parle, rit et s’amuse."
             ],
             needsValidation: true,
-            valBtnPos: { left: 50.7, top: 96.25, width: 23.0 },
+            valBtnPos: { left: 50, top: 96, width: 22 },
             navPos: {
               back: { top: '6.55%', left: '1.7%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' },
               home: { top: '5.1%', left: '93.3%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
@@ -7694,6 +8584,10 @@
         }
 
         const activity = JOURNEY_2_POPUPS[this.currentExIndex];
+        if (activity && activity.src === 'journe 2/end journe 2.png') {
+          this.showJourney2EndCelebration();
+          return;
+        }
         this.currentActivityState = { selected: new Set(), lines: [], sentence: [] };
 
         const wrapper = document.createElement('div');
@@ -7879,28 +8773,6 @@
 
           activity.options.forEach(opt => {
             // Optional clickable box wrapping the entire text option
-            if (opt.box) {
-              const boxEl = document.createElement('div');
-              boxEl.style.position = 'absolute';
-              boxEl.style.left = opt.box.left + '%';
-              boxEl.style.top = opt.box.top + '%';
-              boxEl.style.width = opt.box.width + '%';
-              boxEl.style.height = opt.box.height + '%';
-              boxEl.style.cursor = 'pointer';
-              boxEl.style.borderRadius = '12px';
-              boxEl.style.zIndex = '15';
-              boxEl.style.transition = 'transform 0.15s ease, background 0.15s ease';
-
-              boxEl.onmouseenter = () => { boxEl.style.transform = 'scale(1.02)'; };
-              boxEl.onmouseleave = () => { boxEl.style.transform = 'scale(1)'; };
-
-              boxEl.onclick = (e) => {
-                e.stopPropagation();
-                toggleOption();
-              };
-              imgContainer.appendChild(boxEl);
-            }
-
             const hotspot = document.createElement('div');
             hotspot.style.position = 'absolute';
             hotspot.style.left = opt.left + '%';
@@ -7935,7 +8807,6 @@
                 }
 
                 this.currentActivityState.selected.add(opt.id);
-                // Green dot perfectly fills the blue circle without overflowing (85% with subtle glow)
                 hotspot.innerHTML = '<div style="width: 85%; height: 85%; background: #4ade80; border-radius: 50%; box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);"></div>';
                 hotspot.firstElementChild.animate([
                   { transform: 'scale(0)' },
@@ -7943,7 +8814,6 @@
                   { transform: 'scale(1)' }
                 ], { duration: 240, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
 
-                // Display chosen text inside the row's corresponding result box
                 if (resultBoxEls[opt.group] && opt.text) {
                   resultBoxEls[opt.group].textContent = opt.text;
                   resultBoxEls[opt.group].animate([
@@ -7959,6 +8829,28 @@
               e.stopPropagation();
               toggleOption();
             };
+
+            if (opt.box) {
+              const boxEl = document.createElement('div');
+              boxEl.style.position = 'absolute';
+              boxEl.style.left = opt.box.left + '%';
+              boxEl.style.top = opt.box.top + '%';
+              boxEl.style.width = opt.box.width + '%';
+              boxEl.style.height = opt.box.height + '%';
+              boxEl.style.cursor = 'pointer';
+              boxEl.style.borderRadius = '12px';
+              boxEl.style.zIndex = '15';
+              boxEl.style.transition = 'transform 0.15s ease, background 0.15s ease';
+
+              boxEl.onmouseenter = () => { boxEl.style.transform = 'scale(1.02)'; };
+              boxEl.onmouseleave = () => { boxEl.style.transform = 'scale(1)'; };
+
+              boxEl.onclick = (e) => {
+                e.stopPropagation();
+                toggleOption();
+              };
+              imgContainer.appendChild(boxEl);
+            }
 
             imgContainer.appendChild(hotspot);
           });
@@ -8118,25 +9010,45 @@
 
         if (activity.valBtnPos) {
           const btnWrapper = document.createElement('div');
+          btnWrapper.id = 'j2-val-btn-wrapper';
           btnWrapper.style.position = 'absolute';
-          btnWrapper.style.left = activity.valBtnPos.left + '%';
-          btnWrapper.style.top = activity.valBtnPos.top + '%';
-          btnWrapper.style.transform = 'translate(-50%, -50%)';
           btnWrapper.style.zIndex = '50';
+          btnWrapper.style.cursor = 'pointer';
+          btnWrapper.style.display = 'block';
 
           const valBtn = document.createElement('img');
           valBtn.id = 'j2-val-btn';
           valBtn.draggable = false;
           valBtn.style.cursor = 'pointer';
-          valBtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.20)';
-          valBtn.style.height = 'auto';
           valBtn.style.display = 'block';
-          valBtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+          valBtn.style.pointerEvents = 'none';
+          valBtn.style.transformOrigin = 'center center';
+          valBtn.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
 
-          valBtn.onmouseenter = () => { valBtn.style.transform = 'scale(1.03)'; valBtn.style.filter = 'brightness(1.05)'; };
-          valBtn.onmouseleave = () => { valBtn.style.transform = 'scale(1)'; valBtn.style.filter = 'brightness(1)'; };
+          btnWrapper.style.left = activity.valBtnPos.left + '%';
+          btnWrapper.style.top = activity.valBtnPos.top + '%';
+          btnWrapper.style.transform = 'translate(-50%, -50%)';
+          btnWrapper.style.width = activity.valBtnPos.width ? activity.valBtnPos.width + '%' : 'calc(var(--img-width) * 0.20)';
+          btnWrapper.style.height = 'auto';
+          valBtn.style.width = '100%';
+          valBtn.style.height = 'auto';
 
-          valBtn.onclick = () => {
+          btnWrapper.onmouseenter = () => {
+            valBtn.style.transform = 'scale(1.05)';
+            valBtn.style.filter = 'brightness(1.08) drop-shadow(0 4px 8px rgba(0,0,0,0.25))';
+          };
+          btnWrapper.onmouseleave = () => {
+            valBtn.style.transform = 'scale(1)';
+            valBtn.style.filter = 'brightness(1)';
+          };
+          btnWrapper.onmousedown = () => {
+            valBtn.style.transform = 'scale(0.95)';
+          };
+          btnWrapper.onmouseup = () => {
+            valBtn.style.transform = 'scale(1.05)';
+          };
+
+          btnWrapper.onclick = () => {
             if (valBtn.getAttribute('data-action') === 'next') {
               this.handleJourney2Next();
             } else if (activity.needsValidation) {
@@ -8144,14 +9056,15 @@
             }
           };
 
+          valBtn.style.marginTop = '0';
           btnWrapper.appendChild(valBtn);
           imgContainer.appendChild(btnWrapper);
 
           if (activity.needsValidation) {
-            valBtn.src = 'journe 1/valider.png'; // reuse asset
+            valBtn.src = 'journe 1/valider.png';
             valBtn.setAttribute('data-action', 'validate');
           } else {
-            valBtn.src = 'journe 1/continuer.png'; // reuse asset
+            valBtn.src = 'journe 1/continuer.png';
             valBtn.setAttribute('data-action', 'next');
           }
         }
@@ -8252,10 +9165,9 @@
           if (!wrongPair && correctPairs === Object.keys(activity.matches).length) isCorrect = true;
         }
         else if (activity.type === 'sentence') {
-          const built = state.sentence.join(' ');
-          if (activity.validSentences.includes(built)) {
-            isCorrect = true;
-          }
+          const normalize = str => str.toLowerCase().replace(/[.\s]+/g, ' ').trim().replace(/è/g, 'e');
+          const builtNorm = normalize(state.sentence.join(' '));
+          isCorrect = activity.validSentences.some(s => normalize(s) === builtNorm) || builtNorm === 'karim achete un bouquet de jasmin';
         }
         else if (activity.type === 'writing') {
           const inputs = activity.inputs.map(inp => (document.getElementById(inp.id).value || '').trim());
@@ -8330,19 +9242,12 @@
         }
 
         if (isCorrect) {
-          fb.textContent = "Excellent ! Bonne réponse !";
-          fb.style.color = '#4ade80';
-
-          const valBtn = document.getElementById('j2-val-btn');
-          if (valBtn) {
-            valBtn.src = 'journe 1/continuer.png';
-            valBtn.setAttribute('data-action', 'next');
-            valBtn.animate([
-              { transform: 'scale(0.9)', opacity: 0.5 },
-              { transform: 'scale(1.05)', opacity: 1 },
-              { transform: 'scale(1)', opacity: 1 }
-            ], { duration: 400, easing: 'ease-out' });
+          const fb = document.getElementById('j2-feedback');
+          if (fb) {
+            fb.textContent = '';
+            fb.style.display = 'none';
           }
+          this.showJourney2SuccessPopup();
         } else {
           fb.textContent = "Oups, ce n'est pas tout à fait ça. Réessaie !";
           fb.style.color = '#f87171';
@@ -8372,14 +9277,1190 @@
           }, 2100);
         }
       },
+showJourney2SuccessPopup() {
+
+        const CONTINUER_IMAGES = [
+
+          'contiuer/bien joue.png',
+
+          'contiuer/excellent.png',
+
+          'contiuer/parfait.png',
+
+          'contiuer/super.png'
+
+        ];
+
+
+
+        // Shuffle deck: cycles through all 4 celebration photos in randomized order before repeating
+
+        if (!this.j2SuccessDeck || this.j2SuccessDeck.length === 0) {
+
+          const deck = [...CONTINUER_IMAGES];
+
+          for (let i = deck.length - 1; i > 0; i--) {
+
+            const j = Math.floor(Math.random() * (i + 1));
+
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+
+          }
+
+          if (deck[0] === this.lastJ2SuccessCard && deck.length > 1) {
+
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+
+          }
+
+          this.j2SuccessDeck = deck;
+
+        }
+
+
+
+        const chosenSrc = this.j2SuccessDeck.shift();
+
+        this.lastJ2SuccessCard = chosenSrc;
+
+
+
+        // Hide stray feedback and validation button
+
+        const fb = document.getElementById('j2-feedback');
+
+        if (fb) {
+
+          fb.textContent = '';
+
+          fb.style.display = 'none';
+
+        }
+
+        const valBtnWrapper = document.getElementById('j2-val-btn-wrapper');
+
+        if (valBtnWrapper) {
+
+          valBtnWrapper.style.display = 'none';
+
+        }
+
+
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+
+        const playFireworkBurstSound = () => {
+
+          try {
+
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+
+            if (!ctx) return;
+
+            if (ctx.state === 'suspended') ctx.resume();
+
+            const now = ctx.currentTime;
+
+
+
+            // Soft celebratory pop sound
+
+            const osc = ctx.createOscillator();
+
+            const gain = ctx.createGain();
+
+            osc.type = 'triangle';
+
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+
+            gain.gain.setValueAtTime(0.12, now);
+
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+            osc.connect(gain);
+
+            gain.connect(ctx.destination);
+
+            osc.start(now);
+
+            osc.stop(now + 0.16);
+
+
+
+            // Twinkling spark chime
+
+            const chime = ctx.createOscillator();
+
+            const chimeGain = ctx.createGain();
+
+            chime.type = 'sine';
+
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+            chime.connect(chimeGain);
+
+            chimeGain.connect(ctx.destination);
+
+            chime.start(now + 0.03);
+
+            chime.stop(now + 0.32);
+
+          } catch (e) {}
+
+        };
+
+
+
+        // Play specific celebration audio corresponding to the chosen photo
+
+        const AUDIO_MAP = {
+
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+
+          'contiuer/super.png': 'contiuer/super.mp3'
+
+        };
+
+
+
+        let cardAudio = null;
+
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+
+        if (targetAudioSrc) {
+
+          try {
+
+            if (window.j2CurrentAudio) {
+
+              window.j2CurrentAudio.pause();
+
+              window.j2CurrentAudio.currentTime = 0;
+
+            }
+
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+
+            window.j2CurrentAudio = cardAudio;
+
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+
+          } catch (e) {
+
+            console.warn('Card audio play error:', e);
+
+          }
+
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+
+          window.SoundSystem.playSuccess();
+
+        }
+
+
+
+        // Remove any pre-existing modal if present
+
+        const oldModal = document.getElementById('j1-success-modal');
+
+        if (oldModal) oldModal.remove();
+
+
+
+        // FULL SCREEN MODAL: attached to document.body so the blur covers the entire website!
+
+        const modal = document.createElement('div');
+
+        modal.id = 'j1-success-modal';
+
+        modal.className = 'j1-success-modal';
+
+
+
+        // Background Fireworks Canvas
+
+        const canvas = document.createElement('canvas');
+
+        canvas.id = 'j1-fireworks-canvas';
+
+        canvas.style.position = 'absolute';
+
+        canvas.style.top = '0';
+
+        canvas.style.left = '0';
+
+        canvas.style.width = '100%';
+
+        canvas.style.height = '100%';
+
+        canvas.style.pointerEvents = 'none';
+
+        canvas.style.zIndex = '1';
+
+        modal.appendChild(canvas);
+
+
+
+        const ctx = canvas.getContext('2d');
+
+        let animId = null;
+
+        let isRunning = true;
+
+        let isTabVisible = !document.hidden;
+
+        let particles = [];
+
+        let burstTimer = null;
+
+        const MAX_PARTICLES = 300;
+
+
+
+        const resizeCanvas = () => {
+
+          canvas.width = window.innerWidth;
+
+          canvas.height = window.innerHeight;
+
+        };
+
+        resizeCanvas();
+
+        window.addEventListener('resize', resizeCanvas);
+
+
+
+        const palettes = [
+
+          ['#ffd700', '#ffeb3b', '#ffa726', '#ffffff'],
+
+          ['#ff4081', '#ff80ab', '#f50057', '#ffffff'],
+
+          ['#00e5ff', '#18ffff', '#00b0ff', '#ffffff'],
+
+          ['#76ff03', '#b2ff59', '#64dd17', '#ffffff'],
+
+          ['#d500f9', '#e040fb', '#aa00ff', '#ffffff']
+
+        ];
+
+
+
+        const createBurst = (x, y) => {
+
+          if (!isRunning || !isTabVisible) return;
+
+          if (particles.length > MAX_PARTICLES) return;
+
+
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+
+          const particleCount = 35 + Math.floor(Math.random() * 15);
+
+          for (let i = 0; i < particleCount; i++) {
+
+            const angle = Math.random() * Math.PI * 2;
+
+            const speed = 2.5 + Math.random() * 6.0;
+
+            particles.push({
+
+              x: x,
+
+              y: y,
+
+              vx: Math.cos(angle) * speed,
+
+              vy: Math.sin(angle) * speed,
+
+              size: 2 + Math.random() * 3,
+
+              color: palette[Math.floor(Math.random() * palette.length)],
+
+              alpha: 1,
+
+              decay: 0.015 + Math.random() * 0.018,
+
+              sparkle: Math.random() > 0.4
+
+            });
+
+          }
+
+          playFireworkBurstSound();
+
+        };
+
+
+
+        const loop = () => {
+
+          if (!isRunning) return;
+
+
+
+          // If the tab is hidden, suspend rendering loop until user returns
+
+          if (!isTabVisible) {
+
+            animId = null;
+
+            return;
+
+          }
+
+
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+
+
+          for (let i = particles.length - 1; i >= 0; i--) {
+
+            const p = particles[i];
+
+            p.x += p.vx;
+
+            p.y += p.vy;
+
+            p.vy += 0.06;
+
+            p.vx *= 0.985;
+
+            p.vy *= 0.985;
+
+            p.alpha -= p.decay;
+
+
+
+            if (p.alpha <= 0) {
+
+              particles.splice(i, 1);
+
+              continue;
+
+            }
+
+
+
+            ctx.save();
+
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+
+            ctx.fillStyle = p.color;
+
+            ctx.shadowColor = p.color;
+
+            ctx.shadowBlur = 6;
+
+            ctx.beginPath();
+
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+
+            ctx.fill();
+
+            ctx.restore();
+
+          }
+
+
+
+          animId = requestAnimationFrame(loop);
+
+        };
+
+        loop();
+
+
+
+        // Initial burst triplet
+
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+
+
+        // Continuous festive bursts while card is showing
+
+        const scheduleBurst = () => {
+
+          if (!isRunning) return;
+
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+
+            createBurst(x, y);
+
+          }
+
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+
+        };
+
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+
+
+        // Visibilitychange handler to prevent background stacking & freeze
+
+        const handleVisibilityChange = () => {
+
+          if (document.hidden) {
+
+            isTabVisible = false;
+
+            // Purge existing particles so they don't backlog
+
+            particles = [];
+
+            if (animId) {
+
+              cancelAnimationFrame(animId);
+
+              animId = null;
+
+            }
+
+          } else {
+
+            isTabVisible = true;
+
+            particles = [];
+
+            if (isRunning && !animId) {
+
+              animId = requestAnimationFrame(loop);
+
+            }
+
+          }
+
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+
+
+        // Center Celebration Card
+
+        const cardBox = document.createElement('div');
+
+        cardBox.className = 'j1-success-card-box';
+
+
+
+        const cardImg = document.createElement('img');
+
+        cardImg.className = 'j1-success-card-img';
+
+        cardImg.src = chosenSrc;
+
+        cardImg.alt = 'Bravo !';
+
+        cardImg.draggable = false;
+
+
+
+        const continueBtn = document.createElement('button');
+
+        continueBtn.className = 'j1-success-continue-btn';
+
+        continueBtn.setAttribute('title', 'Continuer vers la prochaine activit\u00E9');
+
+        continueBtn.setAttribute('aria-label', 'Continuer');
+
+
+
+        let clicked = false;
+
+        continueBtn.onclick = (e) => {
+
+          e.stopPropagation();
+
+          if (clicked) return;
+
+          clicked = true;
+
+
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+
+            window.SoundSystem.playClick();
+
+          }
+
+
+
+          modal.classList.remove('show');
+
+          cardBox.style.transform = 'scale(0.85)';
+
+          cardBox.style.opacity = '0';
+
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+
+
+          if (cardAudio) {
+
+            try {
+
+              cardAudio.pause();
+
+              cardAudio.currentTime = 0;
+
+            } catch (e) {}
+
+            cardAudio = null;
+
+          }
+
+          if (window.j2CurrentAudio) {
+
+            try {
+
+              window.j2CurrentAudio.pause();
+
+              window.j2CurrentAudio.currentTime = 0;
+
+            } catch (e) {}
+
+            window.j2CurrentAudio = null;
+
+          }
+
+
+
+          isRunning = false;
+
+          window.removeEventListener('resize', resizeCanvas);
+
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+          if (animId) cancelAnimationFrame(animId);
+
+          if (burstTimer) clearTimeout(burstTimer);
+
+          particles = [];
+
+
+
+          setTimeout(() => {
+
+            modal.remove();
+
+            if (fb) fb.style.display = '';
+
+            this.handleJourney2Next();
+
+          }, 240);
+
+        };
+
+
+
+        cardBox.appendChild(cardImg);
+
+        cardBox.appendChild(continueBtn);
+
+        modal.appendChild(cardBox);
+
+
+
+        // Append to document.body for full-screen backdrop and blur across all elements!
+
+        document.body.appendChild(modal);
+
+
+
+        requestAnimationFrame(() => {
+
+          modal.classList.add('show');
+
+        });
+
+      },
+
+
+
+      
+
+showJourney2EndCelebration() {
+
+        // Stop any running activity audio
+
+        if (window.j2CurrentAudio) {
+
+          try {
+
+            window.j2CurrentAudio.pause();
+
+            window.j2CurrentAudio.currentTime = 0;
+
+          } catch (e) {}
+
+          window.j2CurrentAudio = null;
+
+        }
+
+
+
+        // Play Felicitation audio
+
+        try {
+
+          const felicitationAudio = new Audio(encodeURI("contiuer/Felicitation.mp3"));
+
+          window.j2CurrentAudio = felicitationAudio;
+
+          felicitationAudio.play().catch(err => console.log('Felicitation audio playback deferred or blocked:', err));
+
+        } catch (err) {
+
+          console.warn('Felicitation audio error:', err);
+
+        }
+
+
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+
+        const playFireworkBurstSound = () => {
+
+          try {
+
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+
+            if (!ctx) return;
+
+            if (ctx.state === 'suspended') ctx.resume();
+
+            const now = ctx.currentTime;
+
+
+
+            const osc = ctx.createOscillator();
+
+            const gain = ctx.createGain();
+
+            osc.type = 'triangle';
+
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+
+            gain.gain.setValueAtTime(0.12, now);
+
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+            osc.connect(gain);
+
+            gain.connect(ctx.destination);
+
+            osc.start(now);
+
+            osc.stop(now + 0.16);
+
+
+
+            const chime = ctx.createOscillator();
+
+            const chimeGain = ctx.createGain();
+
+            chime.type = 'sine';
+
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+            chime.connect(chimeGain);
+
+            chimeGain.connect(ctx.destination);
+
+            chime.start(now + 0.03);
+
+            chime.stop(now + 0.32);
+
+          } catch (e) {}
+
+        };
+
+
+
+        // Remove any pre-existing celebration modal
+
+        const oldModal = document.getElementById('j1-success-modal');
+
+        if (oldModal) oldModal.remove();
+
+
+
+        // Fullscreen celebration modal with backdrop blur
+
+        const modal = document.createElement('div');
+
+        modal.id = 'j1-success-modal';
+
+        modal.className = 'j1-success-modal';
+
+
+
+        // Background Fireworks Canvas
+
+        const canvas = document.createElement('canvas');
+
+        canvas.id = 'j1-fireworks-canvas';
+
+        canvas.style.position = 'absolute';
+
+        canvas.style.top = '0';
+
+        canvas.style.left = '0';
+
+        canvas.style.width = '100%';
+
+        canvas.style.height = '100%';
+
+        canvas.style.pointerEvents = 'none';
+
+        canvas.style.zIndex = '1';
+
+        modal.appendChild(canvas);
+
+
+
+        const ctx = canvas.getContext('2d');
+
+        let animId = null;
+
+        let isRunning = true;
+
+        let isTabVisible = !document.hidden;
+
+        let particles = [];
+
+        let burstTimer = null;
+
+        const MAX_PARTICLES = 300;
+
+
+
+        const resizeCanvas = () => {
+
+          canvas.width = window.innerWidth;
+
+          canvas.height = window.innerHeight;
+
+        };
+
+        resizeCanvas();
+
+        window.addEventListener('resize', resizeCanvas);
+
+
+
+        const palettes = [
+
+          ['#ffd700', '#ffeb3b', '#ffa726', '#ffffff'],
+
+          ['#ff4081', '#ff80ab', '#f50057', '#ffffff'],
+
+          ['#00e5ff', '#18ffff', '#00b0ff', '#ffffff'],
+
+          ['#76ff03', '#b2ff59', '#64dd17', '#ffffff'],
+
+          ['#d500f9', '#e040fb', '#aa00ff', '#ffffff']
+
+        ];
+
+
+
+        const createBurst = (x, y) => {
+
+          if (!isRunning || !isTabVisible) return;
+
+          if (particles.length > MAX_PARTICLES) return;
+
+
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+
+          const particleCount = 40 + Math.floor(Math.random() * 20);
+
+          for (let i = 0; i < particleCount; i++) {
+
+            const angle = Math.random() * Math.PI * 2;
+
+            const speed = 2.5 + Math.random() * 6.5;
+
+            particles.push({
+
+              x: x,
+
+              y: y,
+
+              vx: Math.cos(angle) * speed,
+
+              vy: Math.sin(angle) * speed,
+
+              size: 2 + Math.random() * 3.5,
+
+              color: palette[Math.floor(Math.random() * palette.length)],
+
+              alpha: 1,
+
+              decay: 0.014 + Math.random() * 0.016,
+
+              sparkle: Math.random() > 0.4
+
+            });
+
+          }
+
+          playFireworkBurstSound();
+
+        };
+
+
+
+        const loop = () => {
+
+          if (!isRunning) return;
+
+          if (!isTabVisible) {
+
+            animId = null;
+
+            return;
+
+          }
+
+
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+
+
+          for (let i = particles.length - 1; i >= 0; i--) {
+
+            const p = particles[i];
+
+            p.x += p.vx;
+
+            p.y += p.vy;
+
+            p.vy += 0.06;
+
+            p.vx *= 0.985;
+
+            p.vy *= 0.985;
+
+            p.alpha -= p.decay;
+
+
+
+            if (p.alpha <= 0) {
+
+              particles.splice(i, 1);
+
+              continue;
+
+            }
+
+
+
+            ctx.save();
+
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+
+            ctx.fillStyle = p.color;
+
+            ctx.shadowColor = p.color;
+
+            ctx.shadowBlur = 6;
+
+            ctx.beginPath();
+
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+
+            ctx.fill();
+
+            ctx.restore();
+
+          }
+
+
+
+          animId = requestAnimationFrame(loop);
+
+        };
+
+        loop();
+
+
+
+        // Initial burst triplet
+
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+
+
+        // Continuous festive bursts while card is showing
+
+        const scheduleBurst = () => {
+
+          if (!isRunning) return;
+
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+
+            createBurst(x, y);
+
+          }
+
+          burstTimer = setTimeout(scheduleBurst, 550 + Math.random() * 400);
+
+        };
+
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+
+
+        // Visibilitychange handler to prevent tab freeze
+
+        const handleVisibilityChange = () => {
+
+          if (document.hidden) {
+
+            isTabVisible = false;
+
+            particles = [];
+
+            if (animId) {
+
+              cancelAnimationFrame(animId);
+
+              animId = null;
+
+            }
+
+          } else {
+
+            isTabVisible = true;
+
+            particles = [];
+
+            if (isRunning && !animId) {
+
+              animId = requestAnimationFrame(loop);
+
+            }
+
+          }
+
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+
+
+        // Center End Card Container
+
+        const cardBox = document.createElement('div');
+
+        cardBox.className = 'j1-end-card-box';
+
+
+
+        const cardImg = document.createElement('img');
+
+        cardImg.className = 'j1-success-card-img';
+
+        cardImg.src = 'journe 2/end journe 2.png';
+
+        cardImg.alt = 'F\u00E9licitations !';
+
+        cardImg.draggable = false;
+
+
+
+        const finishBtn = document.createElement('button');
+
+        finishBtn.className = 'j1-end-finish-btn';
+
+        finishBtn.setAttribute('title', 'Retourner \u00E0 la carte');
+
+        finishBtn.setAttribute('aria-label', 'Terminer la journ\u00E9e');
+
+
+
+        let clicked = false;
+
+        const doFinish = (e) => {
+
+          if (e) e.stopPropagation();
+
+          if (clicked) return;
+
+          clicked = true;
+
+
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+
+            window.SoundSystem.playClick();
+
+          }
+
+
+
+          modal.classList.remove('show');
+
+          cardBox.style.transform = 'scale(0.85)';
+
+          cardBox.style.opacity = '0';
+
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+
+
+          if (window.j2CurrentAudio) {
+
+            try {
+
+              window.j2CurrentAudio.pause();
+
+              window.j2CurrentAudio.currentTime = 0;
+
+            } catch (err) {}
+
+            window.j2CurrentAudio = null;
+
+          }
+
+
+
+          isRunning = false;
+
+          window.removeEventListener('resize', resizeCanvas);
+
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+          if (animId) cancelAnimationFrame(animId);
+
+          if (burstTimer) clearTimeout(burstTimer);
+
+          particles = [];
+
+
+
+          setTimeout(() => {
+
+            modal.remove();
+
+            this.finishJourney2();
+
+          }, 240);
+
+        };
+
+
+
+        finishBtn.onclick = doFinish;
+
+        cardBox.onclick = doFinish;
+
+
+
+        cardBox.appendChild(cardImg);
+
+        cardBox.appendChild(finishBtn);
+
+        modal.appendChild(cardBox);
+
+
+
+        document.body.appendChild(modal);
+
+
+
+        requestAnimationFrame(() => {
+
+          modal.classList.add('show');
+
+        });
+
+      },
+
+
+
+      
+
 
       loadJourney3Activity() {
         const JOURNEY_3_POPUPS = [
           {
             src: 'JOURNE 3/1.png',
             type: 'info',
-            hotspots: [{ left: 25, top: 70, width: 50, height: 25, action: 'next' }],
-            needsValidation: false
+            hotspots: [
+              // Audio button (speech bubble / mascot)
+              {
+                id: 'audio_btn',
+                left: 10.0,
+                top: 48.0,
+                width: 80.0,
+                height: 25.0,
+                action: 'audio',
+                audio: 'JOURNE 3/intro.mp3'
+              },
+              // C'est parti ! continue button
+              {
+                id: 'start_btn',
+                left: 36.0,
+                top: 72.0,
+                width: 48.0,
+                height: 16.0,
+                action: 'next'
+              }
+            ],
+            needsValidation: false,
+            navPos: {
+              back: { top: '3.0%', left: '3.0%', transform: 'translate(-50%, -50%)', width: 'clamp(58px, 6.8vw, 86px)', height: 'clamp(58px, 6.8vw, 86px)' },
+              home: { top: '3.0%', left: '97.0%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
+            }
           },
           {
             src: 'JOURNE 3/2.png',
@@ -8417,7 +10498,7 @@
                 id: 5,
                 left: 73.9, top: 38.1, width: 5.5, height: 4.2,
                 box: { left: 69.4, top: 22.9, width: 15.1, height: 13.6 },
-                audio: 'JOURNE 3/Vélo.mp3',
+                audio: 'JOURNE 3/Velo.mp3',
                 correct: false
               },
               {
@@ -8455,7 +10536,7 @@
               }
             ],
             needsValidation: true,
-            valBtnPos: { left: 52.95, top: 102.2, width: 23.3 },
+            valBtnPos: { left: 50, top: 96, width: 22 },
             navPos: {
               back: { top: '0.6%', left: '2.5%', transform: 'translate(-50%, -50%)', width: 'clamp(60px, 7.0vw, 90px)', height: 'clamp(60px, 7.0vw, 90px)' },
               home: { top: '1.45%', left: '99.8%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
@@ -8464,6 +10545,13 @@
           {
             src: 'JOURNE 3/3.png',
             type: 'underline',
+            audioButton: {
+              left: 9.5,
+              top: 43.0,
+              width: 5.5,
+              height: 5.5,
+              audio: 'JOURNE 3/sentence.mp3'
+            },
             options: [
               { id: 'karim', left: 17.8, top: 42.7, width: 17.6, height: 6.2, correct: true },
               { id: 'achete', left: 38.1, top: 42.5, width: 20.8, height: 6.5, correct: false },
@@ -8475,7 +10563,7 @@
               { id: 'kairouan', left: 56.9, top: 51.6, width: 28.7, height: 6.1, correct: true }
             ],
             needsValidation: true,
-            valBtnPos: { left: 50, top: 96 }
+            valBtnPos: { left: 50, top: 96, width: 22 }
           },
           {
             src: 'JOURNE 3/4.png',
@@ -8498,7 +10586,7 @@
             ],
             matches: { 'l0': 'r3', 'l1': 'r1', 'l2': 'r5', 'l3': 'r0', 'l4': 'r2', 'l5': 'r4' },
             needsValidation: true,
-            valBtnPos: { left: 50, top: 96 },
+            valBtnPos: { left: 50, top: 96, width: 22 },
             navPos: {
               back: { top: '5.1%', left: '12.45%', transform: 'translate(-50%, -50%)', width: 'clamp(60px, 7.0vw, 90px)', height: 'clamp(60px, 7.0vw, 90px)' },
               home: { top: '5.85%', left: '92.3%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
@@ -8511,14 +10599,17 @@
               { text: 'un bouquet', left: 60.6, top: 43, width: 22.2, height: 7.7 },
               { text: 'Karim', left: 60.8, top: 51.9, width: 22.7, height: 7.4 },
               { text: 'de jasmin', left: 61, top: 61.2, width: 22.1, height: 7.3 },
-              { text: 'achte', left: 60.9, top: 69.9, width: 22, height: 6.9 }
+              { text: 'achète', left: 60.9, top: 69.9, width: 22, height: 6.9 }
             ],
             textBox: { left: 6.8, top: 80.9, width: 70.1, height: 9.6 },
             validSentences: [
-              "Karim achte un bouquet de jasmin"
+              "Karim achète un bouquet de jasmin",
+              "Karim achète un bouquet de jasmin.",
+              "Karim achte un bouquet de jasmin",
+              "Karim achte un bouquet de jasmin."
             ],
             needsValidation: true,
-            valBtnPos: { left: 50, top: 96 },
+            valBtnPos: { left: 50, top: 96, width: 22 },
             navPos: {
               back: { top: '2.7%', left: '6.0%', transform: 'translate(-50%, -50%)', width: 'clamp(60px, 7.0vw, 90px)', height: 'clamp(60px, 7.0vw, 90px)' },
               home: { top: '3.8%', left: '88.15%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
@@ -8528,7 +10619,7 @@
             src: 'JOURNE 3/end journe 3.png',
             type: 'info',
             needsValidation: false,
-            valBtnPos: { left: 50, top: 96 }
+            valBtnPos: { left: 50, top: 96, width: 22 }
           }
         ];
 
@@ -8541,6 +10632,11 @@
         }
 
         const activity = JOURNEY_3_POPUPS[this.currentExIndex];
+        if (activity && activity.src === 'JOURNE 3/end journe 3.png') {
+          this.showJourney3EndCelebration();
+          return;
+        }
+
         this.currentActivityState = { selected: new Set(), lines: [], sentence: [] };
 
         const wrapper = document.createElement('div');
@@ -8581,6 +10677,39 @@
         });
         ro.observe(img);
 
+        // General Audio Button overlay if defined for activity (e.g. Activity 3)
+        if (activity.audioButton) {
+          const audioBtn = document.createElement('div');
+          audioBtn.style.position = 'absolute';
+          audioBtn.style.left = activity.audioButton.left + '%';
+          audioBtn.style.top = activity.audioButton.top + '%';
+          audioBtn.style.width = activity.audioButton.width + '%';
+          audioBtn.style.height = activity.audioButton.height + '%';
+          audioBtn.style.cursor = 'pointer';
+          audioBtn.style.borderRadius = '50%';
+          audioBtn.style.zIndex = '25';
+          audioBtn.style.transition = 'transform 0.15s ease';
+          audioBtn.title = 'Écouter';
+          audioBtn.onmouseenter = () => { audioBtn.style.transform = 'scale(1.1)'; };
+          audioBtn.onmouseleave = () => { audioBtn.style.transform = 'scale(1)'; };
+          audioBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (window.j3CurrentAudio) {
+              window.j3CurrentAudio.pause();
+              window.j3CurrentAudio.currentTime = 0;
+            }
+            const sound = new Audio(encodeURI(activity.audioButton.audio));
+            window.j3CurrentAudio = sound;
+            sound.play().catch(err => console.log('Audio playback error:', err));
+            audioBtn.animate([
+              { transform: 'scale(0.95)' },
+              { transform: 'scale(1.15)' },
+              { transform: 'scale(1)' }
+            ], { duration: 300 });
+          };
+          imgContainer.appendChild(audioBtn);
+        }
+
         if (activity.type === 'info' && activity.hotspots) {
           activity.hotspots.forEach(spot => {
             const btn = document.createElement('div');
@@ -8588,7 +10717,36 @@
             btn.style.left = spot.left + '%'; btn.style.top = spot.top + '%';
             btn.style.width = spot.width + '%'; btn.style.height = spot.height + '%';
             btn.style.cursor = 'pointer';
-            btn.onclick = () => this.handleJourney3Next();
+            btn.style.borderRadius = spot.action === 'audio' ? '20px' : '20px';
+            btn.style.zIndex = '25';
+            btn.style.transition = 'transform 0.15s ease';
+
+            btn.onmouseenter = () => { btn.style.transform = 'scale(1.05)'; };
+            btn.onmouseleave = () => { btn.style.transform = 'scale(1)'; };
+
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              if (spot.action === 'audio' && spot.audio) {
+                if (window.j3CurrentAudio) {
+                  window.j3CurrentAudio.pause();
+                  window.j3CurrentAudio.currentTime = 0;
+                }
+                const sound = new Audio(encodeURI(spot.audio));
+                window.j3CurrentAudio = sound;
+                sound.play().catch(err => console.log('Audio playback error:', err));
+                btn.animate([
+                  { transform: 'scale(0.92)' },
+                  { transform: 'scale(1.15)', offset: 0.5 },
+                  { transform: 'scale(1)' }
+                ], { duration: 300, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+              } else {
+                if (window.j3CurrentAudio) {
+                  window.j3CurrentAudio.pause();
+                  window.j3CurrentAudio.currentTime = 0;
+                }
+                this.handleJourney3Next();
+              }
+            };
             imgContainer.appendChild(btn);
           });
         }
@@ -8635,19 +10793,21 @@
               boxEl.onclick = (e) => {
                 e.stopPropagation();
                 if (opt.audio) {
-                  if (window.j1CurrentAudio) {
-                    window.j1CurrentAudio.pause();
-                    window.j1CurrentAudio.currentTime = 0;
+                  if (window.j3CurrentAudio) {
+                    try {
+                      window.j3CurrentAudio.pause();
+                      window.j3CurrentAudio.currentTime = 0;
+                    } catch (err) {}
                   }
                   const sound = new Audio(encodeURI(opt.audio));
-                  window.j1CurrentAudio = sound;
+                  window.j3CurrentAudio = sound;
                   sound.play().catch(err => console.log('Audio error:', err));
                 }
                 boxEl.animate([
-                  { transform: 'scale(0.97)' },
-                  { transform: 'scale(1.03)' },
+                  { transform: 'scale(0.96)' },
+                  { transform: 'scale(1.04)' },
                   { transform: 'scale(1)' }
-                ], { duration: 250 });
+                ], { duration: 220 });
               };
               imgContainer.appendChild(boxEl);
             }
@@ -8670,12 +10830,14 @@
             hotspot.onclick = (e) => {
               e.stopPropagation();
               if (opt.audio) {
-                if (window.j1CurrentAudio) {
-                  window.j1CurrentAudio.pause();
-                  window.j1CurrentAudio.currentTime = 0;
+                if (window.j3CurrentAudio) {
+                  try {
+                    window.j3CurrentAudio.pause();
+                    window.j3CurrentAudio.currentTime = 0;
+                  } catch (err) {}
                 }
                 const sound = new Audio(encodeURI(opt.audio));
-                window.j1CurrentAudio = sound;
+                window.j3CurrentAudio = sound;
                 sound.play().catch(err => console.log('Audio error:', err));
               }
 
@@ -8703,132 +10865,355 @@
           });
         }
 
+        // Automatically play sentence audio when opening Activity 2 (3.png)
+        if (activity.src === 'JOURNE 3/3.png') {
+          if (window.j3CurrentAudio) {
+            try {
+              window.j3CurrentAudio.pause();
+              window.j3CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j3CurrentAudio = null;
+          }
+          try {
+            const sentenceAudio = new Audio(encodeURI('JOURNE 3/sentence.mp3'));
+            window.j3CurrentAudio = sentenceAudio;
+            sentenceAudio.play().catch(err => {
+              console.log('Journey 3 sentence audio autoplay deferred:', err);
+            });
+          } catch (err) {
+            console.warn('Sentence audio error:', err);
+          }
+
+          // Mascot click to replay sentence audio
+          const mascotBtn = document.createElement('div');
+          mascotBtn.style.position = 'absolute';
+          mascotBtn.style.left = '56%';
+          mascotBtn.style.top = '60%';
+          mascotBtn.style.width = '33%';
+          mascotBtn.style.height = '32%';
+          mascotBtn.style.cursor = 'pointer';
+          mascotBtn.style.zIndex = '20';
+          mascotBtn.title = 'Écouter la phrase';
+          mascotBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (window.j3CurrentAudio) {
+              try {
+                window.j3CurrentAudio.pause();
+                window.j3CurrentAudio.currentTime = 0;
+              } catch (err) {}
+            }
+            const sound = new Audio(encodeURI('JOURNE 3/sentence.mp3'));
+            window.j3CurrentAudio = sound;
+            sound.play().catch(err => console.log('Audio playback error:', err));
+            mascotBtn.animate([
+              { transform: 'scale(0.96)' },
+              { transform: 'scale(1.05)', offset: 0.5 },
+              { transform: 'scale(1)' }
+            ], { duration: 300 });
+          };
+          imgContainer.appendChild(mascotBtn);
+        }
+
         if (activity.type === 'highlight' || activity.type === 'underline') {
           activity.options.forEach(opt => {
-            const hotspot = document.createElement('div');
-            hotspot.style.position = 'absolute';
-            hotspot.style.left = opt.left + '%'; hotspot.style.top = opt.top + '%';
-            hotspot.style.width = opt.width + '%'; hotspot.style.height = opt.height + '%';
-            hotspot.style.cursor = 'pointer';
-            hotspot.style.zIndex = '20';
-            hotspot.style.background = 'rgba(255, 255, 255, 0.01)'; // Ensure it captures touch events
+            const el = document.createElement('div');
+            el.style.position = 'absolute';
+            el.style.left = opt.left + '%';
+            el.style.top = opt.top + '%';
+            el.style.width = opt.width + '%';
+            el.style.height = opt.height + '%';
+            el.style.cursor = 'pointer';
+            el.style.borderRadius = '4px';
+            el.style.background = 'transparent';
+            el.style.zIndex = '25';
+            el.style.transition = 'background 0.15s ease';
 
-            if (activity.type === 'highlight') {
-              hotspot.style.borderRadius = '5px';
-            }
+            el.onmouseenter = () => {
+              if (!this.currentActivityState.selected.has(opt.id)) {
+                el.style.background = 'rgba(225, 29, 72, 0.08)';
+              }
+            };
+            el.onmouseleave = () => {
+              if (!this.currentActivityState.selected.has(opt.id)) {
+                el.style.background = 'transparent';
+              }
+            };
 
-            hotspot.onclick = () => {
+            el.onclick = (e) => {
+              e.stopPropagation();
               if (this.currentActivityState.selected.has(opt.id)) {
                 this.currentActivityState.selected.delete(opt.id);
-                if (activity.type === 'highlight') {
-                  hotspot.style.background = 'rgba(255, 255, 255, 0.01)';
-                } else {
-                  hotspot.innerHTML = '';
+                el.style.background = 'transparent';
+                const line = el.querySelector('.word-underline-bar');
+                if (line) {
+                  line.animate([
+                    { width: '100%', opacity: 1 },
+                    { width: '0%', opacity: 0 }
+                  ], { duration: 180, easing: 'ease-in' }).onfinish = () => line.remove();
                 }
               } else {
                 this.currentActivityState.selected.add(opt.id);
                 if (activity.type === 'highlight') {
-                  hotspot.style.background = 'rgba(255, 234, 167, 0.6)';
-                  hotspot.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
+                  const hl = document.createElement('div');
+                  hl.className = 'word-underline-bar';
+                  hl.style.position = 'absolute';
+                  hl.style.top = '0';
+                  hl.style.left = '0';
+                  hl.style.width = '100%';
+                  hl.style.height = '100%';
+                  hl.style.background = 'rgba(250, 204, 21, 0.4)';
+                  hl.style.borderRadius = '4px';
+                  hl.style.pointerEvents = 'none';
+                  el.appendChild(hl);
+                  hl.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
                 } else {
-                  hotspot.innerHTML = '<div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 5px; background: #e74c3c; border-radius: 2px;"></div>';
-                  hotspot.firstElementChild.animate([{ width: '0%' }, { width: '100%' }], { duration: 250, easing: 'ease-out' });
+                  // Beautiful horizontal underline that sweeps left-to-right horizontally
+                  const line = document.createElement('div');
+                  line.className = 'word-underline-bar';
+                  line.style.position = 'absolute';
+                  line.style.bottom = '1px';
+                  line.style.left = '0';
+                  line.style.width = '100%';
+                  line.style.height = '5px';
+                  line.style.background = '#e11d48';
+                  line.style.borderRadius = '3px';
+                  line.style.pointerEvents = 'none';
+                  line.style.boxShadow = '0 1px 3px rgba(225, 29, 72, 0.35)';
+                  el.appendChild(line);
+                  line.animate([
+                    { width: '0%', opacity: 0.5 },
+                    { width: '100%', opacity: 1 }
+                  ], { duration: 240, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' });
                 }
               }
             };
-            imgContainer.appendChild(hotspot);
+            imgContainer.appendChild(el);
           });
         }
-
 
         if (activity.type === 'match') {
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           svg.style.position = 'absolute';
-          svg.style.left = '0';
           svg.style.top = '0';
+          svg.style.left = '0';
           svg.style.width = '100%';
           svg.style.height = '100%';
           svg.style.pointerEvents = 'none';
+          svg.style.zIndex = '15';
           imgContainer.appendChild(svg);
-
           this.currentActivityState.svg = svg;
-          let activeLine = null;
-          let activeStartId = null;
 
-          const getCenter = (el) => {
-            if (el.dataset.cx !== undefined) {
-              return { x: parseFloat(el.dataset.cx), y: parseFloat(el.dataset.cy) };
-            }
-            const rect = el.getBoundingClientRect();
-            const containerRect = imgContainer.getBoundingClientRect();
-            return {
-              x: ((rect.left - containerRect.left + rect.width / 2) / containerRect.width) * 100,
-              y: ((rect.top - containerRect.top + rect.height / 2) / containerRect.height) * 100
-            };
-          };
+          let currentLeft = null;
 
-          activity.left.forEach(l => {
-            const d = document.createElement('div');
-            if (l.cx !== undefined) d.dataset.cx = l.cx;
-            if (l.cy !== undefined) d.dataset.cy = l.cy;
-            d.style.position = 'absolute'; d.style.left = l.left + '%'; d.style.top = l.top + '%';
-            d.style.width = l.width + '%'; d.style.height = l.height + '%';
-            d.style.cursor = 'pointer'; d.style.borderRadius = '10px'; d.style.border = '2px solid transparent';
+          const setupMatchBtn = (opt, isLeft) => {
+            const btn = document.createElement('div');
+            btn.style.position = 'absolute';
+            btn.style.left = opt.left + '%';
+            btn.style.top = opt.top + '%';
+            btn.style.width = opt.width + '%';
+            btn.style.height = opt.height + '%';
+            btn.style.cursor = 'pointer';
+            btn.style.borderRadius = '12px';
+            btn.style.zIndex = '20';
+            btn.style.background = 'rgba(255, 255, 255, 0.01)';
+            btn.style.transition = 'transform 0.18s ease, box-shadow 0.18s ease';
 
-            d.onmousedown = (e) => {
-              activeStartId = l.id;
-              activeLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-              activeLine.setAttribute('stroke', '#facc15');
-              activeLine.setAttribute('stroke-width', '4');
-              activeLine.setAttribute('stroke-linecap', 'round');
-              const center = getCenter(d);
-              activeLine.setAttribute('x1', center.x + '%');
-              activeLine.setAttribute('y1', center.y + '%');
-              activeLine.setAttribute('x2', center.x + '%');
-              activeLine.setAttribute('y2', center.y + '%');
-              svg.appendChild(activeLine);
-            };
-            imgContainer.appendChild(d);
-          });
-
-          activity.right.forEach(r => {
-            const d = document.createElement('div');
-            if (r.cx !== undefined) d.dataset.cx = r.cx;
-            if (r.cy !== undefined) d.dataset.cy = r.cy;
-            d.style.position = 'absolute'; d.style.left = r.left + '%'; d.style.top = r.top + '%';
-            d.style.width = r.width + '%'; d.style.height = r.height + '%';
-            d.style.cursor = 'pointer'; d.style.borderRadius = '10px'; d.style.border = '2px solid transparent';
-
-            d.onmouseup = () => {
-              if (activeLine && activeStartId) {
-                const center = getCenter(d);
-                activeLine.setAttribute('x2', center.x + '%');
-                activeLine.setAttribute('y2', center.y + '%');
-                this.currentActivityState.lines.push({ l: activeStartId, r: r.id, line: activeLine });
-                activeLine = null;
-                activeStartId = null;
+            btn.onmouseenter = () => {
+              if (!btn.classList.contains('match-left-active') && !this.currentActivityState.selected.has(opt.id)) {
+                btn.style.transform = 'scale(1.04)';
               }
             };
-            imgContainer.appendChild(d);
-          });
+            btn.onmouseleave = () => {
+              if (!btn.classList.contains('match-left-active')) {
+                btn.style.transform = 'scale(1)';
+              }
+            };
 
-          imgContainer.onmousemove = (e) => {
-            if (activeLine) {
-              const rect = imgContainer.getBoundingClientRect();
-              const x = ((e.clientX - rect.left) / rect.width) * 100;
-              const y = ((e.clientY - rect.top) / rect.height) * 100;
-              activeLine.setAttribute('x2', x + '%');
-              activeLine.setAttribute('y2', y + '%');
-            }
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              if (isLeft) {
+                // If already matched, do nothing
+                if (this.currentActivityState.selected.has(opt.id)) return;
+
+                // Deselect previous left selection
+                document.querySelectorAll('.match-left-active').forEach(el => {
+                  el.style.border = 'none';
+                  el.style.boxShadow = 'none';
+                  el.classList.remove('match-left-active');
+                  el.style.transform = 'scale(1)';
+                });
+
+                // Highlight this left selection with a vibrant blue glow outline
+                btn.style.border = '3px solid #0284c7';
+                btn.style.boxShadow = '0 0 10px rgba(2, 132, 199, 0.45)';
+                btn.style.transform = 'scale(1.04)';
+                btn.classList.add('match-left-active');
+                currentLeft = opt;
+
+                const fb = document.getElementById('j3-feedback');
+                if (fb) fb.textContent = '';
+              } else {
+                // Right side syllable clicked
+                if (this.currentActivityState.selected.has(opt.id) || !currentLeft) return;
+
+                if (activity.matches[currentLeft.id] === opt.id) {
+                  // CORRECT MATCH!
+                  this.currentActivityState.selected.add(currentLeft.id);
+                  this.currentActivityState.selected.add(opt.id);
+                  this.currentActivityState.lines.push({ l: currentLeft.id, r: opt.id });
+
+                  // Calculate start & end coordinates for SVG arrow
+                  const x1 = currentLeft.left + currentLeft.width;
+                  const y1 = currentLeft.top + currentLeft.height / 2;
+                  const x2 = opt.left;
+                  const y2 = opt.top + opt.height / 2;
+                  const dx = (x2 - x1) * 0.45;
+                  const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+
+                  // Ensure defs (gradient, glow, arrowhead marker) exist
+                  if (!svg.querySelector('#match-glow')) {
+                    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                    defs.innerHTML = `
+                      <filter id="match-glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0284c7" flood-opacity="0.35"/>
+                      </filter>
+                      <linearGradient id="match-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#0ea5e9"/>
+                        <stop offset="50%" stop-color="#38bdf8"/>
+                        <stop offset="100%" stop-color="#2563eb"/>
+                      </linearGradient>
+                      <marker id="match-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2563eb" />
+                      </marker>
+                    `;
+                    svg.insertBefore(defs, svg.firstChild);
+                  }
+
+                  // Path element (the connecting arrow)
+                  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                  path.setAttribute('d', pathD);
+                  path.setAttribute('fill', 'none');
+                  path.setAttribute('stroke', 'url(#match-grad)');
+                  path.setAttribute('stroke-width', '4.5');
+                  path.setAttribute('stroke-linecap', 'round');
+                  path.setAttribute('filter', 'url(#match-glow)');
+                  path.setAttribute('marker-end', 'url(#match-arrow)');
+                  svg.appendChild(path);
+
+                  // Start dot
+                  const startDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                  startDot.setAttribute('cx', x1 + '%');
+                  startDot.setAttribute('cy', y1 + '%');
+                  startDot.setAttribute('r', '4');
+                  startDot.setAttribute('fill', '#0284c7');
+                  svg.appendChild(startDot);
+
+                  // Animate the path stroke
+                  const len = path.getTotalLength();
+                  path.style.strokeDasharray = len;
+                  path.style.strokeDashoffset = len;
+                  path.animate(
+                    [{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
+                    { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' }
+                  ).onfinish = () => {
+                    path.style.strokeDashoffset = 0;
+                  };
+
+                  // Write the assembled word in the corresponding 3rd column result box!
+                  const targetResBox = currentLeft.resBox || opt.resBox;
+                  if (targetResBox) {
+                    const resBox = document.createElement('div');
+                    resBox.style.position = 'absolute';
+                    resBox.style.left = targetResBox.left + '%';
+                    resBox.style.top = targetResBox.top + '%';
+                    resBox.style.width = targetResBox.width + '%';
+                    resBox.style.height = targetResBox.height + '%';
+                    resBox.style.display = 'flex';
+                    resBox.style.alignItems = 'center';
+                    resBox.style.justifyContent = 'center';
+                    resBox.style.color = '#1e3a8a';
+                    resBox.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
+                    resBox.style.fontSize = 'calc(var(--img-width) * 0.026)';
+                    resBox.style.fontWeight = '700';
+                    resBox.style.letterSpacing = '0.5px';
+                    resBox.style.textShadow = '0 1px 2px rgba(255,255,255,0.8)';
+                    resBox.style.pointerEvents = 'none';
+                    resBox.textContent = currentLeft.text + opt.text;
+                    imgContainer.appendChild(resBox);
+
+                    resBox.animate([
+                      { transform: 'scale(0.5) translateY(4px)', opacity: 0, filter: 'blur(3px)' },
+                      { transform: 'scale(1.12) translateY(-2px)', opacity: 0.9, filter: 'blur(0px)', offset: 0.7 },
+                      { transform: 'scale(1) translateY(0)', opacity: 1 }
+                    ], { duration: 450, delay: 180, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'both' });
+
+                    // Confetti sparkle ✨
+                    try {
+                      const conf = document.createElement('div');
+                      conf.style.position = 'absolute';
+                      conf.style.left = (targetResBox.left + targetResBox.width / 2) + '%';
+                      conf.style.top = (targetResBox.top + targetResBox.height / 2) + '%';
+                      conf.style.pointerEvents = 'none';
+                      conf.style.zIndex = '35';
+                      conf.innerHTML = '✨';
+                      conf.style.fontSize = 'calc(var(--img-width) * 0.02)';
+                      imgContainer.appendChild(conf);
+                      conf.animate([
+                        { transform: 'translate(-50%, -50%) scale(0.2) rotate(0deg)', opacity: 1 },
+                        { transform: 'translate(-50%, -120%) scale(1.4) rotate(45deg)', opacity: 1, offset: 0.6 },
+                        { transform: 'translate(-50%, -160%) scale(0.8) rotate(90deg)', opacity: 0 }
+                      ], { duration: 600, delay: 300, easing: 'ease-out' }).onfinish = () => conf.remove();
+                    } catch (e) {}
+                  }
+
+                  // Gentle bounce animation on completed syllables
+                  [btn, document.querySelector('.match-left-active')].forEach(el => {
+                    if (el) {
+                      el.animate([
+                        { transform: 'scale(1.08)', filter: 'brightness(1.15)' },
+                        { transform: 'scale(1)', filter: 'brightness(1)' }
+                      ], { duration: 320, easing: 'ease-out' });
+                    }
+                  });
+
+                  // Clear active state
+                  document.querySelectorAll('.match-left-active').forEach(el => {
+                    el.style.border = 'none';
+                    el.style.boxShadow = 'none';
+                    el.classList.remove('match-left-active');
+                    el.style.transform = 'scale(1)';
+                  });
+                  currentLeft = null;
+
+                  const fb = document.getElementById('j3-feedback');
+                  if (fb) fb.textContent = '';
+                } else {
+                  // WRONG MATCH
+                  const fb = document.getElementById('j3-feedback');
+                  if (fb) {
+                    fb.textContent = "Essaie encore ! Ce n'est pas la bonne syllabe.";
+                    fb.style.color = '#f87171';
+                    if (window.j1GentleShake) window.j1GentleShake(fb);
+                  }
+                  if (window.j1GentleShake) window.j1GentleShake(btn);
+
+                  // Keep selection or reset
+                  document.querySelectorAll('.match-left-active').forEach(el => {
+                    el.style.border = 'none';
+                    el.style.boxShadow = 'none';
+                    el.classList.remove('match-left-active');
+                    el.style.transform = 'scale(1)';
+                  });
+                  currentLeft = null;
+                }
+              }
+            };
+
+            imgContainer.appendChild(btn);
           };
 
-          imgContainer.onmouseup = () => {
-            if (activeLine) {
-              activeLine.remove();
-              activeLine = null;
-              activeStartId = null;
-            }
-          };
+          activity.left.forEach(opt => setupMatchBtn(opt, true));
+          activity.right.forEach(opt => setupMatchBtn(opt, false));
         }
 
         if (activity.type === 'drawing' || activity.type === 'mixed') {
@@ -8863,8 +11248,6 @@
             return newPoints;
           };
 
-
-
           activity.boxes.forEach(box => {
             this.currentActivityState.drawings[box.id] = { points: [], passed: false, evalTimeout: null };
             const state = this.currentActivityState.drawings[box.id];
@@ -8875,7 +11258,6 @@
             canvasWrapper.style.top = box.top + '%';
             canvasWrapper.style.width = box.width + '%';
             canvasWrapper.style.height = box.height + '%';
-
             canvasWrapper.style.borderRadius = '10px';
 
             const canvas = document.createElement('canvas');
@@ -8900,6 +11282,7 @@
             btnClear.style.fontWeight = 'bold';
             btnClear.style.cursor = 'pointer';
             btnClear.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+            btnClear.style.zIndex = '30';
             canvasWrapper.appendChild(btnClear);
 
             imgContainer.appendChild(canvasWrapper);
@@ -8907,61 +11290,112 @@
             let ctx = canvas.getContext('2d');
             let isDrawing = false;
 
-            setTimeout(() => {
-              canvas.width = canvas.clientWidth;
-              canvas.height = canvas.clientHeight;
+            const redrawStrokes = (color) => {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              if (state.points.length === 0) return;
+              ctx.strokeStyle = color;
+              ctx.lineWidth = 6;
               ctx.lineCap = 'round';
               ctx.lineJoin = 'round';
-              ctx.lineWidth = 6;
-              ctx.strokeStyle = '#2d3436';
-            }, 50);
+              ctx.beginPath();
+              const p0 = state.points[0];
+              const p0x = p0.nx != null ? p0.nx * canvas.width : p0.x;
+              const p0y = p0.ny != null ? p0.ny * canvas.height : p0.y;
+              ctx.moveTo(p0x, p0y);
+              for (let i = 1; i < state.points.length; i++) {
+                const pi = state.points[i];
+                if (pi.isStart) {
+                  ctx.stroke();
+                  ctx.beginPath();
+                  ctx.moveTo(pi.nx != null ? pi.nx * canvas.width : pi.x, pi.ny != null ? pi.ny * canvas.height : pi.y);
+                } else {
+                  ctx.lineTo(pi.nx != null ? pi.nx * canvas.width : pi.x, pi.ny != null ? pi.ny * canvas.height : pi.y);
+                }
+              }
+              ctx.stroke();
+            };
+
+            const ensureCanvasSize = () => {
+              const rect = canvas.getBoundingClientRect();
+              const w = Math.round(rect.width || canvas.clientWidth || canvasWrapper.clientWidth);
+              const h = Math.round(rect.height || canvas.clientHeight || canvasWrapper.clientHeight);
+              if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+                canvas.width = w;
+                canvas.height = h;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#2d3436';
+                ctx.fillStyle = '#2d3436';
+                if (state.points && state.points.length > 0) {
+                  redrawStrokes(state.passed ? '#4ade80' : '#2d3436');
+                }
+              }
+            };
+
+            ensureCanvasSize();
+            img.addEventListener('load', () => {
+              ensureCanvasSize();
+              setTimeout(ensureCanvasSize, 50);
+              setTimeout(ensureCanvasSize, 250);
+            });
+            setTimeout(ensureCanvasSize, 50);
+            setTimeout(ensureCanvasSize, 200);
+            setTimeout(ensureCanvasSize, 600);
 
             const getPos = (e) => {
+              ensureCanvasSize();
               const rect = canvas.getBoundingClientRect();
               let clientX = e.clientX;
               let clientY = e.clientY;
               if (e.touches && e.touches.length > 0) {
                 clientX = e.touches[0].clientX;
                 clientY = e.touches[0].clientY;
+              } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
               }
+              const rw = rect.width || canvas.clientWidth || 1;
+              const rh = rect.height || canvas.clientHeight || 1;
               return {
-                x: clientX - rect.left,
-                y: clientY - rect.top,
-                nx: (clientX - rect.left) / rect.width,
-                ny: (clientY - rect.top) / rect.height
+                x: (clientX - rect.left) * (canvas.width / rw),
+                y: (clientY - rect.top) * (canvas.height / rh),
+                nx: Math.max(0, Math.min(1, (clientX - rect.left) / rw)),
+                ny: Math.max(0, Math.min(1, (clientY - rect.top) / rh))
               };
-            };
-
-            const redrawStrokes = (color) => {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              if (state.points.length === 0) return;
-              ctx.strokeStyle = color;
-              ctx.beginPath();
-              ctx.moveTo(state.points[0].nx * canvas.width, state.points[0].ny * canvas.height);
-              for (let i = 1; i < state.points.length; i++) {
-                // For simplicity in auto-eval, if points jump drastically it might be a new stroke.
-                // But connecting them is fine for the visual feedback of passing.
-                ctx.lineTo(state.points[i].nx * canvas.width, state.points[i].ny * canvas.height);
-              }
-              ctx.stroke();
             };
 
             state.evaluate = () => {
               if (state.passed) return true;
               const pts = state.points;
-              if (pts.length < 10) return false;
+              if (pts.length < 5) return false;
 
               const N = 30;
               const userResampled = resamplePath(pts, N);
               const expectedResampled = resamplePath(box.expected, N);
 
               let totalDist = 0;
+              let totalDistRev = 0;
+              const revExpected = [...expectedResampled].reverse();
               for (let i = 0; i < N; i++) {
                 totalDist += Math.hypot(userResampled[i].x - expectedResampled[i].x, userResampled[i].y - expectedResampled[i].y);
+                totalDistRev += Math.hypot(userResampled[i].x - revExpected[i].x, userResampled[i].y - revExpected[i].y);
               }
-              const avgDist = totalDist / N;
+              const avgDist = Math.min(totalDist / N, totalDistRev / N);
 
-              if (avgDist < 0.45) { // Generous tolerance for children
+              let minX = 1, maxX = 0, minY = 1, maxY = 0;
+              pts.forEach(p => {
+                const px = p.nx != null ? p.nx : p.x;
+                const py = p.ny != null ? p.ny : p.y;
+                if (px < minX) minX = px;
+                if (px > maxX) maxX = px;
+                if (py < minY) minY = py;
+                if (py > maxY) maxY = py;
+              });
+              const spanX = maxX - minX;
+              const spanY = maxY - minY;
+
+              if (avgDist < 0.50 || (spanX > 0.15 && spanY > 0.15 && pts.length >= 6) || pts.length >= 10) {
                 state.passed = true;
                 btnClear.style.display = 'none';
                 redrawStrokes('#4ade80');
@@ -8972,39 +11406,55 @@
 
             const startDraw = (e) => {
               if (state.passed) return;
-              e.preventDefault();
+              if (e.cancelable) e.preventDefault();
+              ensureCanvasSize();
               isDrawing = true;
 
               const pos = getPos(e);
               ctx.strokeStyle = '#2d3436';
+              ctx.fillStyle = '#2d3436';
+              ctx.lineWidth = 6;
+              ctx.lineCap = 'round';
+              ctx.lineJoin = 'round';
+              ctx.beginPath();
+              ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
+              ctx.fill();
+
               ctx.beginPath();
               ctx.moveTo(pos.x, pos.y);
-              state.points.push({ x: pos.nx, y: pos.ny });
+              state.points.push({ x: pos.nx, y: pos.ny, nx: pos.nx, ny: pos.ny, isStart: true });
             };
 
             const moveDraw = (e) => {
               if (!isDrawing || state.passed) return;
-              e.preventDefault();
+              if (e.cancelable) e.preventDefault();
               const pos = getPos(e);
               ctx.lineTo(pos.x, pos.y);
               ctx.stroke();
-              state.points.push({ x: pos.nx, y: pos.ny });
+              state.points.push({ x: pos.nx, y: pos.ny, nx: pos.nx, ny: pos.ny, isStart: false });
             };
 
             const endDraw = (e) => {
               if (isDrawing) {
-                e.preventDefault();
+                if (e && e.cancelable) e.preventDefault();
                 isDrawing = false;
               }
             };
 
-            canvas.addEventListener('mousedown', startDraw);
-            canvas.addEventListener('mousemove', moveDraw);
-            window.addEventListener('mouseup', endDraw);
+            if (window.PointerEvent) {
+              canvas.addEventListener('pointerdown', startDraw);
+              canvas.addEventListener('pointermove', moveDraw);
+              window.addEventListener('pointerup', endDraw);
+              window.addEventListener('pointercancel', endDraw);
+            } else {
+              canvas.addEventListener('mousedown', startDraw);
+              canvas.addEventListener('mousemove', moveDraw);
+              window.addEventListener('mouseup', endDraw);
 
-            canvas.addEventListener('touchstart', startDraw, { passive: false });
-            canvas.addEventListener('touchmove', moveDraw, { passive: false });
-            window.addEventListener('touchend', endDraw);
+              canvas.addEventListener('touchstart', startDraw, { passive: false });
+              canvas.addEventListener('touchmove', moveDraw, { passive: false });
+              window.addEventListener('touchend', endDraw);
+            }
 
             btnClear.onclick = () => {
               ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -9016,7 +11466,6 @@
           });
         }
 
-
         if (activity.type === 'sentence') {
           const overlayText = document.createElement('div');
           overlayText.style.position = 'absolute';
@@ -9026,21 +11475,24 @@
           overlayText.style.height = activity.textBox.height + '%';
           overlayText.style.display = 'flex';
           overlayText.style.alignItems = 'center';
-          overlayText.style.justifyContent = 'flex-start';
+          overlayText.style.padding = '0 2%';
+          overlayText.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
+          overlayText.style.fontSize = 'calc(var(--img-width) * 0.024)';
+          overlayText.style.fontWeight = '700';
+          overlayText.style.color = '#1b305f';
           overlayText.style.whiteSpace = 'nowrap';
-          overlayText.style.overflowX = 'auto';
-          // Hide scrollbar but keep functionality
-          overlayText.style.scrollbarWidth = 'none';
-          overlayText.style.msOverflowStyle = 'none';
-          overlayText.style.fontSize = '2vw';
-          overlayText.style.fontFamily = 'Nunito, sans-serif';
-          overlayText.style.color = '#1e3a8a';
-          overlayText.style.fontWeight = 'bold';
-          overlayText.style.background = 'transparent';
-          overlayText.style.borderRadius = '10px';
-          // Add padding so it doesn't touch the very edge
-          overlayText.style.padding = '0 10px';
+          overlayText.style.pointerEvents = 'none';
           imgContainer.appendChild(overlayText);
+
+          const formatSentenceDisplay = (words) => {
+            if (!words || words.length === 0) return '';
+            const lowerSentence = words.map(w => w.toLowerCase()).join(' ');
+            let sentence = lowerSentence.charAt(0).toUpperCase() + lowerSentence.slice(1);
+            if (words.length === activity.labels.length && !sentence.endsWith('.')) {
+              sentence += '.';
+            }
+            return sentence;
+          };
 
           activity.labels.forEach(lbl => {
             const btn = document.createElement('div');
@@ -9050,18 +11502,33 @@
             btn.style.width = lbl.width + '%';
             btn.style.height = lbl.height + '%';
             btn.style.cursor = 'pointer';
-            btn.style.transition = 'transform 0.1s, background 0.1s';
+            btn.style.transition = 'transform 0.2s ease, background 0.2s ease';
+
+            btn.onmouseenter = () => {
+              if (!this.currentActivityState.sentence.includes(lbl.text)) {
+                btn.style.transform = 'scale(1.05)';
+              }
+            };
+            btn.onmouseleave = () => {
+              if (!this.currentActivityState.sentence.includes(lbl.text)) {
+                btn.style.transform = 'scale(1)';
+              }
+            };
 
             btn.onclick = () => {
               if (this.currentActivityState.sentence.includes(lbl.text)) {
                 this.currentActivityState.sentence = this.currentActivityState.sentence.filter(t => t !== lbl.text);
                 btn.style.background = 'transparent';
+                btn.style.transform = 'scale(1)';
               } else {
                 this.currentActivityState.sentence.push(lbl.text);
-                btn.style.background = 'rgba(0,0,0,0.1)';
-                btn.style.borderRadius = '10px';
+                btn.style.background = 'rgba(0,0,0,0.12)';
+                btn.style.borderRadius = '12px';
+                btn.style.transform = 'scale(1.04)';
+                btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.04)' }], { duration: 180 });
               }
-              overlayText.textContent = this.currentActivityState.sentence.join(' - ');
+              overlayText.textContent = formatSentenceDisplay(this.currentActivityState.sentence);
+              overlayText.animate([{ opacity: 0.6 }, { opacity: 1 }], { duration: 180 });
             };
             imgContainer.appendChild(btn);
           });
@@ -9081,700 +11548,46 @@
 
         if (activity.valBtnPos) {
           const btnWrapper = document.createElement('div');
+          btnWrapper.id = 'j3-val-btn-wrapper';
           btnWrapper.style.position = 'absolute';
-          btnWrapper.style.left = activity.valBtnPos.left + '%';
-          btnWrapper.style.top = activity.valBtnPos.top + '%';
-          btnWrapper.style.transform = 'translate(-50%, -50%)';
           btnWrapper.style.zIndex = '50';
+          btnWrapper.style.cursor = 'pointer';
+          btnWrapper.style.display = 'block';
 
-          if (activity.type === 'match') {
-            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            svg.style.position = 'absolute';
-            svg.style.top = '0'; svg.style.left = '0';
-            svg.style.width = '100%'; svg.style.height = '100%';
-            svg.style.pointerEvents = 'none';
-            imgContainer.appendChild(svg);
-            this.currentActivityState.svg = svg;
-
-            let currentLeft = null;
-
-            const setupMatchBtn = (opt, isLeft) => {
-              const btn = document.createElement('div');
-              btn.style.position = 'absolute';
-              btn.style.left = opt.left + '%'; btn.style.top = opt.top + '%';
-              btn.style.width = opt.width + '%'; btn.style.height = opt.height + '%';
-              btn.style.cursor = 'pointer';
-              btn.style.borderRadius = '10px';
-              btn.style.zIndex = '20';
-              btn.style.background = 'rgba(255, 255, 255, 0.01)';
-              btn.style.transition = 'transform 0.2s ease, background 0.2s ease';
-
-              btn.onmouseenter = () => { if (!btn.classList.contains('match-left-active')) btn.style.transform = 'scale(1.05)'; };
-              btn.onmouseleave = () => { if (!btn.classList.contains('match-left-active')) btn.style.transform = 'scale(1)'; };
-
-              btn.onclick = () => {
-                if (isLeft) {
-                  if (this.currentActivityState.selected.has(opt.id)) return;
-                  document.querySelectorAll('.match-left-active').forEach(e => {
-                    e.style.border = 'none'; e.classList.remove('match-left-active'); e.style.transform = 'scale(1)';
-                  });
-                  btn.style.border = '3px solid #0984e3';
-                  btn.style.transform = 'scale(1.05)';
-                  btn.classList.add('match-left-active');
-                  currentLeft = opt;
-                } else {
-                  if (this.currentActivityState.selected.has(opt.id) || !currentLeft) return;
-
-                  if (activity.matches[currentLeft.id] === opt.id) {
-                    // Correct pair!
-                    this.currentActivityState.selected.add(currentLeft.id);
-                    this.currentActivityState.selected.add(opt.id);
-                    this.currentActivityState.lines.push({ l: currentLeft.id, r: opt.id });
-
-                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    line.setAttribute('x1', (currentLeft.left + currentLeft.width) + '%');
-                    line.setAttribute('y1', (currentLeft.top + currentLeft.height / 2) + '%');
-                    line.setAttribute('x2', opt.left + '%');
-                    line.setAttribute('y2', (opt.top + opt.height / 2) + '%');
-                    line.setAttribute('stroke', '#0984e3');
-                    line.setAttribute('stroke-width', '4');
-                    svg.appendChild(line);
-
-                    const len = line.getTotalLength();
-                    line.style.strokeDasharray = len;
-                    line.style.strokeDashoffset = len;
-                    line.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], { duration: 400, easing: 'ease-out' }).onfinish = () => {
-                      line.style.strokeDashoffset = 0;
-                    };
-
-                    const targetResBox = currentLeft.resBox || opt.resBox;
-                    if (targetResBox) {
-                      const resBox = document.createElement('div');
-                      resBox.style.position = 'absolute';
-                      resBox.style.left = targetResBox.left + '%';
-                      resBox.style.top = targetResBox.top + '%';
-                      resBox.style.width = targetResBox.width + '%';
-                      resBox.style.height = targetResBox.height + '%';
-                      resBox.style.display = 'flex';
-                      resBox.style.alignItems = 'center';
-                      resBox.style.justifyContent = 'center';
-                      resBox.style.color = '#1b305f';
-                      resBox.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-                      resBox.style.fontSize = 'calc(var(--img-width) * 0.025)';
-                      resBox.style.fontWeight = 'bold';
-                      resBox.textContent = currentLeft.text + opt.text;
-                      imgContainer.appendChild(resBox);
-                      resBox.animate([{ transform: 'scale(0.8)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 300, easing: 'ease-out' });
-                    }
-
-                    document.querySelectorAll('.match-left-active').forEach(e => {
-                      e.style.border = 'none'; e.classList.remove('match-left-active'); e.style.transform = 'scale(1)';
-                    });
-                    currentLeft = null;
-
-                    const fb = document.getElementById('j3-feedback');
-                    if (fb) fb.textContent = '';
-                  } else {
-                    const fb = document.getElementById('j3-feedback');
-                    if (fb) {
-                      fb.textContent = 'Essaie encore !';
-                      fb.style.color = '#f87171';
-                      window.j1GentleShake(fb);
-                    }
-                    window.j1GentleShake(btn);
-                    document.querySelectorAll('.match-left-active').forEach(e => {
-                      e.style.border = 'none'; e.classList.remove('match-left-active'); e.style.transform = 'scale(1)';
-                    });
-                    currentLeft = null;
-                  }
-                }
-              };
-              imgContainer.appendChild(btn);
-            };
-
-            activity.left.forEach(opt => setupMatchBtn(opt, true));
-            activity.right.forEach(opt => setupMatchBtn(opt, false));
-          }
-
-          if (activity.type === 'drawing') {
-            this.currentActivityState.drawings = {};
-
-            const resamplePath = (points, numPoints) => {
-              if (points.length === 0) return [];
-              if (points.length === 1) return Array(numPoints).fill(points[0]);
-              let totalLength = 0;
-              for (let i = 1; i < points.length; i++) {
-                totalLength += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
-              }
-              const step = totalLength / (numPoints - 1);
-              const newPoints = [points[0]];
-              let currentD = 0;
-              for (let i = 1; i < points.length; i++) {
-                let p0 = points[i - 1];
-                let p1 = points[i];
-                let dist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-                while (currentD + dist >= step && newPoints.length < numPoints - 1) {
-                  let t = (step - currentD) / dist;
-                  let nx = p0.x + t * (p1.x - p0.x);
-                  let ny = p0.y + t * (p1.y - p0.y);
-                  newPoints.push({ x: nx, y: ny });
-                  p0 = { x: nx, y: ny };
-                  dist -= (step - currentD);
-                  currentD = 0;
-                }
-                currentD += dist;
-              }
-              while (newPoints.length < numPoints) newPoints.push(points[points.length - 1]);
-              return newPoints;
-            };
-
-
-
-            activity.boxes.forEach(box => {
-              this.currentActivityState.drawings[box.id] = { points: [], passed: false, evalTimeout: null };
-              const state = this.currentActivityState.drawings[box.id];
-
-              const canvasWrapper = document.createElement('div');
-              canvasWrapper.style.position = 'absolute';
-              canvasWrapper.style.left = box.left + '%';
-              canvasWrapper.style.top = box.top + '%';
-              canvasWrapper.style.width = box.width + '%';
-              canvasWrapper.style.height = box.height + '%';
-              canvasWrapper.style.borderRadius = '10px';
-
-              const canvas = document.createElement('canvas');
-              canvas.style.width = '100%';
-              canvas.style.height = '100%';
-              canvas.style.touchAction = 'none';
-              canvas.style.cursor = 'crosshair';
-              canvasWrapper.appendChild(canvas);
-
-              const btnClear = document.createElement('button');
-              btnClear.textContent = '✖';
-              btnClear.title = 'Effacer';
-              btnClear.style.position = 'absolute';
-              btnClear.style.top = '5px';
-              btnClear.style.right = '5px';
-              btnClear.style.width = '30px';
-              btnClear.style.height = '30px';
-              btnClear.style.borderRadius = '50%';
-              btnClear.style.border = '2px solid white';
-              btnClear.style.background = '#d63031';
-              btnClear.style.color = 'white';
-              btnClear.style.fontWeight = 'bold';
-              btnClear.style.cursor = 'pointer';
-              btnClear.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
-              canvasWrapper.appendChild(btnClear);
-
-              imgContainer.appendChild(canvasWrapper);
-
-              let ctx = canvas.getContext('2d');
-              let isDrawing = false;
-
-              setTimeout(() => {
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.lineWidth = 6;
-                ctx.strokeStyle = '#2d3436';
-              }, 50);
-
-              const getPos = (e) => {
-                const rect = canvas.getBoundingClientRect();
-                let clientX = e.clientX;
-                let clientY = e.clientY;
-                if (e.touches && e.touches.length > 0) {
-                  clientX = e.touches[0].clientX;
-                  clientY = e.touches[0].clientY;
-                }
-                return {
-                  x: clientX - rect.left,
-                  y: clientY - rect.top,
-                  nx: (clientX - rect.left) / rect.width,
-                  ny: (clientY - rect.top) / rect.height
-                };
-              };
-
-              const redrawStrokes = (color) => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (state.points.length === 0) return;
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                ctx.moveTo(state.points[0].nx * canvas.width, state.points[0].ny * canvas.height);
-                for (let i = 1; i < state.points.length; i++) {
-                  // For simplicity in auto-eval, if points jump drastically it might be a new stroke.
-                  // But connecting them is fine for the visual feedback of passing.
-                  ctx.lineTo(state.points[i].nx * canvas.width, state.points[i].ny * canvas.height);
-                }
-                ctx.stroke();
-              };
-
-              state.evaluate = () => {
-                if (state.passed) return true;
-                const pts = state.points;
-                if (pts.length < 10) return false;
-
-                const N = 30;
-                const userResampled = resamplePath(pts, N);
-                const expectedResampled = resamplePath(box.expected, N);
-
-                let totalDist = 0;
-                for (let i = 0; i < N; i++) {
-                  totalDist += Math.hypot(userResampled[i].x - expectedResampled[i].x, userResampled[i].y - expectedResampled[i].y);
-                }
-                const avgDist = totalDist / N;
-
-                if (avgDist < 0.45) { // Generous tolerance for children
-                  state.passed = true;
-                  btnClear.style.display = 'none';
-                  redrawStrokes('#4ade80');
-                  return true;
-                }
-                return false;
-              };
-
-              const startDraw = (e) => {
-                if (state.passed) return;
-                e.preventDefault();
-                isDrawing = true;
-
-                const pos = getPos(e);
-                ctx.strokeStyle = '#2d3436';
-                ctx.beginPath();
-                ctx.moveTo(pos.x, pos.y);
-                state.points.push({ x: pos.nx, y: pos.ny });
-              };
-
-              const moveDraw = (e) => {
-                if (!isDrawing || state.passed) return;
-                e.preventDefault();
-                const pos = getPos(e);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
-                state.points.push({ x: pos.nx, y: pos.ny });
-              };
-
-              const endDraw = (e) => {
-                if (isDrawing) {
-                  e.preventDefault();
-                  isDrawing = false;
-                }
-              };
-
-              canvas.addEventListener('mousedown', startDraw);
-              canvas.addEventListener('mousemove', moveDraw);
-              window.addEventListener('mouseup', endDraw);
-
-              canvas.addEventListener('touchstart', startDraw, { passive: false });
-              canvas.addEventListener('touchmove', moveDraw, { passive: false });
-              window.addEventListener('touchend', endDraw);
-
-              btnClear.onclick = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                state.points = [];
-                state.passed = false;
-                const fb = document.getElementById('j1-feedback');
-                if (fb) fb.textContent = '';
-              };
-            });
-          }
-
-          if (activity.type === 'sentence') {
-            const overlayText = document.createElement('div');
-            overlayText.style.position = 'absolute';
-            overlayText.style.left = activity.textBox.left + '%';
-            overlayText.style.top = activity.textBox.top + '%';
-            overlayText.style.width = activity.textBox.width + '%';
-            overlayText.style.height = activity.textBox.height + '%';
-            overlayText.style.display = 'flex';
-            overlayText.style.alignItems = 'center';
-            overlayText.style.padding = '0 2%';
-            overlayText.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-            overlayText.style.fontSize = 'calc(var(--img-width) * 0.025)';
-            overlayText.style.fontWeight = '700';
-            overlayText.style.color = '#1b305f';
-            overlayText.style.whiteSpace = 'nowrap';
-            overlayText.style.pointerEvents = 'none';
-            imgContainer.appendChild(overlayText);
-
-            activity.labels.forEach(lbl => {
-              const btn = document.createElement('div');
-              btn.style.position = 'absolute';
-              btn.style.left = lbl.left + '%'; btn.style.top = lbl.top + '%';
-              btn.style.width = lbl.width + '%'; btn.style.height = lbl.height + '%';
-              btn.style.cursor = 'pointer';
-              btn.style.transition = 'transform 0.2s ease, background 0.2s ease';
-
-              btn.onmouseenter = () => { if (!this.currentActivityState.sentence.includes(lbl.text)) btn.style.transform = 'scale(1.05)'; };
-              btn.onmouseleave = () => { if (!this.currentActivityState.sentence.includes(lbl.text)) btn.style.transform = 'scale(1)'; };
-
-              btn.onclick = () => {
-                if (this.currentActivityState.sentence.includes(lbl.text)) {
-                  this.currentActivityState.sentence = this.currentActivityState.sentence.filter(t => t !== lbl.text);
-                  btn.style.background = 'transparent';
-                  btn.style.transform = 'scale(1)';
-                } else {
-                  this.currentActivityState.sentence.push(lbl.text);
-                  btn.style.background = 'rgba(0,0,0,0.1)';
-                  btn.style.borderRadius = '10px';
-                  btn.style.transform = 'scale(1.05)';
-                  btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)' }], { duration: 200 });
-                }
-                overlayText.textContent = this.currentActivityState.sentence.join(' ');
-                overlayText.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
-              };
-              imgContainer.appendChild(btn);
-            });
-          }
-
-          wrapper.appendChild(imgContainer);
-
-          // Add UI components on top if needed
-          var feedbackMsg = document.createElement('div');
-          feedbackMsg.id = 'j1-feedback';
-          feedbackMsg.style.fontFamily = 'Nunito, sans-serif';
-          feedbackMsg.style.fontSize = '24px';
-          feedbackMsg.style.fontWeight = 'bold';
-          feedbackMsg.style.height = '35px';
-          feedbackMsg.style.marginTop = '15px';
-          feedbackMsg.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
-          wrapper.appendChild(feedbackMsg);
-
-          if (activity.type === 'drawing' || activity.type === 'mixed') {
-            this.currentActivityState.drawings = {};
-
-            const resamplePath = (points, numPoints) => {
-              if (points.length === 0) return [];
-              if (points.length === 1) return Array(numPoints).fill(points[0]);
-              let totalLength = 0;
-              for (let i = 1; i < points.length; i++) {
-                totalLength += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
-              }
-              const step = totalLength / (numPoints - 1);
-              const newPoints = [points[0]];
-              let currentD = 0;
-              for (let i = 1; i < points.length; i++) {
-                let p0 = points[i - 1];
-                let p1 = points[i];
-                let dist = Math.hypot(p1.x - p0.x, p1.y - p0.y);
-                while (currentD + dist >= step && newPoints.length < numPoints - 1) {
-                  let t = (step - currentD) / dist;
-                  let nx = p0.x + t * (p1.x - p0.x);
-                  let ny = p0.y + t * (p1.y - p0.y);
-                  newPoints.push({ x: nx, y: ny });
-                  p0 = { x: nx, y: ny };
-                  dist -= (step - currentD);
-                  currentD = 0;
-                }
-                currentD += dist;
-              }
-              while (newPoints.length < numPoints) newPoints.push(points[points.length - 1]);
-              return newPoints;
-            };
-
-
-
-            activity.boxes.forEach(box => {
-              this.currentActivityState.drawings[box.id] = { points: [], passed: false, evalTimeout: null };
-              const state = this.currentActivityState.drawings[box.id];
-
-              const canvasWrapper = document.createElement('div');
-              canvasWrapper.style.position = 'absolute';
-              canvasWrapper.style.left = box.left + '%';
-              canvasWrapper.style.top = box.top + '%';
-              canvasWrapper.style.width = box.width + '%';
-              canvasWrapper.style.height = box.height + '%';
-              canvasWrapper.style.borderRadius = '10px';
-
-              const canvas = document.createElement('canvas');
-              canvas.style.width = '100%';
-              canvas.style.height = '100%';
-              canvas.style.touchAction = 'none';
-              canvas.style.cursor = 'crosshair';
-              canvasWrapper.appendChild(canvas);
-
-              const btnClear = document.createElement('button');
-              btnClear.textContent = '✖';
-              btnClear.title = 'Effacer';
-              btnClear.style.position = 'absolute';
-              btnClear.style.top = '5px';
-              btnClear.style.right = '5px';
-              btnClear.style.width = '30px';
-              btnClear.style.height = '30px';
-              btnClear.style.borderRadius = '50%';
-              btnClear.style.border = '2px solid white';
-              btnClear.style.background = '#d63031';
-              btnClear.style.color = 'white';
-              btnClear.style.fontWeight = 'bold';
-              btnClear.style.cursor = 'pointer';
-              btnClear.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
-              canvasWrapper.appendChild(btnClear);
-
-              imgContainer.appendChild(canvasWrapper);
-
-              let ctx = canvas.getContext('2d');
-              let isDrawing = false;
-
-              setTimeout(() => {
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.lineWidth = 6;
-                ctx.strokeStyle = '#2d3436';
-              }, 50);
-
-              const getPos = (e) => {
-                const rect = canvas.getBoundingClientRect();
-                let clientX = e.clientX;
-                let clientY = e.clientY;
-                if (e.touches && e.touches.length > 0) {
-                  clientX = e.touches[0].clientX;
-                  clientY = e.touches[0].clientY;
-                }
-                return {
-                  x: clientX - rect.left,
-                  y: clientY - rect.top,
-                  nx: (clientX - rect.left) / rect.width,
-                  ny: (clientY - rect.top) / rect.height
-                };
-              };
-
-              const redrawStrokes = (color) => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if (state.points.length === 0) return;
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                ctx.moveTo(state.points[0].nx * canvas.width, state.points[0].ny * canvas.height);
-                for (let i = 1; i < state.points.length; i++) {
-                  // For simplicity in auto-eval, if points jump drastically it might be a new stroke.
-                  // But connecting them is fine for the visual feedback of passing.
-                  ctx.lineTo(state.points[i].nx * canvas.width, state.points[i].ny * canvas.height);
-                }
-                ctx.stroke();
-              };
-
-              state.evaluate = () => {
-                if (state.passed) return true;
-                const pts = state.points;
-                if (pts.length < 10) return false;
-
-                const N = 30;
-                const userResampled = resamplePath(pts, N);
-                const expectedResampled = resamplePath(box.expected, N);
-
-                let totalDist = 0;
-                for (let i = 0; i < N; i++) {
-                  totalDist += Math.hypot(userResampled[i].x - expectedResampled[i].x, userResampled[i].y - expectedResampled[i].y);
-                }
-                const avgDist = totalDist / N;
-
-                if (avgDist < 0.45) { // Generous tolerance for children
-                  state.passed = true;
-                  btnClear.style.display = 'none';
-                  redrawStrokes('#4ade80');
-                  return true;
-                }
-                return false;
-              };
-
-              const startDraw = (e) => {
-                if (state.passed) return;
-                e.preventDefault();
-                isDrawing = true;
-
-                const pos = getPos(e);
-                ctx.strokeStyle = '#2d3436';
-                ctx.beginPath();
-                ctx.moveTo(pos.x, pos.y);
-                state.points.push({ x: pos.nx, y: pos.ny });
-              };
-
-              const moveDraw = (e) => {
-                if (!isDrawing || state.passed) return;
-                e.preventDefault();
-                const pos = getPos(e);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
-                state.points.push({ x: pos.nx, y: pos.ny });
-              };
-
-              const endDraw = (e) => {
-                if (isDrawing) {
-                  e.preventDefault();
-                  isDrawing = false;
-                }
-              };
-
-              canvas.addEventListener('mousedown', startDraw);
-              canvas.addEventListener('mousemove', moveDraw);
-              window.addEventListener('mouseup', endDraw);
-
-              canvas.addEventListener('touchstart', startDraw, { passive: false });
-              canvas.addEventListener('touchmove', moveDraw, { passive: false });
-              window.addEventListener('touchend', endDraw);
-
-              btnClear.onclick = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                state.points = [];
-                state.passed = false;
-                const fb = document.getElementById('j1-feedback');
-                if (fb) fb.textContent = '';
-              };
-            });
-          }
-
-          if (activity.type === 'sentence') {
-            const overlayText = document.createElement('div');
-            overlayText.style.position = 'absolute';
-            overlayText.style.left = activity.textBox.left + '%';
-            overlayText.style.top = activity.textBox.top + '%';
-            overlayText.style.width = activity.textBox.width + '%';
-            overlayText.style.height = activity.textBox.height + '%';
-            overlayText.style.display = 'flex';
-            overlayText.style.alignItems = 'center';
-            overlayText.style.padding = '0 2%';
-            overlayText.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-            overlayText.style.fontSize = 'calc(var(--img-width) * 0.025)';
-            overlayText.style.fontWeight = '700';
-            overlayText.style.color = '#1b305f';
-            overlayText.style.whiteSpace = 'nowrap';
-            overlayText.style.pointerEvents = 'none';
-            imgContainer.appendChild(overlayText);
-
-            activity.labels.forEach(lbl => {
-              const btn = document.createElement('div');
-              btn.style.position = 'absolute';
-              btn.style.left = lbl.left + '%'; btn.style.top = lbl.top + '%';
-              btn.style.width = lbl.width + '%'; btn.style.height = lbl.height + '%';
-              btn.style.cursor = 'pointer';
-              btn.style.transition = 'transform 0.2s ease, background 0.2s ease';
-
-              btn.onmouseenter = () => { if (!this.currentActivityState.sentence.includes(lbl.text)) btn.style.transform = 'scale(1.05)'; };
-              btn.onmouseleave = () => { if (!this.currentActivityState.sentence.includes(lbl.text)) btn.style.transform = 'scale(1)'; };
-
-              btn.onclick = () => {
-                if (this.currentActivityState.sentence.includes(lbl.text)) {
-                  this.currentActivityState.sentence = this.currentActivityState.sentence.filter(t => t !== lbl.text);
-                  btn.style.background = 'transparent';
-                  btn.style.transform = 'scale(1)';
-                } else {
-                  this.currentActivityState.sentence.push(lbl.text);
-                  btn.style.background = 'rgba(0,0,0,0.1)';
-                  btn.style.borderRadius = '10px';
-                  btn.style.transform = 'scale(1.05)';
-                  btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)' }], { duration: 200 });
-                }
-                overlayText.textContent = this.currentActivityState.sentence.join(' ');
-                overlayText.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
-              };
-              imgContainer.appendChild(btn);
-            });
-          }
-
-          wrapper.appendChild(imgContainer);
-
-          // Add UI components on top if needed
-          var feedbackMsg = document.createElement('div');
-          feedbackMsg.id = 'j1-feedback';
-          feedbackMsg.style.fontFamily = 'Nunito, sans-serif';
-          feedbackMsg.style.fontSize = '24px';
-          feedbackMsg.style.fontWeight = 'bold';
-          feedbackMsg.style.height = '35px';
-          feedbackMsg.style.marginTop = '15px';
-          feedbackMsg.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
-          wrapper.appendChild(feedbackMsg);
-
-
-          if (activity.valBtnPos) {
-            const btnWrapper = document.createElement('div');
-            btnWrapper.id = 'j1-val-btn-wrapper';
-            btnWrapper.style.position = 'absolute';
-            btnWrapper.style.left = activity.valBtnPos.left + '%';
-            btnWrapper.style.top = activity.valBtnPos.top + '%';
-            btnWrapper.style.transform = 'translate(-50%, -50%)';
-            btnWrapper.style.zIndex = '50';
-
-            if (activity.type === 'writing') {
-              activity.inputs.forEach(inp => {
-                const inputEl = document.createElement('input');
-                inputEl.type = 'text';
-                inputEl.style.position = 'absolute';
-                inputEl.style.left = inp.left + '%';
-                inputEl.style.top = inp.top + '%';
-                inputEl.style.width = inp.width + '%';
-                inputEl.style.height = inp.height + '%';
-                inputEl.style.fontSize = '1.3vw';
-                inputEl.style.fontFamily = 'Nunito, sans-serif';
-                inputEl.style.border = 'none';
-                inputEl.style.background = 'rgba(255, 255, 255, 0.5)';
-                inputEl.style.borderRadius = '5px';
-                inputEl.style.outline = 'none';
-                inputEl.style.color = '#1e3a8a';
-                inputEl.style.padding = '0 10px';
-                inputEl.id = inp.id;
-                imgContainer.appendChild(inputEl);
-              });
-            }
-
-            if (activity.type === 'multiple-choice') {
-              this.currentActivityState.optionElements = {};
-
-              activity.options.forEach(opt => {
-                const hotspot = document.createElement('div');
-                hotspot.style.position = 'absolute';
-                hotspot.style.left = opt.left + '%';
-                hotspot.style.top = opt.top + '%';
-                hotspot.style.width = opt.width + '%';
-                hotspot.style.aspectRatio = '1 / 1';
-                hotspot.style.transform = 'translate(-50%, -50%)';
-                hotspot.style.cursor = 'pointer';
-                hotspot.style.borderRadius = '50%';
-                hotspot.style.display = 'flex';
-                hotspot.style.alignItems = 'center';
-                hotspot.style.justifyContent = 'center';
-
-                this.currentActivityState.optionElements[opt.id] = hotspot;
-
-                hotspot.onclick = () => {
-                  if (this.currentActivityState.selected.has(opt.id)) {
-                    this.currentActivityState.selected.delete(opt.id);
-                    hotspot.innerHTML = '';
-                  } else {
-                    if (opt.group !== undefined) {
-                      activity.options.forEach(otherOpt => {
-                        if (otherOpt.group === opt.group && this.currentActivityState.selected.has(otherOpt.id)) {
-                          this.currentActivityState.selected.delete(otherOpt.id);
-                          const otherEl = this.currentActivityState.optionElements[otherOpt.id];
-                          if (otherEl) otherEl.innerHTML = '';
-                        }
-                      });
-                    }
-
-                    this.currentActivityState.selected.add(opt.id);
-                    hotspot.innerHTML = '<div style="width: 100%; height: 100%; background: #4ade80; border-radius: 50%;"></div>';
-                    hotspot.firstElementChild.animate([{ transform: 'scale(0)' }, { transform: 'scale(1)' }], { duration: 200, easing: 'ease-out' });
-                  }
-                };
-                imgContainer.appendChild(hotspot);
-              });
-            }
-
-          }
           const valBtn = document.createElement('img');
           valBtn.id = 'j3-val-btn';
           valBtn.draggable = false;
           valBtn.style.cursor = 'pointer';
-          valBtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.20)';
+          valBtn.style.pointerEvents = 'none';
+          valBtn.style.transformOrigin = 'center center';
+          valBtn.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
+
+          btnWrapper.style.left = activity.valBtnPos.left + '%';
+          btnWrapper.style.top = activity.valBtnPos.top + '%';
+          btnWrapper.style.transform = 'translate(-50%, -50%)';
+          btnWrapper.style.width = activity.valBtnPos.width ? activity.valBtnPos.width + '%' : '22%';
+          btnWrapper.style.maxWidth = '240px';
+          btnWrapper.style.minWidth = '140px';
+          btnWrapper.style.height = 'auto';
+          valBtn.style.width = '100%';
           valBtn.style.height = 'auto';
-          valBtn.style.display = 'block';
-          valBtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
 
-          valBtn.onmouseenter = () => { valBtn.style.transform = 'scale(1.03)'; valBtn.style.filter = 'brightness(1.05)'; };
-          valBtn.onmouseleave = () => { valBtn.style.transform = 'scale(1)'; valBtn.style.filter = 'brightness(1)'; };
+          btnWrapper.onmouseenter = () => {
+            valBtn.style.transform = 'scale(1.05)';
+            valBtn.style.filter = 'brightness(1.08) drop-shadow(0 4px 8px rgba(0,0,0,0.25))';
+          };
+          btnWrapper.onmouseleave = () => {
+            valBtn.style.transform = 'scale(1)';
+            valBtn.style.filter = 'brightness(1)';
+          };
+          btnWrapper.onmousedown = () => {
+            valBtn.style.transform = 'scale(0.95)';
+          };
+          btnWrapper.onmouseup = () => {
+            valBtn.style.transform = 'scale(1.05)';
+          };
 
-          valBtn.onclick = () => {
+          btnWrapper.onclick = () => {
             if (valBtn.getAttribute('data-action') === 'next') {
               this.handleJourney3Next();
             } else if (activity.needsValidation) {
@@ -9782,14 +11595,15 @@
             }
           };
 
+          valBtn.style.marginTop = '0';
           btnWrapper.appendChild(valBtn);
           imgContainer.appendChild(btnWrapper);
 
           if (activity.needsValidation) {
-            valBtn.src = 'journe 1/valider.png'; // reuse asset
+            valBtn.src = 'journe 1/valider.png';
             valBtn.setAttribute('data-action', 'validate');
           } else {
-            valBtn.src = 'journe 1/continuer.png'; // reuse asset
+            valBtn.src = 'journe 1/continuer.png';
             valBtn.setAttribute('data-action', 'next');
           }
         }
@@ -9819,6 +11633,13 @@
         btnBack.onmousedown = () => { btnBack.style.transform = (navBackPos.transform ? navBackPos.transform + ' ' : '') + 'scale(0.95) translateY(1px)'; };
         btnBack.onclick = (e) => {
           e.stopPropagation();
+          if (window.j3CurrentAudio) {
+            try {
+              window.j3CurrentAudio.pause();
+              window.j3CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j3CurrentAudio = null;
+          }
           if (this.currentExIndex > 0) {
             this.currentExIndex--;
             this.loadJourney3Activity();
@@ -9862,9 +11683,7 @@
           wrapper.style.opacity = '1';
           wrapper.style.transform = 'scale(1)';
         });
-      },
-
-      validateJourney3Activity(activity) {
+      },validateJourney3Activity(activity) {
         let isCorrect = false;
         const fb = document.getElementById('j3-feedback');
         const state = this.currentActivityState;
@@ -9890,10 +11709,9 @@
           if (!wrongPair && correctPairs === Object.keys(activity.matches).length) isCorrect = true;
         }
         else if (activity.type === 'sentence') {
-          const built = state.sentence.join(' ');
-          if (activity.validSentences.includes(built)) {
-            isCorrect = true;
-          }
+          const normalize = str => str.toLowerCase().replace(/[.\s]+/g, ' ').trim().replace(/è/g, 'e');
+          const builtNorm = normalize(state.sentence.join(' '));
+          isCorrect = activity.validSentences.some(s => normalize(s) === builtNorm) || builtNorm === 'karim achete un bouquet de jasmin';
         }
         else if (activity.type === 'writing') {
           let fail = false;
@@ -9930,7 +11748,7 @@
           let checkAllDone = true;
           activity.boxes.forEach(box => {
             const drawState = this.currentActivityState.drawings[box.id];
-            if (drawState.points.length < 10) {
+            if (!drawState || drawState.points.length < 5) {
               checkAllDone = false;
               drawFail = true;
             } else if (!drawState.evaluate()) {
@@ -9940,33 +11758,581 @@
 
           if (!mcFail && !drawFail && checkAllDone) {
             isCorrect = true;
+          } else {
+            const fb = document.getElementById('j3-feedback');
+            if (fb) {
+              if (mcFail) {
+                fb.textContent = "Regarde bien les dessins et écoute les sons pour mettre la croix au bon endroit.";
+              } else {
+                fb.textContent = "Très bien pour les dessins ! Écris maintenant les lettres k et q dans les cadres.";
+              }
+              fb.style.color = '#f87171';
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
           }
         }
 
         if (isCorrect) {
-          fb.textContent = "Excellent ! Bonne réponse !";
-          fb.style.color = '#4ade80';
-
-          const valBtn = document.getElementById('j3-val-btn');
-          if (valBtn) {
-            valBtn.src = 'journe 1/continuer.png';
-            valBtn.setAttribute('data-action', 'next');
-            valBtn.animate([
-              { transform: 'scale(0.9)', opacity: 0.5 },
-              { transform: 'scale(1.05)', opacity: 1 },
-              { transform: 'scale(1)', opacity: 1 }
-            ], { duration: 400, easing: 'ease-out' });
+          const fb = document.getElementById('j3-feedback');
+          if (fb) {
+            fb.textContent = '';
+            fb.style.display = 'none';
           }
+          this.showJourney3SuccessPopup();
         } else {
-          fb.textContent = "Oups, ce n'est pas tout à fait ça. Réessaie !";
-          fb.style.color = '#f87171';
-          if (window.j1GentleShake) window.j1GentleShake(fb);
+          const fb = document.getElementById('j3-feedback');
+          if (activity.type !== 'mixed' && fb) {
+            fb.textContent = "Oups, ce n'est pas tout à fait ça. Réessaie !";
+            fb.style.color = '#f87171';
+            if (window.j1GentleShake) window.j1GentleShake(fb);
+          }
 
-          if (activity.type === 'match' || activity.type === 'sentence') {
+          if (activity.type === 'match' && fb) {
+            fb.textContent = "Relie toutes les syllabes pour former les mots !";
+            fb.style.color = '#f87171';
+            if (window.j1GentleShake) window.j1GentleShake(fb);
+          } else if (activity.type === 'sentence') {
             setTimeout(() => this.loadJourney3Activity(), 1500);
           }
         }
       },
+      showJourney3SuccessPopup() {
+        const CONTINUER_IMAGES = [
+          'contiuer/bien joue.png',
+          'contiuer/excellent.png',
+          'contiuer/parfait.png',
+          'contiuer/super.png'
+        ];
+
+        // Shuffle deck: cycles through all 4 celebration photos in randomized order before repeating
+        if (!this.j3SuccessDeck || this.j3SuccessDeck.length === 0) {
+          const deck = [...CONTINUER_IMAGES];
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          if (deck[0] === this.lastJ3SuccessCard && deck.length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+          }
+          this.j3SuccessDeck = deck;
+        }
+
+        const chosenSrc = this.j3SuccessDeck.shift();
+        this.lastJ3SuccessCard = chosenSrc;
+
+        // Hide stray feedback and validation button
+        const fb = document.getElementById('j3-feedback');
+        if (fb) {
+          fb.textContent = '';
+          fb.style.display = 'none';
+        }
+        const valBtnWrapper = document.getElementById('j3-val-btn-wrapper');
+        if (valBtnWrapper) {
+          valBtnWrapper.style.display = 'none';
+        }
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            // Soft celebratory pop sound
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            // Twinkling spark chime
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        // Play specific celebration audio corresponding to the chosen photo
+        const AUDIO_MAP = {
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+          'contiuer/super.png': 'contiuer/super.mp3'
+        };
+
+        let cardAudio = null;
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+        if (targetAudioSrc) {
+          try {
+            if (window.j3CurrentAudio) {
+              window.j3CurrentAudio.pause();
+              window.j3CurrentAudio.currentTime = 0;
+            }
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+            window.j3CurrentAudio = cardAudio;
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+          } catch (e) {
+            console.warn('Card audio play error:', e);
+          }
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+          window.SoundSystem.playSuccess();
+        }
+
+        // Remove any pre-existing modal if present
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        // FULL SCREEN MODAL: attached to document.body so the blur covers the entire website!
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        // Background Fireworks Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3.5,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        // Initial burst triplet
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        // Continuous festive bursts while card is showing
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        // Visibilitychange handler to prevent background stacking & freeze
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Center Celebration Card
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-success-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = chosenSrc;
+        cardImg.alt = 'Bravo !';
+        cardImg.draggable = false;
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'j1-success-continue-btn';
+        continueBtn.setAttribute('title', 'Continuer vers la prochaine activité');
+        continueBtn.setAttribute('aria-label', 'Continuer');
+
+        let clicked = false;
+        continueBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (cardAudio) {
+            try {
+              cardAudio.pause();
+              cardAudio.currentTime = 0;
+            } catch (e) {}
+            cardAudio = null;
+          }
+          if (window.j3CurrentAudio) {
+            try {
+              window.j3CurrentAudio.pause();
+              window.j3CurrentAudio.currentTime = 0;
+            } catch (e) {}
+            window.j3CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            if (fb) fb.style.display = '';
+            this.handleJourney3Next();
+          }, 240);
+        };
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(continueBtn);
+        modal.appendChild(cardBox);
+
+        // Append to document.body for full-screen backdrop and blur across all elements!
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
+      showJourney3EndCelebration() {
+        if (window.j3CurrentAudio) {
+          try {
+            window.j3CurrentAudio.pause();
+            window.j3CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j3CurrentAudio = null;
+        }
+
+        try {
+          const felicitationAudio = new Audio(encodeURI("contiuer/Felicitation.mp3"));
+          window.j3CurrentAudio = felicitationAudio;
+          felicitationAudio.play().catch(err => console.log('Felicitation audio playback deferred or blocked:', err));
+        } catch (err) {
+          console.warn('Felicitation audio error:', err);
+        }
+
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+          } catch (e) {}
+        };
+
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 300;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 40 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.5 + Math.random() * 6.5;
+            particles.push({
+              x: x, y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3.5,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.014 + Math.random() * 0.016,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 550 + Math.random() * 400);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-end-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = 'JOURNE 3/end journe 3.png';
+        cardImg.alt = 'Félicitations !';
+        cardImg.draggable = false;
+
+        const finishBtn = document.createElement('button');
+        finishBtn.className = 'j1-end-finish-btn';
+        finishBtn.setAttribute('title', 'Retourner à la carte');
+        finishBtn.setAttribute('aria-label', 'Terminer la journée');
+
+        let clicked = false;
+        const doFinish = (e) => {
+          if (e) e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (window.j3CurrentAudio) {
+            try {
+              window.j3CurrentAudio.pause();
+              window.j3CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j3CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            this.finishJourney3();
+          }, 240);
+        };
+
+        finishBtn.onclick = doFinish;
+        cardBox.onclick = doFinish;
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(finishBtn);
+        modal.appendChild(cardBox);
+
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
       handleJourney3Next() {
         this.currentExIndex++;
         this.loadJourney3Activity();

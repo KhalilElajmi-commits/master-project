@@ -47,6 +47,7 @@
   // Drawing state
   let mode = 'idle'; // idle | drawing | moving
   let drawStart = null;
+  let drawStartClient = null;
   let moveOffset = null;
   let previewDiv = null;
 
@@ -86,8 +87,46 @@
     };
   }
 
+  function calculateRect(e) {
+    const ref = targetImg || overlayEl;
+    if (!ref) return { left: 0, top: 0, width: 0, height: 0 };
+    const refRect = ref.getBoundingClientRect();
+    if (!refRect.width || !refRect.height) return { left: 0, top: 0, width: 0, height: 0 };
+
+    if (currentTool === 'circle' && drawStartClient) {
+      // 100% Geometrically Perfect Circle in screen pixels (widthPx === heightPx)
+      const dx = e.clientX - drawStartClient.x;
+      const dy = e.clientY - drawStartClient.y;
+      const diameterPx = Math.max(Math.abs(dx), Math.abs(dy));
+      const signX = dx >= 0 ? 1 : -1;
+      const signY = dy >= 0 ? 1 : -1;
+
+      const boxLeftClient = signX > 0 ? drawStartClient.x : drawStartClient.x - diameterPx;
+      const boxTopClient = signY > 0 ? drawStartClient.y : drawStartClient.y - diameterPx;
+
+      const left = round1(((boxLeftClient - refRect.left) / refRect.width) * 100);
+      const top = round1(((boxTopClient - refRect.top) / refRect.height) * 100);
+      const width = round1((diameterPx / refRect.width) * 100);
+      const height = round1((diameterPx / refRect.height) * 100);
+
+      return { left, top, width, height };
+    } else {
+      const pos = getRelativePos(e);
+      return normalizeRect(drawStart.x, drawStart.y, pos.x, pos.y);
+    }
+  }
+
   // ═══════════════════ IMAGE DETECTION ═══════════════════
   function findExerciseImage() {
+    // 0. Priority: Success Celebration Card if modal is active in DOM and visible
+    const successModal = document.getElementById('j1-success-modal');
+    if (successModal && successModal.offsetWidth > 0 && window.getComputedStyle(successModal).display !== 'none') {
+      const cardImg = successModal.querySelector('.j1-success-card-img') || successModal.querySelector('img');
+      if (cardImg && (cardImg.offsetWidth > 50 || cardImg.naturalWidth > 50)) {
+        return cardImg;
+      }
+    }
+
     // 1. Look inside exercise-content-area
     const area = document.getElementById('exercise-content-area');
     if (area) {
@@ -208,7 +247,7 @@
         position: fixed; right: 0; top: 0; bottom: 0; width: 310px;
         background: rgba(15, 17, 23, 0.96); backdrop-filter: blur(12px);
         border-left: 2px solid rgba(255,255,255,0.1);
-        z-index: 100000; color: #e0e0e0;
+        z-index: 10000010; color: #e0e0e0;
         font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
         font-size: 13px; overflow-y: auto; overflow-x: visible;
         box-shadow: -4px 0 30px rgba(0,0,0,0.5);
@@ -237,7 +276,7 @@
         justify-content: center;
         box-shadow: -4px 2px 12px rgba(0,0,0,0.4);
         transition: background 0.2s, color 0.2s, transform 0.2s;
-        z-index: 100001;
+        z-index: 10000011;
         pointer-events: auto !important;
       }
       #dov-retract-btn:hover {
@@ -344,13 +383,13 @@
       /* Fullscreen capture layer to allow drawing outside the box */
       #dev-overlay-screen-capture {
         position: fixed; inset: 0; width: 100vw; height: 100vh;
-        z-index: 99990; cursor: crosshair; pointer-events: auto;
+        z-index: 10000002; cursor: crosshair; pointer-events: auto;
       }
 
       /* Overlay canvas on image */
       #dev-overlay-canvas {
         position: absolute; left: 0; top: 0; width: 100%; height: 100%;
-        z-index: 99998; cursor: crosshair; overflow: visible !important;
+        z-index: 10000004; cursor: crosshair; overflow: visible !important;
         pointer-events: auto;
       }
       
@@ -359,13 +398,13 @@
         display: flex; align-items: center; justify-content: center;
         font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.9);
         text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: auto;
-        cursor: grab; transition: box-shadow 0.15s;
+        cursor: move !important; transition: box-shadow 0.15s;
         user-select: none; -webkit-user-select: none;
-        overflow: visible; white-space: nowrap; z-index: 10;
+        overflow: visible; white-space: nowrap; z-index: 10000005;
       }
-      .dov-placed-el:active { cursor: grabbing; }
-      .dov-placed-el:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.6); z-index: 15; }
-      .dov-placed-el.selected { box-shadow: 0 0 0 3px #fff, 0 0 15px rgba(52,152,219,0.6); z-index: 20; }
+      .dov-placed-el:active { cursor: grabbing !important; }
+      .dov-placed-el:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.8); z-index: 10000007; }
+      .dov-placed-el.selected { box-shadow: 0 0 0 3px #fff, 0 0 15px rgba(52,152,219,0.8); z-index: 10000008; }
       
       .dov-placed-el .dov-el-id-badge {
         position: absolute; top: 2px; left: 2px; font-size: 9px;
@@ -375,12 +414,12 @@
       
       .dov-preview-rect {
         position: absolute; border: 2px dashed; border-radius: 4px;
-        pointer-events: none; z-index: 99999;
+        pointer-events: none; z-index: 10000006;
       }
       
       /* Activation hint */
       #dev-overlay-hint {
-        position: fixed; bottom: 12px; right: 12px; z-index: 99997;
+        position: fixed; bottom: 12px; right: 12px; z-index: 10000000;
         background: rgba(15,17,23,0.85); color: rgba(255,255,255,0.6);
         padding: 6px 14px; border-radius: 8px; font-size: 11px;
         font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -643,6 +682,28 @@
     elements.forEach(el => renderSingleElement(el));
   }
 
+  function startElementDragById(id, e) {
+    const el = elements.find(item => item.id === id);
+    if (!el) return;
+
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+
+    selectedId = id;
+    mode = 'moving';
+
+    const pos = getRelativePos(e);
+    moveOffset = { x: pos.x - el.left, y: pos.y - el.top };
+
+    if (overlayEl) {
+      overlayEl.querySelectorAll('.dov-placed-el').forEach(d => {
+        d.classList.toggle('selected', parseInt(d.dataset.elId, 10) === id);
+      });
+    }
+    updateSidebar();
+    showStatus(`Selected ${getToolConfig(el.type).label} #${el.id} (drag to move)`);
+  }
+
   function renderSingleElement(el) {
     if (!overlayEl) return;
     const tool = getToolConfig(el.type);
@@ -677,33 +738,12 @@
       div.appendChild(lbl);
     }
 
-    // Click & Drag to select and move
-    function startElementDrag(e) {
-      e.stopPropagation();
-      e.preventDefault();
-
-      // Highlight selected without full re-render (which would destroy the DOM node mid-drag)
-      selectedId = el.id;
-      if (overlayEl) {
-        overlayEl.querySelectorAll('.dov-placed-el').forEach(d => {
-          if (parseInt(d.dataset.elId, 10) === el.id) {
-            d.classList.add('selected');
-          } else {
-            d.classList.remove('selected');
-          }
-        });
-      }
-      updateSidebar();
-
-      const pos = getRelativePos(e);
-      mode = 'moving';
-      moveOffset = { x: pos.x - el.left, y: pos.y - el.top };
-    }
-
-    div.addEventListener('mousedown', startElementDrag);
+    div.addEventListener('mousedown', (e) => {
+      startElementDragById(el.id, e);
+    });
     div.addEventListener('touchstart', (e) => {
       const m = touchToMouse(e);
-      if (m) startElementDrag(m);
+      if (m) startElementDragById(el.id, m);
     }, { passive: false });
 
     overlayEl.appendChild(div);
@@ -771,9 +811,16 @@
     if (e.button !== 0) return;
     if (e.target && e.target.closest('#dev-overlay-sidebar')) return;
 
-    // Check if clicking on an existing element (handled by element's own mousedown)
-    const clickedEl = e.target && e.target.closest('.dov-placed-el');
-    if (clickedEl) return;
+    // Check if clicking on an existing element (through all layers via elementsFromPoint)
+    const hits = (document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : []) || [];
+    const hitPlaced = hits.find(el => el.classList && el.classList.contains('dov-placed-el'));
+    if (hitPlaced) {
+      const id = parseInt(hitPlaced.dataset.elId, 10);
+      if (!isNaN(id)) {
+        startElementDragById(id, e);
+        return;
+      }
+    }
 
     e.preventDefault();
 
@@ -784,6 +831,7 @@
     const pos = getRelativePos(e);
     mode = 'drawing';
     drawStart = pos;
+    drawStartClient = { x: e.clientX, y: e.clientY };
 
     const tool = getToolConfig(currentTool);
     if (previewDiv) previewDiv.remove();
@@ -805,26 +853,40 @@
 
     if (mode === 'drawing' && previewDiv && drawStart) {
       e.preventDefault();
-      const pos = getRelativePos(e);
-      const rect = normalizeRect(drawStart.x, drawStart.y, pos.x, pos.y);
+      const rect = calculateRect(e);
       previewDiv.style.left = rect.left + '%';
       previewDiv.style.top = rect.top + '%';
       previewDiv.style.width = rect.width + '%';
       previewDiv.style.height = rect.height + '%';
+      if (currentTool === 'circle') {
+        previewDiv.style.borderRadius = '50%';
+      } else {
+        previewDiv.style.borderRadius = '4px';
+      }
     }
 
     if (mode === 'moving' && selectedId !== null && moveOffset) {
       e.preventDefault();
       const pos = getRelativePos(e);
-      moveElement(selectedId, pos.x - moveOffset.x, pos.y - moveOffset.y);
+      const newLeft = round1(pos.x - moveOffset.x);
+      const newTop = round1(pos.y - moveOffset.y);
+      moveElement(selectedId, newLeft, newTop);
+
+      // Live update coordinates in sidebar
+      if (listContainerEl) {
+        const coordEl = listContainerEl.querySelector(`[data-el-id="${selectedId}"] .dov-el-coords`);
+        if (coordEl) {
+          const el = elements.find(item => item.id === selectedId);
+          if (el) coordEl.textContent = `L:${el.left} T:${el.top} W:${el.width} H:${el.height}`;
+        }
+      }
     }
   }
 
   function onMouseUp(e) {
     if (mode === 'drawing' && drawStart) {
       e.preventDefault();
-      const pos = getRelativePos(e);
-      const rect = normalizeRect(drawStart.x, drawStart.y, pos.x, pos.y);
+      const rect = calculateRect(e);
 
       if (previewDiv) { previewDiv.remove(); previewDiv = null; }
 
@@ -834,6 +896,7 @@
       if (labelInputEl) labelInputEl.value = '';
 
       drawStart = null;
+      drawStartClient = null;
       mode = 'idle';
     }
 
@@ -843,6 +906,7 @@
       saveData();
       renderAllElements();
       updateSidebar();
+      showStatus(`✓ Moved element #${selectedId}`);
     }
   }
 
@@ -959,6 +1023,26 @@
       if (selectedId !== null) {
         e.preventDefault();
         removeElement(selectedId);
+      }
+    }
+
+    // Arrow keys to nudge selected element
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      if (selectedId !== null) {
+        e.preventDefault();
+        const el = elements.find(item => item.id === selectedId);
+        if (el) {
+          const step = e.shiftKey ? 1.0 : 0.2;
+          let dx = 0, dy = 0;
+          if (e.key === 'ArrowLeft') dx = -step;
+          if (e.key === 'ArrowRight') dx = step;
+          if (e.key === 'ArrowUp') dy = -step;
+          if (e.key === 'ArrowDown') dy = step;
+          moveElement(selectedId, el.left + dx, el.top + dy);
+          saveData();
+          updateSidebar();
+        }
+        return;
       }
     }
 

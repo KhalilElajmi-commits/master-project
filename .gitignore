@@ -12,3 +12,10 @@ desktop.ini
 # Temporary & Log Files
 *.log
 *.tmp
+
+# User documents, executables and temporary media
+*.exe
+*.pdf
+*.pptx
+*.jfif
+journe 4/ebad77e1*
