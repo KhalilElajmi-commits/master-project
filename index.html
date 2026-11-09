@@ -1281,10 +1281,7 @@
             // Initialize Firebase App Check with reCAPTCHA Enterprise provider
             try {
               if (typeof firebase.appCheck === 'function') {
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-                }
-                const siteKey = window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LcY3rUqAAAAABcdef1234567890abcdef123456';
+                const siteKey = window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LdAWhguAAAAANNbg2iJtYw636xDuZT2nB3l9q5E';
                 this.appCheck = firebase.appCheck();
                 this.appCheck.activate(
                   new firebase.appCheck.ReCaptchaEnterpriseProvider(siteKey),
@@ -1401,10 +1398,11 @@
   <!-- Firebase AI Logic SDK (Official Modular ESM with GoogleAIBackend & App Check) -->
   <script type="module">
     import { initializeApp, getApps } from "https://esm.sh/@firebase/app@0.16.5";
-    import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://esm.sh/@firebase/app-check@0.8.12?deps=@firebase/app@0.16.5";
+    import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from "https://esm.sh/@firebase/app-check@0.8.12?deps=@firebase/app@0.16.5";
     import { getAI, getGenerativeModel, GoogleAIBackend } from "https://esm.sh/@firebase/ai@3.0.0?deps=@firebase/app@0.16.5";
 
     let aiModelPromise = null;
+    let modularAppCheckInstance = null;
 
     async function initFirebaseAiLogic() {
       if (aiModelPromise) return aiModelPromise;
@@ -1413,29 +1411,44 @@
         // 1. Initialize modular FirebaseApp (named to guarantee zero conflict with Compat instance)
         const modularApp = getApps().find(a => a.name === "ecriproAiApp") || initializeApp(firebaseConfig, "ecriproAiApp");
 
-        // 2. Initialize App Check on this modular app with the registered reCAPTCHA Enterprise provider
-        try {
-          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+        // 2. Initialize App Check with registered reCAPTCHA Enterprise site key
+        const siteKey = window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LdAWhguAAAAANNbg2iJtYw636xDuZT2nB3l9q5E';
+        if (!modularAppCheckInstance) {
+          try {
+            modularAppCheckInstance = initializeAppCheck(modularApp, {
+              provider: new ReCaptchaEnterpriseProvider(siteKey),
+              isTokenAutoRefreshEnabled: true
+            });
+            console.log("[Firebase AI Logic] App Check successfully initialized with reCAPTCHA Enterprise provider");
+          } catch (acErr) {
+            console.error("[Firebase AI Logic] App Check initialization error:", acErr);
+            throw new Error("Impossible d'initialiser App Check : " + acErr.message);
           }
-          const siteKey = window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LcY3rUqAAAAABcdef1234567890abcdef123456';
-          initializeAppCheck(modularApp, {
-            provider: new ReCaptchaEnterpriseProvider(siteKey),
-            isTokenAutoRefreshEnabled: true
-          });
-          console.log("[Firebase AI Logic] App Check registered on modular app");
-        } catch (acErr) {
-          console.warn("[Firebase AI Logic] App Check note:", acErr.message);
         }
 
-        // 3. Initialize Firebase AI Logic with Gemini Developer API backend (GoogleAIBackend)
+        // 3. Pre-flight App Check token audit & retrieval verification
+        try {
+          const tokenResult = await getToken(modularAppCheckInstance, false);
+          if (!tokenResult || !tokenResult.token) {
+            throw new Error("Jeton App Check vide ou indisponible");
+          }
+          const expiresAt = tokenResult.expireTimeMillis
+            ? new Date(tokenResult.expireTimeMillis).toISOString()
+            : "inconnu";
+          console.log("[Firebase AI Logic] App Check token verified. HasToken: true. Expires at:", expiresAt);
+        } catch (tokenErr) {
+          console.error("[Firebase AI Logic] App Check token verification failed:", tokenErr.message);
+          throw new Error("Vérification du jeton App Check échouée : " + tokenErr.message);
+        }
+
+        // 4. Initialize Firebase AI Logic with Gemini Developer API backend (GoogleAIBackend)
         const ai = getAI(modularApp, {
           backend: new GoogleAIBackend()
         });
 
-        // 4. Retrieve Generative Model with temperature 0.2 and JSON response type
+        // 5. Retrieve Generative Model with temperature 0.2 and JSON response type
         const model = getGenerativeModel(ai, {
-          model: "gemini-2.0-flash",
+          model: "gemini-3.5-flash-lite",
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
@@ -1444,7 +1457,7 @@
           }
         });
 
-        console.log("[Firebase AI Logic] Generative model initialized with GoogleAIBackend (gemini-2.0-flash)");
+        console.log("[Firebase AI Logic] Generative model initialized with GoogleAIBackend (gemini-3.5-flash-lite)");
         return model;
       })();
 
@@ -1452,7 +1465,7 @@
     }
 
     window.GeminiAIService = {
-      model: "gemini-2.0-flash",
+      model: "gemini-3.5-flash-lite",
 
       async evaluateWriting(evaluationContext) {
         if (!evaluationContext) throw new Error("Evaluation context is required");
@@ -1542,10 +1555,10 @@ Retourne UNIQUEMENT un objet JSON valide (aucun commentaire, pas de balises mark
         console.log("[GeminiAIService] Requesting evaluation via Firebase AI Logic model.generateContent()...");
         const model = await initFirebaseAiLogic();
 
-        // 12-second timeout protection
+        // 25-second timeout protection
         const generatePromise = model.generateContent(prompt);
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout dépassé lors de l'évaluation IA")), 12000)
+          setTimeout(() => reject(new Error("Timeout dépassé lors de l'évaluation IA")), 25000)
         );
 
         const result = await Promise.race([generatePromise, timeoutPromise]);
@@ -16631,7 +16644,9 @@ showJourney2EndCelebration() {
         const docId = 'eval_' + safeStudentId + '_' + this.evalSessionId;
 
         const autoScore = this.computeAutoScore();
-        const writingText = (this.evalAnswers && this.evalAnswers.text) ? this.evalAnswers.text.trim() : '';
+        const writingText = (this.evalAnswers && (this.evalAnswers.text || (this.evalAnswers.writing && this.evalAnswers.writing.text)))
+          ? (this.evalAnswers.text || this.evalAnswers.writing.text).trim()
+          : '';
         const currentStatus = statusOverride || 'completed';
 
         const payload = {
