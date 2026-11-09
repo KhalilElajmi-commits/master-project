@@ -1238,10 +1238,11 @@
       box-shadow: none;
     }
   </style>
-  <!-- Firebase Compat SDK & Firestore Service -->
+  <!-- Firebase Compat SDK, App Check & Firestore Service -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-check-compat.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBBCXAcvKEJ93QCXf80qJ7x0WBt9O88RPE",
@@ -1257,6 +1258,8 @@
       app: null,
       db: null,
       analytics: null,
+      appCheck: null,
+      appCheckToken: null,
       initialized: false,
 
       init() {
@@ -1274,12 +1277,47 @@
                 this.analytics = firebase.analytics();
               }
             } catch(e) {}
+
+            // Initialize Firebase App Check with reCAPTCHA Enterprise provider
+            try {
+              if (typeof firebase.appCheck === 'function') {
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+                }
+                const siteKey = window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LcY3rUqAAAAABcdef1234567890abcdef123456';
+                this.appCheck = firebase.appCheck();
+                this.appCheck.activate(
+                  new firebase.appCheck.ReCaptchaEnterpriseProvider(siteKey),
+                  true
+                );
+                console.log("[FirebaseService] App Check initialized with reCAPTCHA Enterprise provider");
+              }
+            } catch (acErr) {
+              console.warn("[FirebaseService] App Check activation note:", acErr.message);
+            }
+
             this.initialized = true;
             console.log("Firebase initialized successfully via SDK");
           }
         } catch (err) {
           console.warn("Firebase SDK initialization fallback:", err);
         }
+      },
+
+      async getAppCheckToken() {
+        this.init();
+        if (this.appCheck && typeof this.appCheck.getToken === 'function') {
+          try {
+            const tokenResult = await this.appCheck.getToken(false);
+            if (tokenResult && tokenResult.token) {
+              this.appCheckToken = tokenResult.token;
+              return tokenResult.token;
+            }
+          } catch (e) {
+            console.warn("[FirebaseService] App Check token retrieval note:", e.message);
+          }
+        }
+        return this.appCheckToken || null;
       },
 
       async saveEvaluation(docId, payload) {
@@ -1342,7 +1380,13 @@
           } else if (Array.isArray(val)) {
             out[k] = {
               arrayValue: {
-                values: val.map(v => (typeof v === 'object' ? { mapValue: { fields: this._toFirestoreFields(v) } } : { stringValue: String(v) }))
+                values: val.map(v => {
+                  if (v === null || v === undefined) return { nullValue: null };
+                  if (typeof v === 'object') return { mapValue: { fields: this._toFirestoreFields(v) } };
+                  if (typeof v === 'boolean') return { booleanValue: v };
+                  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+                  return { stringValue: String(v) };
+                })
               }
             };
           } else if (typeof val === 'object') {
@@ -1350,6 +1394,230 @@
           }
         }
         return out;
+      }
+    };
+
+    /* ==========================================================================
+       Firebase AI Logic / Gemini Developer API Service for Student Evaluation
+       ========================================================================== */
+    window.GeminiAIService = {
+      model: "gemini-2.0-flash",
+
+      async evaluateWriting(evaluationContext) {
+        if (!evaluationContext) throw new Error("Evaluation context is required");
+
+        const answers = evaluationContext.answers || {};
+        const writingObj = answers.writing || {};
+        const studentText = (writingObj.text || evaluationContext.text || '').trim();
+
+        if (!studentText) {
+          throw new Error("Aucun texte fourni par l'élève à évaluer.");
+        }
+
+        const situation = answers.situation || "Non spécifié";
+        const character = answers.character || "Non spécifié";
+        const place = answers.place || "Non spécifié";
+        const time = answers.time || "Non spécifié";
+        const chronology = Array.isArray(answers.chronology) && answers.chronology.length > 0
+          ? answers.chronology.join(" -> ")
+          : "Non spécifié";
+
+        const systemInstruction = `Tu es un professeur de français de l'école primaire évaluant la production écrite d'un élève de 4ème année primaire (élèves âgés de 9 à 10 ans).
+Niveau : Français 4ème année primaire (début de production d'écrits autonomes).
+Module : Module 1 — Évaluation : Je construis mon histoire.
+
+CONSIGNE OFFICIELLE :
+« Raconte ton histoire ! Écris au moins 3 phrases en utilisant les éléments précédents (situation, personnage, lieu et temps). »
+
+CONTEXTE ET CHOIX DE L'ÉLÈVE :
+- Situation : ${situation}
+- Personnage : ${character}
+- Lieu : ${place}
+- Moment : ${time}
+- Chronologie des événements : ${chronology}
+
+PRODUCTION ÉCRITE DE L'ÉLÈVE :
+"""
+${studentText}
+"""
+
+GRILLE OFFICIELLE D'ÉVALUATION (TOTAL EXACT SUR 10 POINTS) :
+Évalue chaque critère de manière rigoureuse, indépendante, équitable et bienveillante :
+1. C1 — Adéquation à la consigne (Maximum : 2 points) :
+   - Respect du sujet et présence d'au moins 3 phrases.
+   - Présence et cohérence des éléments choisis (personnage, lieu, temps, situation).
+2. C5 — Cohérence du récit (Maximum : 2 points) :
+   - Enchaînement chronologique logique des événements.
+   - Présence de connecteurs temporels/logiques (d'abord, puis, ensuite, enfin, etc.).
+3. C3 — Correction linguistique (Maximum : 2 points) :
+   - Construction des phrases (Sujet + Verbe + Complément).
+   - Conjugaison correcte et cohérence des temps verbaux.
+4. C4 — Orthographe (Maximum : 2 points) :
+   - Orthographe d'usage des mots courants.
+   - Accords sujet-verbe et accords dans le groupe nominal (genre et nombre).
+5. C6 — Vocabulaire (Maximum : 1 point) :
+   - Richesse et pertinence du vocabulaire adapté au niveau 4ème.
+6. C2 + C7 — Présentation et ponctuation (Maximum : 1 point) :
+   - Majuscules en début de phrase et aux noms propres, ponctuation finale (points).
+
+RÈGLE STRICTE SUR LES TEXTES INVENTÉS OU CHARABIA :
+Si le texte de l'élève est un charabia incompréhensible, une suite de lettres aléatoires ou répétitives (ex: "zdzadzdzad..."), ou totalement hors de propos, attribue 0 point à TOUS les critères sans exception et un score total de 0/10. N'accorde JAMAIS de points simplement parce qu'il y a des lettres ou 3 blocs de texte.
+
+RÈGLE DU SCORE TOTAL :
+Le champ "score" doit obligatoirement être égal à la somme arithmétique exacte des notes attribuées aux 6 critères ci-dessus (C1 + C5 + C3 + C4 + C6 + C2_C7). Ne dépasse jamais le maximum d'aucun critère.
+
+FORMAT DE RÉPONSE OBLIGATOIRE :
+Retourne UNIQUEMENT un objet JSON valide (aucun commentaire, pas de balises markdown) sous ce format :
+{
+  "score": 0,
+  "maxScore": 10,
+  "criteria": {
+    "C1": { "name": "Adéquation à la consigne", "score": 0, "max": 2, "feedback": "" },
+    "C5": { "name": "Cohérence du récit", "score": 0, "max": 2, "feedback": "" },
+    "C3": { "name": "Correction linguistique", "score": 0, "max": 2, "feedback": "" },
+    "C4": { "name": "Orthographe", "score": 0, "max": 2, "feedback": "" },
+    "C6": { "name": "Vocabulaire", "score": 0, "max": 1, "feedback": "" },
+    "C2_C7": { "name": "Présentation et ponctuation", "score": 0, "max": 1, "feedback": "" }
+  },
+  "strengths": [],
+  "mistakes": [
+    { "original": "", "correction": "", "explanation": "" }
+  ],
+  "corrections": [],
+  "feedback": "",
+  "status": "evaluated"
+}`;
+
+        const reqBody = {
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: systemInstruction }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            maxOutputTokens: 1200,
+            responseMimeType: "application/json"
+          }
+        };
+
+        const activeKey = window.GEMINI_API_KEY || firebaseConfig.apiKey;
+        let lastError = null;
+
+        // 1. Try Firebase AI Logic / Vertex AI for Firebase endpoint
+        try {
+          const appCheckToken = window.FirebaseService ? await window.FirebaseService.getAppCheckToken() : null;
+          const vertexUrl = `https://firebasevertexai.googleapis.com/v1beta/projects/${firebaseConfig.projectId}/locations/us-central1/publishers/google/models/${this.model}:generateContent?key=${activeKey}`;
+          
+          const headers = { 'Content-Type': 'application/json' };
+          if (appCheckToken) {
+            headers['X-Firebase-AppCheck'] = appCheckToken;
+          }
+
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+
+          console.log("[GeminiAIService] Calling Firebase AI Logic endpoint...");
+          const res = await fetch(vertexUrl, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(reqBody),
+            signal: controller.signal
+          });
+          clearTimeout(timer);
+
+          if (res.ok) {
+            const data = await res.json();
+            return this._processGeminiResponse(data);
+          } else {
+            const errBody = await res.text();
+            console.warn("[GeminiAIService] Firebase AI Logic HTTP " + res.status + ":", errBody);
+            lastError = new Error(`Firebase AI Logic HTTP ${res.status}: ${errBody}`);
+          }
+        } catch (vErr) {
+          console.warn("[GeminiAIService] Firebase AI Logic attempt error:", vErr.message);
+          lastError = vErr;
+        }
+
+        // 2. Try Gemini Developer API endpoint (generativelanguage.googleapis.com)
+        try {
+          const devUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${activeKey}`;
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 12000);
+
+          console.log("[GeminiAIService] Calling Gemini Developer API endpoint...");
+          const res = await fetch(devUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reqBody),
+            signal: controller.signal
+          });
+          clearTimeout(timer);
+
+          if (res.ok) {
+            const data = await res.json();
+            return this._processGeminiResponse(data);
+          } else {
+            const errBody = await res.text();
+            console.warn("[GeminiAIService] Gemini Developer API HTTP " + res.status + ":", errBody);
+            lastError = new Error(`Gemini Developer API HTTP ${res.status}: ${errBody}`);
+          }
+        } catch (dErr) {
+          console.warn("[GeminiAIService] Gemini Developer API attempt error:", dErr.message);
+          lastError = dErr;
+        }
+
+        throw lastError || new Error("Failed to reach Gemini evaluation service");
+      },
+
+      _processGeminiResponse(data) {
+        if (!data || !data.candidates || !data.candidates.length) {
+          throw new Error("Réponse vide ou invalide reçue de Gemini");
+        }
+        const candidate = data.candidates[0];
+        const parts = candidate.content && candidate.content.parts;
+        if (!parts || !parts.length || !parts[0].text) {
+          throw new Error("Contenu textuel manquant dans la réponse de Gemini");
+        }
+
+        let raw = parts[0].text.trim();
+        if (raw.startsWith("```json")) raw = raw.substring(7);
+        else if (raw.startsWith("```")) raw = raw.substring(3);
+        if (raw.endsWith("```")) raw = raw.substring(0, raw.length - 3);
+        raw = raw.trim();
+
+        const parsed = JSON.parse(raw);
+
+        // Sanitize criteria & enforce 10-point scale
+        parsed.criteria = parsed.criteria || {};
+        const maxes = { C1: 2, C5: 2, C3: 2, C4: 2, C6: 1, C2_C7: 1 };
+        let sum = 0;
+
+        for (const [key, max] of Object.entries(maxes)) {
+          const c = parsed.criteria[key] || {};
+          let pts = typeof c.score === 'number' ? c.score : 0;
+          pts = Math.max(0, Math.min(max, pts));
+          c.score = pts;
+          c.max = max;
+          parsed.criteria[key] = c;
+          sum += pts;
+        }
+
+        // Sum equals score
+        sum = Math.round(sum * 10) / 10;
+        parsed.score = Math.max(0, Math.min(10, sum));
+        parsed.maxScore = 10;
+        parsed.strengths = Array.isArray(parsed.strengths) ? parsed.strengths : [];
+        parsed.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : [];
+        parsed.corrections = Array.isArray(parsed.corrections) ? parsed.corrections : [];
+        parsed.feedback = typeof parsed.feedback === 'string' ? parsed.feedback : "Bravo pour ton travail !";
+        parsed.status = "evaluated";
+        parsed.evaluatedAt = new Date().toISOString();
+        parsed.model = this.model;
+
+        return parsed;
       }
     };
   </script>
@@ -16426,12 +16694,50 @@ showJourney2EndCelebration() {
 
         this.lastSavedEvaluation = payload;
 
-        // Save to Firestore via FirebaseService
+        // Step 1: Initial immediate save to Firestore (guarantees student submission is never lost)
         if (window.FirebaseService) {
           try {
             await window.FirebaseService.saveEvaluation(docId, payload);
           } catch (err) {
-            console.error('[Firebase] Error in saveEvaluation:', err);
+            console.error('[Firebase] Error in initial saveEvaluation:', err);
+          }
+        }
+
+        // Step 2: Trigger genuine AI Evaluation with Gemini Developer API & Firebase AI Logic
+        if (currentStatus === 'completed' && writingText && window.GeminiAIService) {
+          try {
+            console.log('[GeminiAI] Starting genuine evaluation for student:', studentId);
+            const aiEval = await window.GeminiAIService.evaluateWriting(payload);
+            if (aiEval && typeof aiEval.score === 'number') {
+              console.log('[GeminiAI] Evaluation completed successfully. Writing score:', aiEval.score);
+              payload.writingScore = aiEval.score;
+              payload.writingStatus = "evaluated";
+              payload.scoresBreakdown.writing = aiEval.score;
+              payload.totalScore = autoScore + aiEval.score;
+              payload.finalScoreOutOf10 = Math.round((autoScore + aiEval.score) / 6);
+              payload.aiEvaluation = aiEval;
+              payload.answers.writing.aiEvaluation = aiEval;
+
+              this.lastSavedEvaluation = payload;
+
+              // Step 3: Update Firestore with the AI evaluation results
+              if (window.FirebaseService) {
+                await window.FirebaseService.saveEvaluation(docId, payload);
+              }
+            }
+          } catch (aiErr) {
+            console.warn('[GeminiAI] Evaluation notice (preserved as pending):', aiErr.message);
+            payload.writingStatus = "pending_teacher_grading";
+            payload.writingScore = null;
+            payload.aiEvaluationError = {
+              message: aiErr.message,
+              timestamp: new Date().toISOString()
+            };
+            if (window.FirebaseService) {
+              try {
+                await window.FirebaseService.saveEvaluation(docId, payload);
+              } catch (saveErr) {}
+            }
           }
         }
 
@@ -16444,7 +16750,10 @@ showJourney2EndCelebration() {
             localStorage.setItem('ecripro_eval_completed_' + studentId, JSON.stringify({
               docId,
               submittedAt: payload.submittedAt,
-              autoScore: autoScore
+              autoScore: autoScore,
+              writingScore: payload.writingScore,
+              writingStatus: payload.writingStatus,
+              totalScore: payload.totalScore
             }));
           } catch (e) {}
         }
@@ -17312,7 +17621,7 @@ showJourney2EndCelebration() {
                 vbtn.style.pointerEvents = 'none';
                 vbtn.style.opacity = '0.6';
                 vbtn.style.cursor = 'wait';
-                showFeedback("⏳ Enregistrement de ton évaluation...");
+                showFeedback("⏳ Évaluation de ton texte avec l'IA...");
 
                 try {
                   await this.submitEvaluationToFirestore();
@@ -17677,7 +17986,9 @@ showJourney2EndCelebration() {
         // Final score inside designated box (left: 43.5%, top: 61.2%, width: 10.1%, height: 11.6%)
         const saved = this.lastSavedEvaluation;
         let points = 10;
-        if (saved && typeof saved.autoScore === 'number') {
+        if (saved && typeof saved.totalScore === 'number' && saved.writingStatus === 'evaluated') {
+          points = Math.round(saved.totalScore / 6);
+        } else if (saved && typeof saved.autoScore === 'number') {
           points = saved.autoScore > 10 ? Math.round(saved.autoScore / 5) : saved.autoScore;
         } else if (typeof this.evalScore === 'number') {
           points = this.evalScore > 10 ? Math.round(this.evalScore / 5) : this.evalScore;
