@@ -534,7 +534,13 @@
     }
 
     // Button handlers
-    document.getElementById('dov-close-btn').onclick = deactivate;
+    const dovClose = document.getElementById('dov-close-btn');
+    if (dovClose) {
+      dovClose.onclick = (e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        deactivate();
+      };
+    }
     document.getElementById('dov-btn-copy').onclick = copyJSON;
     document.getElementById('dov-btn-export').onclick = downloadJSON;
     document.getElementById('dov-btn-clear').onclick = () => {
@@ -542,8 +548,13 @@
       if (confirm('Clear ALL elements for this page?')) clearData();
     };
 
-    // Prevent keyboard shortcut when typing in label
-    labelInputEl.addEventListener('keydown', e => e.stopPropagation());
+    // Prevent keyboard shortcut when typing in label, allow Escape or Enter to blur
+    labelInputEl.addEventListener('keydown', e => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        labelInputEl.blur();
+      }
+      e.stopPropagation();
+    });
   }
 
   function selectTool(toolId) {
@@ -996,7 +1007,7 @@
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' ||
         e.target.isContentEditable) return;
 
-    if (e.key.toLowerCase() === ACTIVATE_KEY && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if ((e.key.toLowerCase() === ACTIVATE_KEY || e.code === 'KeyX') && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       toggle();
       return;

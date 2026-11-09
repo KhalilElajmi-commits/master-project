@@ -1238,6 +1238,114 @@
       box-shadow: none;
     }
   </style>
+  <!-- Firebase Compat SDK & Firestore Service -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBBCXAcvKEJ93QCXf80qJ7x0WBt9O88RPE",
+      authDomain: "students-9d81b.firebaseapp.com",
+      projectId: "students-9d81b",
+      storageBucket: "students-9d81b.firebasestorage.app",
+      messagingSenderId: "991487211489",
+      appId: "1:991487211489:web:78ff29222442e9558304a0",
+      measurementId: "G-5S0BCJBDK3"
+    };
+
+    window.FirebaseService = {
+      app: null,
+      db: null,
+      analytics: null,
+      initialized: false,
+
+      init() {
+        if (this.initialized) return;
+        try {
+          if (typeof firebase !== 'undefined' && firebase.apps) {
+            if (!firebase.apps.length) {
+              this.app = firebase.initializeApp(firebaseConfig);
+            } else {
+              this.app = firebase.app();
+            }
+            this.db = firebase.firestore();
+            try {
+              if (typeof firebase.analytics === 'function') {
+                this.analytics = firebase.analytics();
+              }
+            } catch(e) {}
+            this.initialized = true;
+            console.log("Firebase initialized successfully via SDK");
+          }
+        } catch (err) {
+          console.warn("Firebase SDK initialization fallback:", err);
+        }
+      },
+
+      async saveEvaluation(docId, payload) {
+        this.init();
+        // 1. Try Firebase SDK if available
+        if (this.db) {
+          try {
+            await this.db.collection('evaluations').doc(docId).set(payload, { merge: true });
+            console.log("Evaluation saved to Firestore via SDK:", docId);
+            return { success: true, method: 'sdk', docId };
+          } catch (sdkError) {
+            console.warn("SDK save failed, trying REST fallback:", sdkError);
+          }
+        }
+
+        // 2. High-reliability REST API fallback (works in standalone webviews/sandboxes)
+        try {
+          const restUrl = "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents/evaluations/" + encodeURIComponent(docId) + "?key=" + firebaseConfig.apiKey;
+          const fields = this._toFirestoreFields(payload);
+          const response = await fetch(restUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields })
+          });
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error("REST save error " + response.status + ": " + errText);
+          }
+          console.log("Evaluation saved to Firestore via REST:", docId);
+          return { success: true, method: 'rest', docId };
+        } catch (restError) {
+          console.error("Firestore REST save also failed:", restError);
+          return { success: false, error: restError.message, docId };
+        }
+      },
+
+      _toFirestoreFields(obj) {
+        const out = {};
+        for (const k of Object.keys(obj)) {
+          const val = obj[k];
+          if (val === null || val === undefined) {
+            out[k] = { nullValue: null };
+          } else if (typeof val === 'boolean') {
+            out[k] = { booleanValue: val };
+          } else if (typeof val === 'number') {
+            if (Number.isInteger(val)) {
+              out[k] = { integerValue: String(val) };
+            } else {
+              out[k] = { doubleValue: val };
+            }
+          } else if (typeof val === 'string') {
+            out[k] = { stringValue: val };
+          } else if (Array.isArray(val)) {
+            out[k] = {
+              arrayValue: {
+                values: val.map(v => (typeof v === 'object' ? { mapValue: { fields: this._toFirestoreFields(v) } } : { stringValue: String(v) }))
+              }
+            };
+          } else if (typeof val === 'object') {
+            out[k] = { mapValue: { fields: this._toFirestoreFields(val) } };
+          }
+        }
+        return out;
+      }
+    };
+  </script>
 </head>
 
 <body>
@@ -1430,7 +1538,7 @@
   </main>
 
   <!-- POPUP OVERLAY -->
-  <div id="level-popup-overlay">
+  <div id="level-popup-overlay" onclick="if(event.target===this) closeLevelPopup(false)">
     <div class="level-popup-container">
       <img src="exercice pop up.png" class="level-popup-bg" alt="" draggable="false" />
       <div class="popup-bubble-text"
@@ -2170,7 +2278,7 @@
           const overlay = document.getElementById("overlay-" + level.id);
           const hitbox = document.getElementById("hitbox-" + level.id);
 
-          const isUnlocked = level.id <= 8 && level.id <= this.state.unlockedLevel;
+          const isUnlocked = (level.id <= 8 && level.id <= this.state.unlockedLevel) || level.id === 10 || level.name === 'Layer_7';
           const isIntroduced = this.state.introducedLevels.includes(level.id);
 
           if (overlay) {
@@ -2183,7 +2291,7 @@
 
           if (hitbox) {
             hitbox.style.cursor = isUnlocked ? "pointer" : "not-allowed";
-            hitbox.style.pointerEvents = level.id <= 8 ? "auto" : "none";
+            hitbox.style.pointerEvents = (level.id <= 8 || level.id === 10 || level.name === 'Layer_7') ? "auto" : "none";
           }
 
           if (isUnlocked && !isIntroduced && level.id === this.state.unlockedLevel) {
@@ -2202,7 +2310,7 @@
       },
 
       handleLevelClick(levelId) {
-        if (levelId > 8 || levelId > this.state.unlockedLevel) {
+        if ((levelId > 8 || levelId > this.state.unlockedLevel) && levelId !== 10) {
           return;
         }
 
@@ -2220,8 +2328,53 @@
         const titleEl = popup.querySelector('.popup-title');
         const descEl = popup.querySelector('.popup-description');
         const btn = popup.querySelector('.popup-commencer-btn');
+        const closeBtn = popup.querySelector('.popup-close-btn');
+        if (closeBtn) {
+          if (levelId === 10) {
+            closeBtn.style.top = '19.9%';
+            closeBtn.style.left = '78.7%';
+            closeBtn.style.right = 'auto';
+            closeBtn.style.bottom = 'auto';
+            closeBtn.style.width = '12%';
+            closeBtn.style.height = '18%';
+            closeBtn.style.transform = 'translate(-50%, -50%)';
+            closeBtn.style.borderRadius = '50%';
+            closeBtn.style.opacity = '0';
+            closeBtn.style.border = 'none';
+            closeBtn.style.boxShadow = 'none';
+            closeBtn.style.cursor = 'pointer';
+          } else if (levelId === 7) {
+            closeBtn.style.top = '18.5%';
+            closeBtn.style.left = '85.8%';
+            closeBtn.style.right = 'auto';
+            closeBtn.style.bottom = 'auto';
+            closeBtn.style.width = '10%';
+            closeBtn.style.height = '15%';
+            closeBtn.style.transform = 'translate(-50%, -50%)';
+            closeBtn.style.borderRadius = '50%';
+            closeBtn.style.opacity = '0';
+            closeBtn.style.border = 'none';
+            closeBtn.style.boxShadow = 'none';
+            closeBtn.style.cursor = 'pointer';
+          } else {
+            closeBtn.style.top = '-15px';
+            closeBtn.style.right = '-15px';
+            closeBtn.style.left = 'auto';
+            closeBtn.style.bottom = 'auto';
+            closeBtn.style.width = '45px';
+            closeBtn.style.height = '45px';
+            closeBtn.style.transform = 'none';
+            closeBtn.style.borderRadius = '50%';
+            closeBtn.style.opacity = '1';
+            closeBtn.style.border = '3px solid white';
+            closeBtn.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.background = '#ff4757';
+            closeBtn.style.color = 'white';
+          }
+        }
 
-        if (levelId === 2 || levelId === 3 || levelId === 4 || levelId === 5 || levelId === 6 || levelId === 7 || levelId === 8) {
+        if (levelId === 2 || levelId === 3 || levelId === 4 || levelId === 5 || levelId === 6 || levelId === 7 || levelId === 8 || levelId === 10) {
           if (levelId === 2) {
             imgEl.src = 'journe 2/pop for journe 2.png';
           } else if (levelId === 3) {
@@ -2236,15 +2389,17 @@
             imgEl.src = 'journe 7/first pop up.png';
           } else if (levelId === 8) {
             imgEl.src = 'journe 8/FIRST POPUP.png';
+          } else if (levelId === 10) {
+            imgEl.src = 'evalution/pop up evalution.png';
           }
           bubbleText.style.display = 'none';
           titleEl.style.display = 'none';
           descEl.style.display = 'none';
           // Button bounds derived exactly from scan (Commencer button)
-          btn.style.left = levelId === 8 ? '31.25%' : (levelId === 7 ? '32.7%' : '33%');
-          btn.style.top = levelId === 8 ? '80.2%' : (levelId === 7 ? '79.3%' : ((levelId === 5 || levelId === 6) ? '79%' : '77.3%'));
-          btn.style.width = levelId === 8 ? '40.6%' : (levelId === 7 ? '30.2%' : '38%');
-          btn.style.height = levelId === 8 ? '12.1%' : (levelId === 7 ? '8.1%' : '14%');
+          btn.style.left = levelId === 10 ? '20%' : (levelId === 8 ? '31.25%' : (levelId === 7 ? '32.7%' : '33%'));
+          btn.style.top = levelId === 10 ? '73%' : (levelId === 8 ? '80.2%' : (levelId === 7 ? '79.3%' : ((levelId === 5 || levelId === 6) ? '79%' : '77.3%')));
+          btn.style.width = levelId === 10 ? '60%' : (levelId === 8 ? '40.6%' : (levelId === 7 ? '30.2%' : '38%'));
+          btn.style.height = levelId === 10 ? '18%' : (levelId === 8 ? '12.1%' : (levelId === 7 ? '8.1%' : '14%'));
           btn.style.bottom = 'auto'; // override default bottom
         } else {
           imgEl.src = 'exercice pop up.png';
@@ -2278,6 +2433,23 @@
     };
     function closeLevelPopup(startLevel) {
       document.getElementById('level-popup-overlay').classList.remove('active');
+      const closeBtn = document.querySelector('#level-popup-overlay .popup-close-btn');
+      if (closeBtn) {
+        closeBtn.style.top = '-15px';
+        closeBtn.style.right = '-15px';
+        closeBtn.style.left = 'auto';
+        closeBtn.style.bottom = 'auto';
+        closeBtn.style.width = '45px';
+        closeBtn.style.height = '45px';
+        closeBtn.style.transform = 'none';
+        closeBtn.style.borderRadius = '50%';
+        closeBtn.style.opacity = '1';
+        closeBtn.style.border = '3px solid white';
+        closeBtn.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.background = '#ff4757';
+        closeBtn.style.color = 'white';
+      }
       if (startLevel) {
         let levelId = window.currentSelectedLevel;
         if (typeof ExerciseSystem !== 'undefined') {
@@ -2506,6 +2678,24 @@
           document.getElementById('exercise-footer').style.display = 'none';
           document.getElementById('exercise-bg').src = 'journe 8/BACKGROUND.png';
           this.loadJourney8Activity();
+          return;
+        } else if (levelId === 10 || levelId === 'evaluation' || levelId === 'evalution' || levelId === 'eval') {
+          this.currentLevelId = 10;
+          if (window.FirebaseService) {
+            window.FirebaseService.init();
+          }
+          if (!this.restoreEvaluationSession()) {
+            this.currentExIndex = 0;
+            this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+            this.evalAnswers = { profile: null, situation: null, character: null, place: null, time: null, chronology: [], text: '' };
+            this.evalScores = { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null };
+            this.evalScore = 0;
+          }
+          document.getElementById('exercise-stage').classList.add('active');
+          document.getElementById('exercise-header').style.display = 'none';
+          document.getElementById('exercise-footer').style.display = 'none';
+          document.getElementById('exercise-bg').src = 'evalution/back ground.png';
+          this.loadEvaluationActivity();
           return;
         }
 
@@ -3729,14 +3919,10 @@
 
             if (isCorrect) {
               isAnswerCorrect = true;
-              feedbackEl.textContent = 'Bravo ! Tu as reconstitué l\'histoire !';
-              feedbackEl.style.color = '#16a34a';
+              feedbackEl.textContent = '';
+              feedbackEl.style.display = 'none';
               vbtn.src = 'journe 1/continuer.png';
-              vbtn.animate([
-                { transform: 'scale(0.85)' },
-                { transform: 'scale(1.2)' },
-                { transform: 'scale(1)' }
-              ], { duration: 320, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+              this.showJourney6SuccessPopup();
             } else {
               feedbackEl.textContent = 'Ce n\'est pas tout à fait ça. Relis bien et réessaie !';
               feedbackEl.style.color = '#dc2626';
@@ -3829,10 +4015,10 @@
             type: 'grouped-choice',
             groups: [[1, 2, 3, 4]],
             options: [
-              { id: 1, left: 5.9, top: 31.9, width: 14.2, height: 28.6, correct: false },
-              { id: 2, left: 22.1, top: 32.1, width: 14.9, height: 28.4, correct: true },
-              { id: 3, left: 39.0, top: 31.8, width: 14.0, height: 29.4, correct: false },
-              { id: 4, left: 54.6, top: 31.6, width: 14.7, height: 29.4, correct: false }
+              { id: 1, left: 5.7, top: 30.6, width: 20.0, height: 31.3, correct: false },
+              { id: 2, left: 28.1, top: 30.6, width: 21.9, height: 31.6, correct: true },
+              { id: 3, left: 51.9, top: 30.7, width: 21.5, height: 31.0, correct: false },
+              { id: 4, left: 75.5, top: 30.6, width: 20.1, height: 31.0, correct: false }
             ],
             valBtnPos: { left: 49.25, top: 97.65, width: 16.9 },
             navPos: {
@@ -3850,8 +4036,8 @@
               { id: 'A', left: 5.4, top: 43.7, width: 52.9, height: 7.3, text: 'Caroline et Nadia rentrent chez elles après la classe.' },
               { id: 'C', left: 5.5, top: 52.2, width: 53.0, height: 7.4, text: 'Les deux fillettes achètent de petits gâteaux.' }
             ],
-            displayBox: { left: 63.8, top: 28.5, width: 29.8, height: 8.0 },
-            feedbackBox: { left: 62.0, top: 40.0, width: 33.5, height: 21.5 },
+            displayBox: { left: 63.8, top: 29.1, width: 30.9, height: 7.1 },
+            feedbackBox: { left: 64.0, top: 39.9, width: 30.2, height: 20.3 },
             valBtnPos: { left: 50.05, top: 89.9, width: 15.9 },
             navPos: {
               back: { top: '10.25%', left: '2.2%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' },
@@ -3891,17 +4077,18 @@
         container.innerHTML = '';
 
         if (this.currentExIndex >= JOURNEY_6_POPUPS.length) {
-          this.close();
-          if (MapSystem.state.unlockedLevel === 6) {
-            MapSystem.state.unlockedLevel = 7;
-            MapSystem.saveProgress();
-          }
-          setTimeout(() => { MapSystem.init(); }, 100);
+          this.finishJourney6();
           return;
         }
 
         const activity = JOURNEY_6_POPUPS[this.currentExIndex];
         if (!activity) return;
+
+        // When the final Journey 6 end card (popup end.png) is reached, trigger the full fireworks & Felicitation celebration!
+        if (activity && (activity.src === 'journe 6/popup end.png' || activity.src === 'journe 6/end pop up.png' || activity.src === 'journe 6/end popup.png')) {
+          this.showJourney6EndCelebration();
+          return;
+        }
 
         this.currentActivityState = { selected: new Set() };
 
@@ -4073,19 +4260,9 @@
               if (!fail && validsFound === totalValids && totalValids > 0) {
                 isAnswerCorrect = true;
                 vbtn.src = 'journe 1/continuer.png';
-                vbtn.animate([
-                  { transform: 'scale(0.85)' },
-                  { transform: 'scale(1.2)' },
-                  { transform: 'scale(1)' }
-                ], { duration: 320, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
-
-                fb.textContent = "Bravo ! C'est la bonne réponse !";
-                fb.style.color = '#16a34a';
-                fb.animate([
-                  { opacity: 0, transform: 'translate(-50%, -50%) scale(0.8)' },
-                  { opacity: 1, transform: 'translate(-50%, -50%) scale(1.1)' },
-                  { opacity: 1, transform: 'translate(-50%, -50%) scale(1)' }
-                ], { duration: 320 });
+                fb.textContent = '';
+                fb.style.display = 'none';
+                this.showJourney6SuccessPopup();
               } else {
                 fb.textContent = "Ce n'est pas la bonne image. Regarde bien les actions !";
                 fb.style.color = '#dc2626';
@@ -4235,7 +4412,7 @@
             } else {
               orderedItems.push(id);
             }
-            feedbackEl.textContent = '';
+            feedbackEl.innerHTML = '';
             updateDisplay();
             updateItemStyles();
           };
@@ -4298,21 +4475,71 @@
               return;
             }
 
-            const isCorrect = orderedItems.every((val, index) => val === activity.correctOrder[index]);
+            const isCorrect = (orderedItems.join('') === 'BCDA' || orderedItems.join('') === 'BDCA');
 
             if (isCorrect) {
               isAnswerCorrect = true;
-              feedbackEl.textContent = 'Bravo ! Tu as reconstitué l\'histoire !';
-              feedbackEl.style.color = '#16a34a';
+              if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+                window.SoundSystem.playSuccess();
+              }
               vbtn.src = 'journe 1/continuer.png';
               vbtn.animate([
                 { transform: 'scale(0.85)' },
                 { transform: 'scale(1.2)' },
                 { transform: 'scale(1)' }
               ], { duration: 320, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+
+              // 1. Highlight user's answer badges in green in the first box
+              displayEl.innerHTML = '';
+              orderedItems.forEach((itemId, idx) => {
+                if (idx > 0) {
+                  const arrow = document.createElement('span');
+                  arrow.textContent = '➔';
+                  arrow.style.color = '#16a34a';
+                  arrow.style.fontWeight = 'bold';
+                  arrow.style.fontSize = 'calc(var(--img-width) * 0.016)';
+                  displayEl.appendChild(arrow);
+                }
+                const badge = document.createElement('div');
+                badge.textContent = itemId;
+                badge.style.display = 'inline-flex';
+                badge.style.alignItems = 'center';
+                badge.style.justifyContent = 'center';
+                badge.style.width = 'calc(var(--img-width) * 0.032)';
+                badge.style.height = 'calc(var(--img-width) * 0.032)';
+                badge.style.borderRadius = '50%';
+                badge.style.backgroundColor = '#16a34a';
+                badge.style.color = '#ffffff';
+                badge.style.fontWeight = 'bold';
+                badge.style.fontSize = 'calc(var(--img-width) * 0.018)';
+                badge.style.boxShadow = '0 2px 5px rgba(22, 163, 74, 0.35)';
+                displayEl.appendChild(badge);
+              });
+
+              // 2. Show the right answer in the second box
+              const orderedTexts = orderedItems.map(id => activity.items.find(it => it.id === id));
+              feedbackEl.style.display = 'flex';
+              feedbackEl.style.flexDirection = 'column';
+              feedbackEl.style.alignItems = 'flex-start';
+              feedbackEl.style.justifyContent = 'center';
+              feedbackEl.style.padding = '8px 12px';
+              const sentencesHtml = orderedTexts.map((it, i) => "<b>" + (i + 1) + ".</b> " + it.text).join("<br>");
+              feedbackEl.innerHTML = '<div style="font-size: calc(var(--img-width) * 0.016); font-weight: 800; color: #15803d; margin-bottom: 6px; width: 100%; text-align: center;">✨ Bravo ! Voici l\'histoire dans l\'ordre :</div><div style="font-size: calc(var(--img-width) * 0.0132); color: #1e293b; line-height: 1.35; width: 100%; text-align: left;">' + sentencesHtml + '</div>';
+              feedbackEl.animate([
+                { opacity: 0, transform: 'scale(0.96)' },
+                { opacity: 1, transform: 'scale(1)' }
+              ], { duration: 320, easing: 'ease-out' });
+
+              setTimeout(() => {
+                if (isAnswerCorrect && typeof this.showJourney6SuccessPopup === 'function') {
+                  this.showJourney6SuccessPopup();
+                }
+              }, 1400);
             } else {
-              feedbackEl.textContent = 'Ce n\'est pas tout à fait ça. Relis bien et réessaie !';
-              feedbackEl.style.color = '#dc2626';
+              feedbackEl.style.display = 'flex';
+              feedbackEl.style.alignItems = 'center';
+              feedbackEl.style.justifyContent = 'center';
+              feedbackEl.innerHTML = '<span style="color: #dc2626; font-size: calc(var(--img-width) * 0.017); font-weight: bold;">Ce n\'est pas tout à fait ça. Relis bien et réessaie !</span>';
               if (window.j1GentleShake) window.j1GentleShake(feedbackEl);
             }
           };
@@ -4528,14 +4755,10 @@
 
             if (isCorrect) {
               isAnswerCorrect = true;
-              feedbackEl.textContent = 'Bravo ! Tu as parfaitement placé tous les connecteurs temporels !';
-              feedbackEl.style.color = '#16a34a';
+              feedbackEl.textContent = '';
+              feedbackEl.style.display = 'none';
               vbtn.src = 'journe 1/continuer.png';
-              vbtn.animate([
-                { transform: 'scale(0.85)' },
-                { transform: 'scale(1.2)' },
-                { transform: 'scale(1)' }
-              ], { duration: 320, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+              this.showJourney6SuccessPopup();
             } else {
               feedbackEl.textContent = 'Certains mots ne sont pas au bon endroit. Regarde bien l\'exemple et réessaie !';
               feedbackEl.style.color = '#dc2626';
@@ -4597,6 +4820,14 @@
         btnBack.onmouseleave = () => { btnBack.style.transform = navBackPos.transform || 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
         btnBack.onclick = (e) => {
           e.stopPropagation();
+          if (window.j6CurrentAudio) {
+            try {
+              window.j6CurrentAudio.pause();
+              window.j6CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j6CurrentAudio = null;
+          }
+          this._j6ShowingSuccess = false;
           if (this.currentExIndex > 0) {
             this.currentExIndex--;
             this.loadJourney6Activity();
@@ -4649,8 +4880,569 @@
       },
 
       handleJourney6Next() {
+        if (window.j6CurrentAudio) {
+          try {
+            window.j6CurrentAudio.pause();
+            window.j6CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j6CurrentAudio = null;
+        }
+        this._j6ShowingSuccess = false;
         this.currentExIndex++;
         this.loadJourney6Activity();
+      },
+
+      showJourney6SuccessPopup() {
+        if (this._j6ShowingSuccess) return;
+        this._j6ShowingSuccess = true;
+
+        const CONTINUER_IMAGES = [
+          'contiuer/bien joue.png',
+          'contiuer/excellent.png',
+          'contiuer/parfait.png',
+          'contiuer/super.png'
+        ];
+
+        // Shuffle deck: cycles through all 4 celebration photos in randomized order before repeating
+        if (!this.j6SuccessDeck || this.j6SuccessDeck.length === 0) {
+          const deck = [...CONTINUER_IMAGES];
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          if (deck[0] === this.lastJ6SuccessCard && deck.length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+          }
+          this.j6SuccessDeck = deck;
+        }
+
+        const chosenSrc = this.j6SuccessDeck.shift();
+        this.lastJ6SuccessCard = chosenSrc;
+
+        // Hide stray feedback and validation button
+        const fb = document.getElementById('j6-feedback');
+        if (fb) {
+          fb.textContent = '';
+          fb.style.display = 'none';
+        }
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            // Soft celebratory pop sound
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            // Twinkling spark chime
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        // Play specific celebration audio corresponding to the chosen photo
+        const AUDIO_MAP = {
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+          'contiuer/super.png': 'contiuer/super.mp3'
+        };
+
+        let cardAudio = null;
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+        if (targetAudioSrc) {
+          try {
+            if (window.j6CurrentAudio) {
+              window.j6CurrentAudio.pause();
+              window.j6CurrentAudio.currentTime = 0;
+            }
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+            window.j6CurrentAudio = cardAudio;
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+          } catch (e) {
+            console.warn('Card audio play error:', e);
+          }
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+          window.SoundSystem.playSuccess();
+        }
+
+        // Remove any pre-existing modal if present
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        // FULL SCREEN MODAL: attached to document.body so the blur covers the entire website!
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        // Background Fireworks Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        // Initial burst triplet
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        // Continuous festive bursts while card is showing
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Center Celebration Card
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-success-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = chosenSrc;
+        cardImg.alt = 'Bravo !';
+        cardImg.draggable = false;
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'j1-success-continue-btn';
+        continueBtn.setAttribute('title', 'Continuer vers la prochaine activité');
+        continueBtn.setAttribute('aria-label', 'Continuer');
+
+        let clicked = false;
+        continueBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+          this._j6ShowingSuccess = false;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (cardAudio) {
+            try {
+              cardAudio.pause();
+              cardAudio.currentTime = 0;
+            } catch (e) {}
+            cardAudio = null;
+          }
+          if (window.j6CurrentAudio) {
+            try {
+              window.j6CurrentAudio.pause();
+              window.j6CurrentAudio.currentTime = 0;
+            } catch (e) {}
+            window.j6CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            if (fb) fb.style.display = '';
+            this.handleJourney6Next();
+          }, 240);
+        };
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(continueBtn);
+        modal.appendChild(cardBox);
+
+        // Append to document.body for full-screen backdrop and blur across all elements!
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
+      showJourney6EndCelebration() {
+        if (window.j6CurrentAudio) {
+          try {
+            window.j6CurrentAudio.pause();
+            window.j6CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j6CurrentAudio = null;
+        }
+
+        try {
+          const felicitationAudio = new Audio(encodeURI("contiuer/Felicitation.mp3"));
+          window.j6CurrentAudio = felicitationAudio;
+          felicitationAudio.play().catch(err => console.log('Felicitation audio playback deferred or blocked:', err));
+        } catch (err) {
+          console.warn('Felicitation audio error:', err);
+        }
+
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+          } catch (e) {}
+        };
+
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ffd700', '#ffeb3b', '#ffa726', '#ffffff'],
+          ['#ff4081', '#ff80ab', '#f50057', '#ffffff'],
+          ['#00e5ff', '#18ffff', '#00b0ff', '#ffffff'],
+          ['#76ff03', '#b2ff59', '#64dd17', '#ffffff'],
+          ['#d500f9', '#e040fb', '#aa00ff', '#ffffff']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-end-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = 'journe 6/popup end.png';
+        cardImg.alt = 'Félicitations !';
+        cardImg.draggable = false;
+
+        const finishBtn = document.createElement('button');
+        finishBtn.className = 'j1-end-finish-btn';
+        finishBtn.setAttribute('title', 'Retourner à la carte');
+        finishBtn.setAttribute('aria-label', 'Terminer la journée');
+
+        let clicked = false;
+        const doFinish = (e) => {
+          if (e) e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (window.j6CurrentAudio) {
+            try {
+              window.j6CurrentAudio.pause();
+              window.j6CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j6CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            this.finishJourney6();
+          }, 240);
+        };
+
+        finishBtn.onclick = doFinish;
+        cardBox.onclick = doFinish;
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(finishBtn);
+        modal.appendChild(cardBox);
+
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
+      finishJourney6() {
+        this.close();
+        MapSystem.state.unlockedLevel = window.currentSelectedLevel + 1;
+        MapSystem.saveProgress();
+        MapSystem.updateVisuals(false);
+        const targetLevel = MAP_LEVELS.find(l => l.id === MapSystem.state.unlockedLevel);
+        if (targetLevel) {
+          MapCamera.focusOn(targetLevel, 1.8, 2000);
+          setTimeout(() => {
+            MapSystem.updateVisuals(true);
+          }, 2100);
+        }
       },
 
       loadJourney7Activity() {
@@ -6407,6 +7199,8 @@
           writeBox.style.zIndex = '25';
 
           const textarea = document.createElement('textarea');
+          textarea.addEventListener('focus', () => playEvalClickSound());
+          textarea.addEventListener('click', () => playEvalClickSound());
           textarea.placeholder = "D'abord, Caroline arrive à l'école le matin.\nEnsuite, elle rencontre son amie dans la classe.\nPuis, les élèves jouent ensemble dans la cour.\nEnfin, elles rentrent contentes chez elles.";
           textarea.style.width = '100%';
           textarea.style.height = '100%';
@@ -6624,6 +7418,34 @@
         this.loadJourney8Activity();
       },
       close() {
+        if (window.evalCurrentAudio) {
+          window.evalCurrentAudio.pause();
+          window.evalCurrentAudio = null;
+        }
+        if (window.j6CurrentAudio) {
+          try {
+            window.j6CurrentAudio.pause();
+            window.j6CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j6CurrentAudio = null;
+        }
+        this._j6ShowingSuccess = false;
+        if (window.j5CurrentAudio) {
+          try {
+            window.j5CurrentAudio.pause();
+            window.j5CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j5CurrentAudio = null;
+        }
+        this._j5ShowingSuccess = false;
+        if (window.j4CurrentAudio) {
+          try {
+            window.j4CurrentAudio.pause();
+            window.j4CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j4CurrentAudio = null;
+        }
+        this._j4ShowingSuccess = false;
         if (window.j3CurrentAudio) {
           try {
             window.j3CurrentAudio.pause();
@@ -7104,15 +7926,15 @@
               { text: 'du raisin', left: 77, top: 38, width: 14, height: 7 },
               { text: 'achète', left: 51, top: 47, width: 13, height: 7 },
               { text: 'et', left: 65, top: 47, width: 11, height: 7 },
-              { text: 'un zèbre', left: 77, top: 47, width: 14, height: 7 },
+              { text: '.', left: 77, top: 47, width: 14, height: 7 },
               { text: 'des fraises', left: 51, top: 56, width: 27, height: 7 }
             ],
             textBox: { left: 14, top: 69, width: 59, height: 7 },
             validSentences: [
-              "Au souk Aziza achète du raisin et des fraises",
-              "Aziza achète du raisin et des fraises Au souk",
-              "Au souk Aziza achète des fraises et du raisin",
-              "Aziza achète des fraises et du raisin Au souk"
+              "Au souk Aziza achète du raisin et des fraises.",
+              "Aziza achète du raisin et des fraises au souk.",
+              "Au souk Aziza achète des fraises et du raisin.",
+              "Aziza achète des fraises et du raisin au souk."
             ],
             needsValidation: true,
             valBtnPos: { left: 50, top: 86 },
@@ -7815,8 +8637,24 @@
 
           const formatSentenceDisplay = (words) => {
             if (!words || words.length === 0) return '';
-            const lowerSentence = words.map(w => w.toLowerCase()).join(' ');
-            return lowerSentence.charAt(0).toUpperCase() + lowerSentence.slice(1);
+            const hasExplicitDot = words.includes('.');
+            const wordTokens = words.filter(w => w !== '.');
+            if (wordTokens.length === 0) return hasExplicitDot ? '.' : '';
+
+            const formatted = wordTokens.map((w, idx) => {
+              const lower = w.toLowerCase();
+              if (lower === 'aziza') return 'Aziza';
+              if (idx === 0) return lower.charAt(0).toUpperCase() + lower.slice(1);
+              return lower;
+            });
+
+            let sentence = formatted.join(' ');
+            if (hasExplicitDot || wordTokens.length >= 6) {
+              if (!sentence.endsWith('.')) {
+                sentence += '.';
+              }
+            }
+            return sentence;
           };
 
           activity.labels.forEach(lbl => {
@@ -8063,9 +8901,23 @@
           if (!wrongPair && correctPairs === Object.keys(activity.matches).length) isCorrect = true;
         }
         else if (activity.type === 'sentence') {
-          const normalizeStr = s => s.trim().toLowerCase().replace(/\s+/g, ' ');
-          const builtNormalized = normalizeStr(state.sentence.join(' '));
-          if (activity.validSentences.some(v => normalizeStr(v) === builtNormalized)) {
+          const normalize = str => (str || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[.\s]+/g, ' ')
+            .trim();
+
+          const builtNorm = normalize(state.sentence.join(' '));
+
+          const validNorms = [
+            "au souk aziza achete du raisin et des fraises",
+            "aziza achete du raisin et des fraises au souk",
+            "au souk aziza achete des fraises et du raisin",
+            "aziza achete des fraises et du raisin au souk"
+          ];
+
+          if (validNorms.includes(builtNorm) || activity.validSentences.some(v => normalize(v) === builtNorm)) {
             isCorrect = true;
           }
         }
@@ -10599,14 +11451,13 @@ showJourney2EndCelebration() {
               { text: 'un bouquet', left: 60.6, top: 43, width: 22.2, height: 7.7 },
               { text: 'Karim', left: 60.8, top: 51.9, width: 22.7, height: 7.4 },
               { text: 'de jasmin', left: 61, top: 61.2, width: 22.1, height: 7.3 },
-              { text: 'achète', left: 60.9, top: 69.9, width: 22, height: 6.9 }
+              { text: 'achète', left: 60.9, top: 69.9, width: 22, height: 6.9 },
+              { text: '.', left: 60.9, top: 80.5, width: 21.8, height: 9.8 }
             ],
-            textBox: { left: 6.8, top: 80.9, width: 70.1, height: 9.6 },
+            textBox: { left: 6.6, top: 79.9, width: 51.8, height: 10.4 },
             validSentences: [
-              "Karim achète un bouquet de jasmin",
               "Karim achète un bouquet de jasmin.",
-              "Karim achte un bouquet de jasmin",
-              "Karim achte un bouquet de jasmin."
+              "Karim achete un bouquet de jasmin."
             ],
             needsValidation: true,
             valBtnPos: { left: 50, top: 96, width: 22 },
@@ -11473,11 +12324,12 @@ showJourney2EndCelebration() {
           overlayText.style.top = activity.textBox.top + '%';
           overlayText.style.width = activity.textBox.width + '%';
           overlayText.style.height = activity.textBox.height + '%';
+          overlayText.style.boxSizing = 'border-box';
           overlayText.style.display = 'flex';
           overlayText.style.alignItems = 'center';
-          overlayText.style.padding = '0 2%';
+          overlayText.style.padding = '0 2.5%';
           overlayText.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-          overlayText.style.fontSize = 'calc(var(--img-width) * 0.024)';
+          overlayText.style.fontSize = 'clamp(14px, calc(var(--img-width) * 0.024), 26px)';
           overlayText.style.fontWeight = '700';
           overlayText.style.color = '#1b305f';
           overlayText.style.whiteSpace = 'nowrap';
@@ -11486,10 +12338,22 @@ showJourney2EndCelebration() {
 
           const formatSentenceDisplay = (words) => {
             if (!words || words.length === 0) return '';
-            const lowerSentence = words.map(w => w.toLowerCase()).join(' ');
-            let sentence = lowerSentence.charAt(0).toUpperCase() + lowerSentence.slice(1);
-            if (words.length === activity.labels.length && !sentence.endsWith('.')) {
-              sentence += '.';
+            const hasExplicitDot = words.includes('.');
+            const wordTokens = words.filter(w => w !== '.');
+            if (wordTokens.length === 0) return hasExplicitDot ? '.' : '';
+
+            const formatted = wordTokens.map((w, idx) => {
+              const lower = w.toLowerCase();
+              if (lower === 'karim') return 'Karim';
+              if (idx === 0) return lower.charAt(0).toUpperCase() + lower.slice(1);
+              return lower;
+            });
+
+            let sentence = formatted.join(' ');
+            if (hasExplicitDot) {
+              if (!sentence.endsWith('.')) {
+                sentence += '.';
+              }
             }
             return sentence;
           };
@@ -11709,9 +12573,22 @@ showJourney2EndCelebration() {
           if (!wrongPair && correctPairs === Object.keys(activity.matches).length) isCorrect = true;
         }
         else if (activity.type === 'sentence') {
-          const normalize = str => str.toLowerCase().replace(/[.\s]+/g, ' ').trim().replace(/è/g, 'e');
-          const builtNorm = normalize(state.sentence.join(' '));
-          isCorrect = activity.validSentences.some(s => normalize(s) === builtNorm) || builtNorm === 'karim achete un bouquet de jasmin';
+          const normalize = str => (str || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[.\s]+/g, ' ')
+            .trim();
+
+          const hasDot = state.sentence.includes('.');
+          const isDotAtEnd = state.sentence.length > 0 && state.sentence[state.sentence.length - 1] === '.';
+          const wordTokens = state.sentence.filter(w => w !== '.');
+          const wordsNorm = normalize(wordTokens.join(' '));
+          const targetNorm = 'karim achete un bouquet de jasmin';
+
+          if (hasDot && isDotAtEnd && (wordsNorm === targetNorm || activity.validSentences.some(v => normalize(v) === wordsNorm))) {
+            isCorrect = true;
+          }
         }
         else if (activity.type === 'writing') {
           let fail = false;
@@ -11787,12 +12664,24 @@ showJourney2EndCelebration() {
             if (window.j1GentleShake) window.j1GentleShake(fb);
           }
 
-          if (activity.type === 'match' && fb) {
+          if (activity.type === 'sentence') {
+            if (fb) {
+              const hasDot = state.sentence.includes('.');
+              const isDotAtEnd = state.sentence.length > 0 && state.sentence[state.sentence.length - 1] === '.';
+              const wordTokens = state.sentence.filter(w => w !== '.');
+              const normalize = str => (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.\s]+/g, ' ').trim();
+              const wordsNorm = normalize(wordTokens.join(' '));
+              if (wordsNorm === 'karim achete un bouquet de jasmin' && (!hasDot || !isDotAtEnd)) {
+                fb.textContent = "N'oublie pas de terminer par le point !";
+                fb.style.color = '#f87171';
+                if (window.j1GentleShake) window.j1GentleShake(fb);
+              }
+            }
+            setTimeout(() => this.loadJourney3Activity(), 1500);
+          } else if (activity.type === 'match' && fb) {
             fb.textContent = "Relie toutes les syllabes pour former les mots !";
             fb.style.color = '#f87171';
             if (window.j1GentleShake) window.j1GentleShake(fb);
-          } else if (activity.type === 'sentence') {
-            setTimeout(() => this.loadJourney3Activity(), 1500);
           }
         }
       },
@@ -12474,6 +13363,13 @@ showJourney2EndCelebration() {
         }
 
         const activity = JOURNEY_4_POPUPS[this.currentExIndex];
+
+        // When the final Journey 4 end card (end pop up.png) is reached, trigger the full fireworks & Felicitation celebration!
+        if (activity && activity.src === 'journe 4/end pop up.png') {
+          this.showJourney4EndCelebration();
+          return;
+        }
+
         this.currentActivityState = { selected: new Set(), lines: [], sentence: [] };
 
         const wrapper = document.createElement('div');
@@ -12846,6 +13742,14 @@ showJourney2EndCelebration() {
         btnBack.onmousedown = () => { btnBack.style.transform = (navBackPos.transform ? navBackPos.transform + ' ' : '') + 'scale(0.95) translateY(1px)'; };
         btnBack.onclick = (e) => {
           e.stopPropagation();
+          if (window.j4CurrentAudio) {
+            try {
+              window.j4CurrentAudio.pause();
+              window.j4CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j4CurrentAudio = null;
+          }
+          this._j4ShowingSuccess = false;
           if (this.currentExIndex > 0) {
             this.currentExIndex--;
             this.loadJourney4Activity();
@@ -13044,27 +13948,574 @@ showJourney2EndCelebration() {
         }
 
         if (isCorrect) {
-          fb.textContent = "Excellent ! Bonne réponse !";
-          fb.style.color = '#4ade80';
-
-          const valBtn = document.getElementById('j4-val-btn');
-          if (valBtn) {
-            valBtn.src = 'journe 1/continuer.png';
-            valBtn.setAttribute('data-action', 'next');
-            valBtn.animate([
-              { transform: 'scale(0.9)', opacity: 0.5 },
-              { transform: 'scale(1.05)', opacity: 1 },
-              { transform: 'scale(1)', opacity: 1 }
-            ], { duration: 400, easing: 'ease-out' });
+          const fb = document.getElementById('j4-feedback');
+          if (fb) {
+            fb.textContent = '';
+            fb.style.display = 'none';
           }
+          this.showJourney4SuccessPopup();
         } else {
-          fb.textContent = "Oups, ce n'est pas tout à fait ça. Réessaie !";
-          fb.style.color = '#f87171';
-          if (window.j1GentleShake) window.j1GentleShake(fb);
+          const fb = document.getElementById('j4-feedback');
+          if (fb) {
+            fb.textContent = "Oups, ce n'est pas tout à fait ça. Réessaie !";
+            fb.style.color = '#f87171';
+            if (window.j1GentleShake) window.j1GentleShake(fb);
+          }
         }
       },
 
+      showJourney4SuccessPopup() {
+        if (this._j4ShowingSuccess) return;
+        this._j4ShowingSuccess = true;
+
+        const CONTINUER_IMAGES = [
+          'contiuer/bien joue.png',
+          'contiuer/excellent.png',
+          'contiuer/parfait.png',
+          'contiuer/super.png'
+        ];
+
+        // Shuffle deck: cycles through all 4 celebration photos in randomized order before repeating
+        if (!this.j4SuccessDeck || this.j4SuccessDeck.length === 0) {
+          const deck = [...CONTINUER_IMAGES];
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          if (deck[0] === this.lastJ4SuccessCard && deck.length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+          }
+          this.j4SuccessDeck = deck;
+        }
+
+        const chosenSrc = this.j4SuccessDeck.shift();
+        this.lastJ4SuccessCard = chosenSrc;
+
+        // Hide stray feedback and validation button
+        const fb = document.getElementById('j4-feedback');
+        if (fb) {
+          fb.textContent = '';
+          fb.style.display = 'none';
+        }
+        const valBtn = document.getElementById('j4-val-btn');
+        if (valBtn) {
+          valBtn.style.display = 'none';
+        }
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            // Soft celebratory pop sound
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            // Twinkling spark chime
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        // Play specific celebration audio corresponding to the chosen photo
+        const AUDIO_MAP = {
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+          'contiuer/super.png': 'contiuer/super.mp3'
+        };
+
+        let cardAudio = null;
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+        if (targetAudioSrc) {
+          try {
+            if (window.j4CurrentAudio) {
+              window.j4CurrentAudio.pause();
+              window.j4CurrentAudio.currentTime = 0;
+            }
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+            window.j4CurrentAudio = cardAudio;
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+          } catch (e) {
+            console.warn('Card audio play error:', e);
+          }
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+          window.SoundSystem.playSuccess();
+        }
+
+        // Remove any pre-existing modal if present
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        // FULL SCREEN MODAL: attached to document.body so the blur covers the entire website!
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        // Background Fireworks Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        // Initial burst triplet
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        // Continuous festive bursts while card is showing
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Center Celebration Card
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-success-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = chosenSrc;
+        cardImg.alt = 'Bravo !';
+        cardImg.draggable = false;
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'j1-success-continue-btn';
+        continueBtn.setAttribute('title', 'Continuer vers la prochaine activité');
+        continueBtn.setAttribute('aria-label', 'Continuer');
+
+        let clicked = false;
+        continueBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+          this._j4ShowingSuccess = false;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (cardAudio) {
+            try {
+              cardAudio.pause();
+              cardAudio.currentTime = 0;
+            } catch (e) {}
+            cardAudio = null;
+          }
+          if (window.j4CurrentAudio) {
+            try {
+              window.j4CurrentAudio.pause();
+              window.j4CurrentAudio.currentTime = 0;
+            } catch (e) {}
+            window.j4CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            if (fb) fb.style.display = '';
+            this.handleJourney4Next();
+          }, 240);
+        };
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(continueBtn);
+        modal.appendChild(cardBox);
+
+        // Append to document.body for full-screen backdrop and blur across all elements!
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
+      showJourney4EndCelebration() {
+        if (window.j4CurrentAudio) {
+          try {
+            window.j4CurrentAudio.pause();
+            window.j4CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j4CurrentAudio = null;
+        }
+
+        try {
+          const felicitationAudio = new Audio(encodeURI("contiuer/Felicitation.mp3"));
+          window.j4CurrentAudio = felicitationAudio;
+          felicitationAudio.play().catch(err => console.log('Felicitation audio playback deferred or blocked:', err));
+        } catch (err) {
+          console.warn('Felicitation audio error:', err);
+        }
+
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+          } catch (e) {}
+        };
+
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ffd700', '#ffeb3b', '#ffa726', '#ffffff'],
+          ['#ff4081', '#ff80ab', '#f50057', '#ffffff'],
+          ['#00e5ff', '#18ffff', '#00b0ff', '#ffffff'],
+          ['#76ff03', '#b2ff59', '#64dd17', '#ffffff'],
+          ['#d500f9', '#e040fb', '#aa00ff', '#ffffff']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-end-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = 'journe 4/end pop up.png';
+        cardImg.alt = 'Félicitations !';
+        cardImg.draggable = false;
+
+        const finishBtn = document.createElement('button');
+        finishBtn.className = 'j1-end-finish-btn';
+        finishBtn.setAttribute('title', 'Retourner à la carte');
+        finishBtn.setAttribute('aria-label', 'Terminer la journée');
+
+        let clicked = false;
+        const doFinish = (e) => {
+          if (e) e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (window.j4CurrentAudio) {
+            try {
+              window.j4CurrentAudio.pause();
+              window.j4CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j4CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            this.finishJourney4();
+          }, 240);
+        };
+
+        finishBtn.onclick = doFinish;
+        cardBox.onclick = doFinish;
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(finishBtn);
+        modal.appendChild(cardBox);
+
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
       handleJourney4Next() {
+        if (window.j4CurrentAudio) {
+          try {
+            window.j4CurrentAudio.pause();
+            window.j4CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j4CurrentAudio = null;
+        }
+        this._j4ShowingSuccess = false;
         this.currentExIndex++;
         this.loadJourney4Activity();
       },
@@ -13207,6 +14658,13 @@ showJourney2EndCelebration() {
         }
 
         const activity = JOURNEY_5_POPUPS[this.currentExIndex];
+
+        // When the final Journey 5 end card (end popup.png) is reached, trigger the full fireworks & Felicitation celebration!
+        if (activity && (activity.src === 'journe 5/end popup.png' || activity.src === 'journe 5/end pop up.png')) {
+          this.showJourney5EndCelebration();
+          return;
+        }
+
         this.currentActivityState = {
           selected: new Set(),
           slotValues: {},
@@ -13716,6 +15174,14 @@ showJourney2EndCelebration() {
         btnBack.onmouseleave = () => { btnBack.style.transform = navBackPos.transform || 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
         btnBack.onclick = (e) => {
           e.stopPropagation();
+          if (window.j5CurrentAudio) {
+            try {
+              window.j5CurrentAudio.pause();
+              window.j5CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j5CurrentAudio = null;
+          }
+          this._j5ShowingSuccess = false;
           if (this.currentExIndex > 0) {
             this.currentExIndex--;
             this.loadJourney5Activity();
@@ -13990,28 +15456,575 @@ showJourney2EndCelebration() {
             }
           }
 
-          if (isCorrect) {
-          fb.textContent = "Excellent ! Bonne réponse !";
-          fb.style.color = '#4ade80';
-
-          const valBtn = document.getElementById('j5-val-btn');
-          if (valBtn) {
-            valBtn.src = 'journe 1/continuer.png';
-            valBtn.setAttribute('data-action', 'next');
-            valBtn.animate([
-              { transform: 'scale(0.9)', opacity: 0.5 },
-              { transform: 'scale(1.05)', opacity: 1 },
-              { transform: 'scale(1)', opacity: 1 }
-            ], { duration: 400, easing: 'ease-out' });
+        if (isCorrect) {
+          const fb = document.getElementById('j5-feedback');
+          if (fb) {
+            fb.textContent = '';
+            fb.style.display = 'none';
           }
+          this.showJourney5SuccessPopup();
         } else {
-          fb.textContent = "Oups, ce n'est pas tout à fait ça. Réessaie !";
-          fb.style.color = '#f87171';
-          if (window.j1GentleShake) window.j1GentleShake(fb);
+          const fb = document.getElementById('j5-feedback');
+          if (fb) {
+            fb.textContent = "Oups, ce n'est pas tout à fait ça. Réessaie !";
+            fb.style.color = '#f87171';
+            if (window.j1GentleShake) window.j1GentleShake(fb);
+          }
         }
       },
 
+      showJourney5SuccessPopup() {
+        if (this._j5ShowingSuccess) return;
+        this._j5ShowingSuccess = true;
+
+        const CONTINUER_IMAGES = [
+          'contiuer/bien joue.png',
+          'contiuer/excellent.png',
+          'contiuer/parfait.png',
+          'contiuer/super.png'
+        ];
+
+        // Shuffle deck: cycles through all 4 celebration photos in randomized order before repeating
+        if (!this.j5SuccessDeck || this.j5SuccessDeck.length === 0) {
+          const deck = [...CONTINUER_IMAGES];
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          if (deck[0] === this.lastJ5SuccessCard && deck.length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+          }
+          this.j5SuccessDeck = deck;
+        }
+
+        const chosenSrc = this.j5SuccessDeck.shift();
+        this.lastJ5SuccessCard = chosenSrc;
+
+        // Hide stray feedback and validation button
+        const fb = document.getElementById('j5-feedback');
+        if (fb) {
+          fb.textContent = '';
+          fb.style.display = 'none';
+        }
+        const valBtn = document.getElementById('j5-val-btn');
+        if (valBtn) {
+          valBtn.style.display = 'none';
+        }
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            // Soft celebratory pop sound
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            // Twinkling spark chime
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        // Play specific celebration audio corresponding to the chosen photo
+        const AUDIO_MAP = {
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+          'contiuer/super.png': 'contiuer/super.mp3'
+        };
+
+        let cardAudio = null;
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+        if (targetAudioSrc) {
+          try {
+            if (window.j5CurrentAudio) {
+              window.j5CurrentAudio.pause();
+              window.j5CurrentAudio.currentTime = 0;
+            }
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+            window.j5CurrentAudio = cardAudio;
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+          } catch (e) {
+            console.warn('Card audio play error:', e);
+          }
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+          window.SoundSystem.playSuccess();
+        }
+
+        // Remove any pre-existing modal if present
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        // FULL SCREEN MODAL: attached to document.body so the blur covers the entire website!
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        // Background Fireworks Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        // Initial burst triplet
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        // Continuous festive bursts while card is showing
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Center Celebration Card
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-success-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = chosenSrc;
+        cardImg.alt = 'Bravo !';
+        cardImg.draggable = false;
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'j1-success-continue-btn';
+        continueBtn.setAttribute('title', 'Continuer vers la prochaine activité');
+        continueBtn.setAttribute('aria-label', 'Continuer');
+
+        let clicked = false;
+        continueBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+          this._j5ShowingSuccess = false;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (cardAudio) {
+            try {
+              cardAudio.pause();
+              cardAudio.currentTime = 0;
+            } catch (e) {}
+            cardAudio = null;
+          }
+          if (window.j5CurrentAudio) {
+            try {
+              window.j5CurrentAudio.pause();
+              window.j5CurrentAudio.currentTime = 0;
+            } catch (e) {}
+            window.j5CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            if (fb) fb.style.display = '';
+            this.handleJourney5Next();
+          }, 240);
+        };
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(continueBtn);
+        modal.appendChild(cardBox);
+
+        // Append to document.body for full-screen backdrop and blur across all elements!
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
+      showJourney5EndCelebration() {
+        if (window.j5CurrentAudio) {
+          try {
+            window.j5CurrentAudio.pause();
+            window.j5CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j5CurrentAudio = null;
+        }
+
+        try {
+          const felicitationAudio = new Audio(encodeURI("contiuer/Felicitation.mp3"));
+          window.j5CurrentAudio = felicitationAudio;
+          felicitationAudio.play().catch(err => console.log('Felicitation audio playback deferred or blocked:', err));
+        } catch (err) {
+          console.warn('Felicitation audio error:', err);
+        }
+
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+          } catch (e) {}
+        };
+
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ffd700', '#ffeb3b', '#ffa726', '#ffffff'],
+          ['#ff4081', '#ff80ab', '#f50057', '#ffffff'],
+          ['#00e5ff', '#18ffff', '#00b0ff', '#ffffff'],
+          ['#76ff03', '#b2ff59', '#64dd17', '#ffffff'],
+          ['#d500f9', '#e040fb', '#aa00ff', '#ffffff']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-end-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = 'journe 5/end popup.png';
+        cardImg.alt = 'Félicitations !';
+        cardImg.draggable = false;
+
+        const finishBtn = document.createElement('button');
+        finishBtn.className = 'j1-end-finish-btn';
+        finishBtn.setAttribute('title', 'Retourner à la carte');
+        finishBtn.setAttribute('aria-label', 'Terminer la journée');
+
+        let clicked = false;
+        const doFinish = (e) => {
+          if (e) e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (window.j5CurrentAudio) {
+            try {
+              window.j5CurrentAudio.pause();
+              window.j5CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j5CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            this.finishJourney5();
+          }, 240);
+        };
+
+        finishBtn.onclick = doFinish;
+        cardBox.onclick = doFinish;
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(finishBtn);
+        modal.appendChild(cardBox);
+
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
       handleJourney5Next() {
+        if (window.j5CurrentAudio) {
+          try {
+            window.j5CurrentAudio.pause();
+            window.j5CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j5CurrentAudio = null;
+        }
+        this._j5ShowingSuccess = false;
         this.currentExIndex++;
         this.loadJourney5Activity();
       },
@@ -14268,7 +16281,1441 @@ showJourney2EndCelebration() {
         } else {
           this.loadExercise();
         }
+      },
+
+      // --- EVALUATION SESSION & FIRESTORE INTEGRATION ---
+      saveEvaluationSession() {
+        try {
+          const sessionData = {
+            currentExIndex: this.currentExIndex,
+            evalAnswers: this.evalAnswers || {},
+            evalScores: this.evalScores || {},
+            evalScore: this.computeAutoScore(),
+            evalSessionId: this.evalSessionId || (this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
+            updatedAt: new Date().toISOString()
+          };
+          localStorage.setItem('ecripro_eval_session', JSON.stringify(sessionData));
+        } catch (e) {
+          console.warn('Failed to save evaluation session to localStorage:', e);
+        }
+      },
+
+      restoreEvaluationSession() {
+        try {
+          const raw = localStorage.getItem('ecripro_eval_session');
+          if (!raw) return false;
+          const sessionData = JSON.parse(raw);
+          if (sessionData && sessionData.evalAnswers) {
+            this.evalAnswers = sessionData.evalAnswers;
+            this.evalScores = sessionData.evalScores || { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null };
+            this.evalScore = this.computeAutoScore();
+            this.evalSessionId = sessionData.evalSessionId || ('sess_' + Date.now());
+            if (typeof sessionData.currentExIndex === 'number' && sessionData.currentExIndex >= 0 && sessionData.currentExIndex <= 6) {
+              this.currentExIndex = sessionData.currentExIndex;
+            }
+            console.log('Evaluation session restored successfully:', sessionData);
+            return true;
+          }
+        } catch (e) {
+          console.warn('Failed to restore evaluation session:', e);
+        }
+        return false;
+      },
+
+      clearEvaluationSession() {
+        try {
+          localStorage.removeItem('ecripro_eval_session');
+        } catch (e) {}
+      },
+
+      computeAutoScore() {
+        if (!this.evalScores) return 0;
+        let sum = 0;
+        ['situation', 'character', 'place', 'time', 'chronology'].forEach(k => {
+          if (typeof this.evalScores[k] === 'number') {
+            sum += this.evalScores[k];
+          }
+        });
+        return Math.min(50, Math.max(0, sum));
+      },
+
+      isChronologyCorrect(order) {
+        if (!Array.isArray(order) || order.length !== 4) return false;
+        return (order[0] === 'arrive' && order[3] === 'commence' &&
+               ((order[1] === 'rencontre' && order[2] === 'entre') ||
+                (order[1] === 'entre' && order[2] === 'rencontre')));
+      },
+
+      getSentenceCount(text) {
+        if (!text || !text.trim()) return 0;
+        const matches = text.trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g);
+        if (!matches) return 0;
+        return matches.filter(s => s.trim().length > 3).length;
+      },
+
+      getWordCount(text) {
+        if (!text || !text.trim()) return 0;
+        return text.trim().split(/\s+/).filter(w => w.trim().length > 0).length;
+      },
+
+      async submitEvaluationToFirestore() {
+        if (window.FirebaseService) {
+          window.FirebaseService.init();
+        }
+
+        const profile = (this.evalAnswers && this.evalAnswers.profile) || {};
+        const studentId = (profile.id || 'ANON').trim();
+        const studentNom = (profile.nom || '').trim();
+        const studentPrenom = (profile.prenom || '').trim();
+        const studentClasse = (profile.classe || '').trim();
+
+        if (!this.evalSessionId) {
+          this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        }
+
+        const safeStudentId = studentId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const docId = 'eval_' + safeStudentId + '_' + this.evalSessionId;
+
+        const autoScore = this.computeAutoScore();
+        const writingText = (this.evalAnswers && this.evalAnswers.text) ? this.evalAnswers.text.trim() : '';
+
+        const payload = {
+          studentId: studentId,
+          studentNom: studentNom,
+          studentPrenom: studentPrenom,
+          studentClasse: studentClasse,
+          sessionId: this.evalSessionId,
+          module: "Module 1",
+          journey: "Évaluation — Je construis mon histoire",
+          submittedAt: new Date().toISOString(),
+          status: "completed",
+          autoScore: autoScore,
+          maxAutoScore: 50,
+          writingStatus: "pending_teacher_grading",
+          writingScore: null,
+          maxTotalScore: 60,
+          answers: {
+            situation: this.evalAnswers ? this.evalAnswers.situation : null,
+            character: this.evalAnswers ? this.evalAnswers.character : null,
+            place: this.evalAnswers ? this.evalAnswers.place : null,
+            time: this.evalAnswers ? this.evalAnswers.time : null,
+            chronology: (this.evalAnswers && this.evalAnswers.chronology) ? this.evalAnswers.chronology : [],
+            writing: {
+              text: writingText,
+              sentenceCount: this.getSentenceCount(writingText),
+              wordCount: this.getWordCount(writingText)
+            }
+          },
+          scoresBreakdown: {
+            situation: (this.evalScores && this.evalScores.situation) || 0,
+            character: (this.evalScores && this.evalScores.character) || 0,
+            place: (this.evalScores && this.evalScores.place) || 0,
+            time: (this.evalScores && this.evalScores.time) || 0,
+            chronology: (this.evalScores && this.evalScores.chronology) || 0,
+            writing: null
+          }
+        };
+
+        this.lastSavedEvaluation = payload;
+
+        // Save to Firestore via FirebaseService
+        if (window.FirebaseService) {
+          try {
+            await window.FirebaseService.saveEvaluation(docId, payload);
+          } catch (err) {
+            console.error('Error in saveEvaluation:', err);
+          }
+        }
+
+        // Clear in-progress session since submitted
+        this.clearEvaluationSession();
+
+        // Save persistent record of completion in localStorage
+        try {
+          localStorage.setItem('ecripro_eval_completed_' + studentId, JSON.stringify({
+            docId,
+            submittedAt: payload.submittedAt,
+            autoScore: autoScore
+          }));
+        } catch (e) {}
+
+        return payload;
+      },
+
+      loadEvaluationActivity() {
+        const EVAL_POPUPS = [
+          {
+            src: 'evalution/first.png',
+            type: 'profile',
+            fields: [
+              { id: 'id', label: 'ID', left: 56.0, top: 48.5, width: 35.5, height: 6.0, placeholder: 'Ex: 1042', required: true },
+              { id: 'nom', label: 'Nom', left: 55.5, top: 56.0, width: 36.0, height: 6.0, placeholder: 'Ex: Ben Ali', required: true },
+              { id: 'prenom', label: 'Prénom', left: 58.0, top: 63.8, width: 33.5, height: 6.0, placeholder: 'Ex: Sarah', required: true },
+              { id: 'classe', label: 'Classe', left: 58.5, top: 71.5, width: 33.0, height: 6.0, placeholder: 'Ex: 4ème B', required: true }
+            ],
+            valBtnPos: { left: 50.0, top: 91.5, width: 22.0, height: 7.5 }
+          },
+          {
+            src: 'evalution/1.png',
+            type: 'situation',
+            options: [
+              {
+                id: 'school',
+                title: "Vive l'école !",
+                left: 21.5,
+                top: 36.5,
+                width: 36.2,
+                height: 53.5,
+                checkbox: { left: 25.8, top: 69.8, width: 5.1, height: 4.8 },
+                correct: true
+              },
+              {
+                id: 'baby',
+                title: "Bienvenue dans la famille !",
+                left: 58.2,
+                top: 36.0,
+                width: 39.1,
+                height: 54.7,
+                checkbox: { left: 62.2, top: 69.0, width: 5.4, height: 4.9 },
+                correct: true
+              }
+            ],
+            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+          },
+          {
+            src: 'evalution/2.png',
+            type: 'mcq',
+            category: 'character',
+            options: [
+              {
+                id: 'eleve',
+                title: "Une élève",
+                left: 10.3,
+                top: 39.0,
+                width: 26.8,
+                height: 38.7,
+                checkbox: { left: 14.3, top: 69.1, width: 5.4, height: 5.2 },
+                correct: true
+              },
+              {
+                id: 'maitresse',
+                title: "La maîtresse",
+                left: 37.9,
+                top: 38.6,
+                width: 29.7,
+                height: 39.4,
+                checkbox: { left: 40.5, top: 69.5, width: 5.5, height: 5.3 },
+                correct: false
+              },
+              {
+                id: 'directeur',
+                title: "Le directeur",
+                left: 67.6,
+                top: 38.4,
+                width: 28.0,
+                height: 39.3,
+                checkbox: { left: 69.7, top: 69.7, width: 5.5, height: 5.0 },
+                correct: false
+              }
+            ],
+            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+          },
+          {
+            src: 'evalution/3.png',
+            type: 'mcq',
+            category: 'place',
+            options: [
+              {
+                id: 'ecole',
+                title: "L'école",
+                left: 10.4,
+                top: 36.7,
+                width: 27.7,
+                height: 41.4,
+                checkbox: { left: 13.6, top: 68.7, width: 6.7, height: 5.8 },
+                correct: true
+              },
+              {
+                id: 'maternite',
+                title: "La maternité",
+                left: 38.6,
+                top: 37.0,
+                width: 29.4,
+                height: 41.6,
+                checkbox: { left: 40.8, top: 68.7, width: 6.1, height: 4.9 },
+                correct: false
+              },
+              {
+                id: 'plage',
+                title: "La plage",
+                left: 68.9,
+                top: 37.4,
+                width: 27.2,
+                height: 40.7,
+                checkbox: { left: 70.7, top: 69.1, width: 6.3, height: 5.2 },
+                correct: false
+              }
+            ],
+            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+          },
+          {
+            src: 'evalution/4.png',
+            type: 'mcq',
+            category: 'time',
+            options: [
+              {
+                id: 'rentree',
+                title: "Le premier jour d'école",
+                left: 11.5,
+                top: 35.1,
+                width: 29.9,
+                height: 41.5,
+                checkbox: { left: 14.6, top: 65.2, width: 6.3, height: 5.8 },
+                correct: true
+              },
+              {
+                id: 'nuit',
+                title: "La nuit",
+                left: 41.4,
+                top: 35.0,
+                width: 28.0,
+                height: 41.9,
+                checkbox: { left: 44.5, top: 65.8, width: 6.6, height: 5.3 },
+                correct: false
+              },
+              {
+                id: 'vacances',
+                title: "Pendant les vacances",
+                left: 69.6,
+                top: 35.0,
+                width: 27.5,
+                height: 41.4,
+                checkbox: { left: 71.0, top: 65.7, width: 6.5, height: 5.3 },
+                correct: false
+              }
+            ],
+            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+          },
+          {
+            src: 'evalution/5.png',
+            type: 'chronology',
+            columns: [
+              {
+                id: 'entre',
+                text: 'Elle entre dans la classe.',
+                left: 8.2,
+                top: 35.1,
+                width: 21.9,
+                height: 45.4,
+                circle: { left: 7.7, top: 33.8, width: 8.0, height: 7.8 },
+                expectedStep: 3
+              },
+              {
+                id: 'commence',
+                text: 'Elle commence une activité.',
+                left: 30.6,
+                top: 34.6,
+                width: 22.0,
+                height: 46.7,
+                circle: { left: 30.0, top: 33.2, width: 8.6, height: 8.4 },
+                expectedStep: 4
+              },
+              {
+                id: 'arrive',
+                text: "L'élève arrive devant l'école.",
+                left: 53.3,
+                top: 35.7,
+                width: 21.7,
+                height: 46.0,
+                circle: { left: 52.7, top: 32.9, width: 8.9, height: 8.7 },
+                expectedStep: 1
+              },
+              {
+                id: 'rencontre',
+                text: 'Elle rencontre ses camarades.',
+                left: 75.9,
+                top: 35.3,
+                width: 22.4,
+                height: 45.7,
+                circle: { left: 77.1, top: 32.9, width: 8.4, height: 8.2 },
+                expectedStep: 2
+              }
+            ],
+            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+          },
+          {
+            src: 'evalution/6.png',
+            type: 'writing',
+            writingBox: { left: 39.5, top: 23.5, width: 54.0, height: 58.0 },
+            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+          },
+          {
+            src: 'evalution/pop up end.png',
+            type: 'end'
+          }
+        ];
+
+        const container = document.getElementById('exercise-content-area');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (!this.evalAnswers) {
+          this.evalAnswers = { profile: null, situation: null, character: null, place: null, time: null, chronology: [], text: '' };
+        }
+        if (!this.evalScores) {
+          this.evalScores = { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null };
+        }
+        this.evalScore = this.computeAutoScore();
+        this.saveEvaluationSession();
+
+        if (this.currentExIndex >= EVAL_POPUPS.length - 1) {
+          this.showEvaluationEndCelebration();
+          return;
+        }
+
+        const activity = EVAL_POPUPS[this.currentExIndex];
+        if (!activity) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; user-select: none;';
+
+        const imgContainer = document.createElement('div');
+        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 85vh;';
+
+        const bgImg = document.createElement('img');
+        bgImg.src = activity.src;
+        bgImg.draggable = false;
+        bgImg.style.cssText = 'display: block; max-width: 95vw; max-height: 75vh; width: auto; height: auto;';
+
+        imgContainer.appendChild(bgImg);
+
+        const ro = new ResizeObserver(() => {
+          const rect = bgImg.getBoundingClientRect();
+          imgContainer.style.setProperty('--img-width', rect.width + 'px');
+          imgContainer.style.setProperty('--img-height', rect.height + 'px');
+        });
+        ro.observe(bgImg);
+
+        // Default chime sound for every interaction inside evaluation (as requested by user)
+        const playEvalClickSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.evalAudioCtx = window.evalAudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'triangle';
+            chime.frequency.setValueAtTime(587.33, now);
+            chime.frequency.exponentialRampToValueAtTime(1174.66, now + 0.22);
+            chimeGain.gain.setValueAtTime(0.12, now);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now);
+            chime.stop(now + 0.28);
+          } catch(e) {}
+        };
+        window.playEvalClickSound = playEvalClickSound;
+
+        // Top Navigation: Back and Home buttons
+        const btnBack = document.createElement('div');
+        btnBack.style.cssText = 'position: absolute; top: 10.5%; left: 10.5%; width: 7%; height: 7%; transform: translate(-50%, -50%); cursor: pointer; border-radius: 50%; z-index: 100; transition: transform 0.15s ease;';
+        btnBack.setAttribute('title', 'Retour');
+        btnBack.onmouseenter = () => btnBack.style.transform = 'translate(-50%, -50%) scale(1.12)';
+        btnBack.onmouseleave = () => btnBack.style.transform = 'translate(-50%, -50%) scale(1)';
+        btnBack.onclick = () => {
+          playEvalClickSound();
+          if (this.currentExIndex > 0) {
+            this.currentExIndex--;
+            this.loadEvaluationActivity();
+          } else {
+            this.close();
+          }
+        };
+        imgContainer.appendChild(btnBack);
+
+        const btnHome = document.createElement('div');
+        btnHome.style.cssText = 'position: absolute; top: 10.5%; left: 88.5%; width: 7%; height: 7%; transform: translate(-50%, -50%); cursor: pointer; border-radius: 50%; z-index: 100; transition: transform 0.15s ease;';
+        btnHome.setAttribute('title', 'Retour à la carte');
+        btnHome.onmouseenter = () => btnHome.style.transform = 'translate(-50%, -50%) scale(1.12)';
+        btnHome.onmouseleave = () => btnHome.style.transform = 'translate(-50%, -50%) scale(1)';
+        btnHome.onclick = () => {
+          this.close();
+        };
+        imgContainer.appendChild(btnHome);
+
+        // Explicit Close 'X' Button on top-right of evaluation screen
+        const btnClose = document.createElement('button');
+        btnClose.id = 'eval-close-x-btn';
+        btnClose.innerHTML = '✖';
+        btnClose.setAttribute('title', 'Quitter l\'évaluation et revenir à la carte');
+        btnClose.setAttribute('aria-label', 'Fermer');
+        btnClose.style.cssText = 'position: fixed; top: 18px; right: 22px; width: 44px; height: 44px; border-radius: 50%; background: #ff4757; color: white; border: 3px solid white; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.35); z-index: 999999; transition: transform 0.15s ease, background 0.15s ease; outline: none;';
+        btnClose.onmouseenter = () => { btnClose.style.transform = 'scale(1.12)'; btnClose.style.background = '#e03242'; };
+        btnClose.onmouseleave = () => { btnClose.style.transform = 'scale(1)'; btnClose.style.background = '#ff4757'; };
+        btnClose.onclick = (e) => {
+          e.stopPropagation();
+          playEvalClickSound();
+          this.close();
+        };
+        wrapper.appendChild(btnClose);
+
+        // Feedback message element
+        const feedbackEl = document.createElement('div');
+        feedbackEl.style.cssText = 'position: absolute; bottom: 1%; left: 50%; transform: translateX(-50%); font-family: sans-serif; font-weight: bold; font-size: 15px; color: #dc2626; background: rgba(255,255,255,0.95); padding: 6px 16px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; z-index: 90; text-align: center; white-space: nowrap;';
+        imgContainer.appendChild(feedbackEl);
+
+        const showFeedback = (msg) => {
+          feedbackEl.textContent = msg;
+          feedbackEl.style.display = 'block';
+          feedbackEl.animate([
+            { transform: 'translateX(-50%) scale(0.9)', opacity: 0 },
+            { transform: 'translateX(-50%) scale(1)', opacity: 1 }
+          ], { duration: 200 });
+          setTimeout(() => {
+            feedbackEl.style.display = 'none';
+          }, 3200);
+        };
+
+        // Render Activity Content by Type
+        let validateFn = null;
+
+        if (activity.type === 'profile') {
+          const profileData = (this.evalAnswers && this.evalAnswers.profile) || {};
+          const inputEls = {};
+
+          activity.fields.forEach(f => {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.id = 'eval-input-' + f.id;
+            inp.placeholder = f.placeholder || '';
+            inp.value = profileData[f.id] || '';
+            inp.autocomplete = 'off';
+            inp.spellcheck = false;
+            inp.style.cssText = 'position: absolute; left: ' + f.left + '%; top: ' + f.top + '%; width: ' + f.width + '%; height: ' + f.height + '%; background: transparent; border: none; outline: none; font-family: "Nunito", "Segoe UI", cursive, sans-serif; font-weight: 800; font-size: clamp(15px, 1.9vw, 25px); color: #1e3a8a; padding: 0 8px; box-sizing: border-box; z-index: 25; transition: all 0.15s ease; border-radius: 6px;';
+
+            inp.onfocus = () => {
+              playEvalClickSound();
+              inp.style.background = 'rgba(37, 99, 235, 0.08)';
+              inp.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.35)';
+            };
+
+            inp.onblur = () => {
+              inp.style.background = 'transparent';
+              inp.style.boxShadow = 'none';
+            };
+
+            inp.oninput = () => {
+              inp.style.border = 'none';
+              inp.style.background = 'rgba(37, 99, 235, 0.08)';
+            };
+
+            inp.onkeydown = (e) => {
+              if (e.key === 'Enter') {
+                if (f.id === 'id') {
+                  const next = document.getElementById('eval-input-nom');
+                  if (next) next.focus();
+                } else if (f.id === 'nom') {
+                  const next = document.getElementById('eval-input-prenom');
+                  if (next) next.focus();
+                } else if (f.id === 'prenom') {
+                  const next = document.getElementById('eval-input-classe');
+                  if (next) next.focus();
+                } else if (f.id === 'classe') {
+                  if (validateFn && validateFn()) {
+                    playEvalClickSound();
+                    this.currentExIndex++;
+                    this.loadEvaluationActivity();
+                  }
+                }
+              }
+            };
+
+            inputEls[f.id] = inp;
+            imgContainer.appendChild(inp);
+          });
+
+          // Focus first empty input automatically
+          setTimeout(() => {
+            const firstEmpty = activity.fields.find(f => !inputEls[f.id].value.trim());
+            if (firstEmpty && inputEls[firstEmpty.id]) {
+              inputEls[firstEmpty.id].focus();
+            }
+          }, 150);
+
+          validateFn = () => {
+            const missing = [];
+            const collected = {};
+
+            activity.fields.forEach(f => {
+              const el = inputEls[f.id];
+              const val = el ? el.value.trim() : '';
+              collected[f.id] = val;
+              if (f.required && !val) {
+                missing.push(f.label);
+                if (el) {
+                  el.style.border = '2px solid #ef4444';
+                  el.style.background = 'rgba(239, 68, 68, 0.12)';
+                  el.animate([
+                    { transform: 'translateX(-5px)' },
+                    { transform: 'translateX(5px)' },
+                    { transform: 'translateX(-3px)' },
+                    { transform: 'translateX(3px)' },
+                    { transform: 'translateX(0)' }
+                  ], { duration: 250 });
+                }
+              } else if (el) {
+                el.style.border = 'none';
+              }
+            });
+
+            if (missing.length > 0) {
+              showFeedback("⚠️ Remplis tous les champs obligatoires (" + missing.join(', ') + ") pour commencer !");
+              const firstMiss = activity.fields.find(f => !collected[f.id]);
+              if (firstMiss && inputEls[firstMiss.id]) {
+                inputEls[firstMiss.id].focus();
+              }
+              return false;
+            }
+
+            this.evalAnswers.profile = collected;
+            try {
+              localStorage.setItem('eval_student_profile', JSON.stringify(collected));
+            } catch(e) {}
+            this.saveEvaluationSession();
+            return true;
+          };
+
+        } else if (activity.type === 'situation') {
+          let selectedOptId = this.evalAnswers.situation || null;
+
+          const updateSituationSelection = (optId) => {
+            selectedOptId = optId;
+            this.evalAnswers.situation = optId;
+            this.evalScores.situation = 10;
+            this.evalScore = this.computeAutoScore();
+            this.saveEvaluationSession();
+            activity.options.forEach(opt => {
+              const cardEl = document.getElementById('eval-sit-card-' + opt.id);
+              const tickEl = document.getElementById('eval-sit-tick-' + opt.id);
+              if (opt.id === optId) {
+                if (cardEl) {
+                  cardEl.style.border = '3.5px solid #22c55e';
+                  cardEl.style.backgroundColor = 'rgba(34, 197, 94, 0.08)';
+                  cardEl.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.25)';
+                  cardEl.style.transform = 'scale(1.015)';
+                }
+                if (tickEl) {
+                  tickEl.style.display = 'flex';
+                  tickEl.animate([
+                    { transform: 'scale(0) rotate(-15deg)' },
+                    { transform: 'scale(1.25) rotate(5deg)' },
+                    { transform: 'scale(1) rotate(0deg)' }
+                  ], { duration: 250, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+                }
+              } else {
+                if (cardEl) {
+                  cardEl.style.border = '3.5px solid transparent';
+                  cardEl.style.backgroundColor = 'transparent';
+                  cardEl.style.boxShadow = 'none';
+                  cardEl.style.transform = 'scale(1)';
+                }
+                if (tickEl) {
+                  tickEl.style.display = 'none';
+                }
+              }
+            });
+          };
+
+          activity.options.forEach(opt => {
+            // Card / Image clickable area (Image 1 or Image 2)
+            const cardEl = document.createElement('div');
+            cardEl.id = 'eval-sit-card-' + opt.id;
+            cardEl.style.cssText = 'position: absolute; left: ' + opt.left + '%; top: ' + opt.top + '%; width: ' + opt.width + '%; height: ' + opt.height + '%; cursor: pointer; border-radius: 20px; transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); box-sizing: border-box; border: 3.5px solid transparent; z-index: 10;';
+
+            cardEl.onmouseenter = () => {
+              if (selectedOptId !== opt.id) {
+                cardEl.style.transform = 'scale(1.015)';
+                cardEl.style.backgroundColor = 'rgba(59, 130, 246, 0.06)';
+              }
+            };
+            cardEl.onmouseleave = () => {
+              if (selectedOptId !== opt.id) {
+                cardEl.style.transform = 'scale(1)';
+                cardEl.style.backgroundColor = 'transparent';
+              }
+            };
+
+            cardEl.onclick = () => { playEvalClickSound(); updateSituationSelection(opt.id); };
+            imgContainer.appendChild(cardEl);
+
+            // Checkbox tick container (Box 3 or Box 4)
+            const boxEl = document.createElement('div');
+            boxEl.id = 'eval-sit-box-' + opt.id;
+            boxEl.style.cssText = 'position: absolute; left: ' + opt.checkbox.left + '%; top: ' + opt.checkbox.top + '%; width: ' + opt.checkbox.width + '%; height: ' + opt.checkbox.height + '%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 25; border-radius: 8px;';
+
+            const tickEl = document.createElement('div');
+            tickEl.id = 'eval-sit-tick-' + opt.id;
+            tickEl.style.cssText = 'width: 100%; height: 100%; display: none; align-items: center; justify-content: center; pointer-events: none;';
+            tickEl.innerHTML = '<svg viewBox="0 0 24 24" style="width: 85%; height: 85%; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));"><path d="M4 12.5 L9.5 18 L20 5.5" fill="none" stroke="#16a34a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+            boxEl.appendChild(tickEl);
+            boxEl.onclick = (e) => {
+              e.stopPropagation();
+              playEvalClickSound();
+              updateSituationSelection(opt.id);
+            };
+            boxEl.onmouseenter = () => {
+              if (selectedOptId !== opt.id) cardEl.style.transform = 'scale(1.015)';
+            };
+            boxEl.onmouseleave = () => {
+              if (selectedOptId !== opt.id) cardEl.style.transform = 'scale(1)';
+            };
+
+            imgContainer.appendChild(boxEl);
+          });
+
+          // Restore previously chosen selection if any
+          if (selectedOptId) {
+            setTimeout(() => updateSituationSelection(selectedOptId), 40);
+          }
+
+          validateFn = () => {
+            if (!selectedOptId) {
+              showFeedback("💡 Clique sur une image ou coche pour faire ton choix !");
+              return false;
+            }
+            this.evalAnswers.situation = selectedOptId;
+            this.evalScores.situation = 10;
+            this.evalScore = this.computeAutoScore();
+            this.saveEvaluationSession();
+            return true;
+          };
+
+        } else if (activity.type === 'mcq') {
+          let selectedOptId = this.evalAnswers[activity.category] || null;
+
+          const updateMcqSelection = (optId) => {
+            selectedOptId = optId;
+            const chosen = activity.options.find(o => o.id === optId);
+            this.evalAnswers[activity.category] = optId;
+            this.evalScores[activity.category] = (chosen && chosen.correct) ? 10 : 0;
+            this.evalScore = this.computeAutoScore();
+            this.saveEvaluationSession();
+            activity.options.forEach(opt => {
+              const cardEl = document.getElementById('eval-mcq-card-' + opt.id);
+              const tickEl = document.getElementById('eval-mcq-tick-' + opt.id);
+              if (opt.id === optId) {
+                if (cardEl) {
+                  cardEl.style.border = '3.5px solid #22c55e';
+                  cardEl.style.backgroundColor = 'rgba(34, 197, 94, 0.08)';
+                  cardEl.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.25)';
+                  cardEl.style.transform = 'scale(1.015)';
+                }
+                if (tickEl) {
+                  tickEl.style.display = 'flex';
+                  tickEl.animate([
+                    { transform: 'scale(0) rotate(-15deg)' },
+                    { transform: 'scale(1.25) rotate(5deg)' },
+                    { transform: 'scale(1) rotate(0deg)' }
+                  ], { duration: 250, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+                }
+              } else {
+                if (cardEl) {
+                  cardEl.style.border = '3.5px solid transparent';
+                  cardEl.style.backgroundColor = 'transparent';
+                  cardEl.style.boxShadow = 'none';
+                  cardEl.style.transform = 'scale(1)';
+                }
+                if (tickEl) {
+                  tickEl.style.display = 'none';
+                }
+              }
+            });
+          };
+
+          activity.options.forEach(opt => {
+            // Card / Image clickable area
+            const cardEl = document.createElement('div');
+            cardEl.id = 'eval-mcq-card-' + opt.id;
+            cardEl.style.cssText = 'position: absolute; left: ' + opt.left + '%; top: ' + opt.top + '%; width: ' + opt.width + '%; height: ' + opt.height + '%; cursor: pointer; border-radius: 18px; transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); box-sizing: border-box; border: 3.5px solid transparent; z-index: 10;';
+
+            cardEl.onmouseenter = () => {
+              if (selectedOptId !== opt.id) {
+                cardEl.style.transform = 'scale(1.015)';
+                cardEl.style.backgroundColor = 'rgba(59, 130, 246, 0.06)';
+              }
+            };
+            cardEl.onmouseleave = () => {
+              if (selectedOptId !== opt.id) {
+                cardEl.style.transform = 'scale(1)';
+                cardEl.style.backgroundColor = 'transparent';
+              }
+            };
+
+            cardEl.onclick = () => { playEvalClickSound(); updateMcqSelection(opt.id); };
+            imgContainer.appendChild(cardEl);
+
+            // Checkbox tick container if defined
+            if (opt.checkbox) {
+              const boxEl = document.createElement('div');
+              boxEl.id = 'eval-mcq-box-' + opt.id;
+              boxEl.style.cssText = 'position: absolute; left: ' + opt.checkbox.left + '%; top: ' + opt.checkbox.top + '%; width: ' + opt.checkbox.width + '%; height: ' + opt.checkbox.height + '%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 25; border-radius: 8px;';
+
+              const tickEl = document.createElement('div');
+              tickEl.id = 'eval-mcq-tick-' + opt.id;
+              tickEl.style.cssText = 'width: 100%; height: 100%; display: none; align-items: center; justify-content: center; pointer-events: none;';
+              tickEl.innerHTML = '<svg viewBox="0 0 24 24" style="width: 85%; height: 85%; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));"><path d="M4 12.5 L9.5 18 L20 5.5" fill="none" stroke="#16a34a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+              boxEl.appendChild(tickEl);
+              boxEl.onclick = (e) => {
+                e.stopPropagation();
+                playEvalClickSound();
+                updateMcqSelection(opt.id);
+              };
+              boxEl.onmouseenter = () => {
+                if (selectedOptId !== opt.id) cardEl.style.transform = 'scale(1.015)';
+              };
+              boxEl.onmouseleave = () => {
+                if (selectedOptId !== opt.id) cardEl.style.transform = 'scale(1)';
+              };
+
+              imgContainer.appendChild(boxEl);
+            }
+          });
+
+          // Restore previously chosen selection if any
+          if (selectedOptId) {
+            setTimeout(() => updateMcqSelection(selectedOptId), 40);
+          }
+
+          validateFn = () => {
+            if (!selectedOptId) {
+              const hintWord = activity.category === 'character' ? 'un personnage' : (activity.category === 'place' ? 'un lieu' : (activity.category === 'time' ? 'un moment' : 'une image'));
+              showFeedback("💡 Clique sur " + hintWord + " ou coche pour faire ton choix !");
+              return false;
+            }
+            const chosen = activity.options.find(o => o.id === selectedOptId);
+            this.evalAnswers[activity.category] = chosen.id;
+            this.evalScores[activity.category] = (chosen && chosen.correct) ? 10 : 0;
+            this.evalScore = this.computeAutoScore();
+            this.saveEvaluationSession();
+            if (chosen.correct) {
+              return true;
+            } else {
+              showFeedback("💡 Observe bien les images et réessaie !");
+              return false;
+            }
+          };
+
+        } else if (activity.type === 'chronology') {
+          const selectedOrder = (this.evalAnswers.chronology && Array.isArray(this.evalAnswers.chronology)) ? [...this.evalAnswers.chronology] : [];
+
+          const updateChronologyDisplay = () => {
+            activity.columns.forEach(col => {
+              const colEl = document.getElementById('eval-col-' + col.id);
+              const badgeEl = document.getElementById('eval-col-badge-' + col.id);
+              const pos = selectedOrder.indexOf(col.id);
+              if (pos !== -1) {
+                const step = pos + 1;
+                if (badgeEl) {
+                  badgeEl.textContent = step;
+                  badgeEl.style.display = 'flex';
+                }
+                if (colEl) {
+                  colEl.style.border = '3.5px solid #3b82f6';
+                  colEl.style.backgroundColor = 'rgba(59, 130, 246, 0.08)';
+                  colEl.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.2)';
+                }
+              } else {
+                if (badgeEl) {
+                  badgeEl.style.display = 'none';
+                }
+                if (colEl) {
+                  colEl.style.border = '3.5px solid transparent';
+                  colEl.style.backgroundColor = 'transparent';
+                  colEl.style.boxShadow = 'none';
+                }
+              }
+            });
+          };
+
+          const handleColClick = (colId) => {
+            const idx = selectedOrder.indexOf(colId);
+            if (idx !== -1) {
+              selectedOrder.splice(idx, 1);
+            } else {
+              if (selectedOrder.length >= 4) return;
+              selectedOrder.push(colId);
+              setTimeout(() => {
+                const badgeEl = document.getElementById('eval-col-badge-' + colId);
+                if (badgeEl) {
+                  badgeEl.animate([
+                    { transform: 'scale(0) rotate(-20deg)' },
+                    { transform: 'scale(1.25) rotate(5deg)' },
+                    { transform: 'scale(1) rotate(0deg)' }
+                  ], { duration: 240, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+                }
+              }, 10);
+            }
+            updateChronologyDisplay();
+          };
+
+          activity.columns.forEach(col => {
+            // Card clickable area
+            const colEl = document.createElement('div');
+            colEl.id = 'eval-col-' + col.id;
+            colEl.style.cssText = 'position: absolute; left: ' + col.left + '%; top: ' + col.top + '%; width: ' + col.width + '%; height: ' + col.height + '%; cursor: pointer; border-radius: 18px; box-sizing: border-box; border: 3.5px solid transparent; transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 15;';
+
+            colEl.onmouseenter = () => {
+              if (!selectedOrder.includes(col.id)) {
+                colEl.style.transform = 'scale(1.015)';
+                colEl.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
+              }
+            };
+            colEl.onmouseleave = () => {
+              if (!selectedOrder.includes(col.id)) {
+                colEl.style.transform = 'scale(1)';
+                colEl.style.backgroundColor = 'transparent';
+              }
+            };
+            colEl.onclick = () => { playEvalClickSound(); handleColClick(col.id); };
+            imgContainer.appendChild(colEl);
+
+            // Circle badge container exactly at user circle coords
+            const circleCoords = col.circle || { left: col.left, top: col.top, width: 8, height: 8 };
+            const badge = document.createElement('div');
+            badge.id = 'eval-col-badge-' + col.id;
+            badge.style.cssText = 'position: absolute; left: ' + circleCoords.left + '%; top: ' + circleCoords.top + '%; width: ' + circleCoords.width + '%; height: ' + circleCoords.height + '%; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; border: 3px solid white; display: none; align-items: center; justify-content: center; font-family: "Nunito", "Segoe UI", sans-serif; font-size: clamp(20px, 2.8vw, 38px); font-weight: 900; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.45); cursor: pointer; z-index: 30; user-select: none;';
+            badge.onclick = (e) => {
+              e.stopPropagation();
+              playEvalClickSound();
+              handleColClick(col.id);
+            };
+            imgContainer.appendChild(badge);
+          });
+
+          // Restore previously chosen sequence if any
+          if (selectedOrder.length > 0) {
+            setTimeout(() => updateChronologyDisplay(), 40);
+          }
+
+          validateFn = () => {
+            if (selectedOrder.length !== 4) {
+              showFeedback("💡 Clique sur les 4 images dans l'ordre chronologique (1 à 4) !");
+              return false;
+            }
+            const isCorrect = this.isChronologyCorrect(selectedOrder);
+            this.evalAnswers.chronology = [...selectedOrder];
+            this.evalScores.chronology = isCorrect ? 10 : 0;
+            this.evalScore = this.computeAutoScore();
+            this.saveEvaluationSession();
+            if (isCorrect) {
+              return true;
+            } else {
+              showFeedback('💡 Observe bien le déroulement de la rentrée et réessaie !');
+              return false;
+            }
+          };
+
+        } else if (activity.type === 'writing') {
+          // Notebook lined textarea
+          const textWrapper = document.createElement('div');
+          textWrapper.style.cssText = 'position: absolute; left: ' + activity.writingBox.left + '%; top: ' + activity.writingBox.top + '%; width: ' + activity.writingBox.width + '%; height: ' + activity.writingBox.height + '%; display: flex; flex-direction: column; z-index: 50;';
+
+          const textarea = document.createElement('textarea');
+          textarea.style.cssText = 'width: 100%; height: 85%; background: transparent; border: none; outline: none; resize: none; font-family: "Segoe UI", "Comic Sans MS", cursive, sans-serif; font-size: clamp(14px, 1.7vw, 22px); font-weight: 600; line-height: clamp(34px, 4.3vh, 56px); color: #1e3a8a; padding: 6px 12px; box-sizing: border-box;';
+          textarea.placeholder = "C'est le premier jour d'école. L'élève arrive dans la cour de l'école...";
+          textarea.value = this.evalAnswers.text || '';
+
+          const counter = document.createElement('div');
+          counter.style.cssText = 'height: 15%; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-family: sans-serif; font-size: 13px; font-weight: bold; color: #475569; background: rgba(255, 255, 255, 0.7); border-radius: 8px;';
+          
+          const updateCounters = () => {
+            const val = textarea.value.trim();
+            const sentenceCount = val ? val.split(/[.!?]+/).filter(s => s.trim().length > 0).length : 0;
+            const wordCount = val ? val.split(/\s+/).filter(w => w.trim().length > 0).length : 0;
+            counter.innerHTML = '<span>✍️ ' + sentenceCount + (sentenceCount > 1 ? ' phrases écrites' : ' phrase écrite') + ' (au moins 3)</span><span>📝 ' + wordCount + (wordCount > 1 ? ' mots' : ' mot') + '</span>';
+            if (sentenceCount >= 3) {
+              counter.style.color = '#15803d';
+            } else {
+              counter.style.color = '#475569';
+            }
+          };
+
+          textarea.addEventListener('input', updateCounters);
+          updateCounters();
+
+          textWrapper.appendChild(textarea);
+          textWrapper.appendChild(counter);
+          imgContainer.appendChild(textWrapper);
+
+          textarea.addEventListener('input', () => {
+            this.evalAnswers.text = textarea.value;
+            this.saveEvaluationSession();
+          });
+
+          validateFn = () => {
+            const val = textarea.value.trim();
+            const sentenceCount = this.getSentenceCount(val);
+            if (sentenceCount < 3) {
+              showFeedback('💡 Écris au moins 3 phrases complètes pour raconter ton histoire !');
+              return false;
+            }
+            this.evalAnswers.text = val;
+            this.evalScores.writing = null; // Teacher grading pending (target 10 points)
+            this.evalScore = this.computeAutoScore();
+            this.saveEvaluationSession();
+            return true;
+          };
+        }
+
+        // Valider button
+        if (activity.valBtnPos) {
+          const btnWrapper = document.createElement('div');
+          btnWrapper.style.cssText = 'position: absolute; left: ' + activity.valBtnPos.left + '%; top: ' + activity.valBtnPos.top + '%; transform: translate(-50%, -50%); z-index: 80;';
+
+          const vbtn = document.createElement('img');
+          vbtn.src = 'journe 1/valider.png';
+          vbtn.style.cssText = 'width: calc(var(--img-width) * 0.22); height: auto; cursor: pointer; display: block; transition: transform 0.15s ease, filter 0.15s ease;';
+
+          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
+          vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'brightness(1)'; };
+
+          vbtn.onclick = async () => {
+            playEvalClickSound();
+            if (validateFn && validateFn()) {
+              if (activity.type === 'profile') {
+                vbtn.style.pointerEvents = 'none';
+                this.currentExIndex++;
+                this.loadEvaluationActivity();
+              } else if (activity.type === 'writing') {
+                if (this._evalSubmitting) return; // Prevent accidental duplicate submissions
+                this._evalSubmitting = true;
+                vbtn.style.pointerEvents = 'none';
+                vbtn.style.opacity = '0.6';
+                vbtn.style.cursor = 'wait';
+                showFeedback("⏳ Enregistrement de ton évaluation...");
+
+                try {
+                  await this.submitEvaluationToFirestore();
+                } catch (e) {
+                  console.warn('Submission notice:', e);
+                } finally {
+                  this._evalSubmitting = false;
+                }
+
+                this.currentExIndex++;
+                this.loadEvaluationActivity();
+              } else {
+                vbtn.style.pointerEvents = 'none';
+                this.showEvaluationSuccessPopup();
+              }
+            }
+          };
+
+          btnWrapper.appendChild(vbtn);
+          imgContainer.appendChild(btnWrapper);
+        }
+
+        wrapper.appendChild(imgContainer);
+        container.appendChild(wrapper);
+      },
+
+      showEvaluationSuccessPopup() {
+        if (this._evalShowingSuccess) return;
+        this._evalShowingSuccess = true;
+
+        const CONTINUER_IMAGES = [
+          'contiuer/bien joue.png',
+          'contiuer/excellent.png',
+          'contiuer/parfait.png',
+          'contiuer/super.png'
+        ];
+
+        // Shuffle deck: cycles through all 4 celebration photos in randomized order before repeating
+        if (!this.evalSuccessDeck || this.evalSuccessDeck.length === 0) {
+          const deck = [...CONTINUER_IMAGES];
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          if (deck[0] === this.lastEvalSuccessCard && deck.length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+          }
+          this.evalSuccessDeck = deck;
+        }
+
+        const chosenSrc = this.evalSuccessDeck.shift();
+        this.lastEvalSuccessCard = chosenSrc;
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.evalAudioCtx = window.evalAudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            // Soft celebratory pop sound
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            // Twinkling spark chime
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        // Play specific celebration audio corresponding to the chosen photo
+        const AUDIO_MAP = {
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+          'contiuer/super.png': 'contiuer/super.mp3'
+        };
+
+        let cardAudio = null;
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+        if (targetAudioSrc) {
+          try {
+            if (window.evalCurrentAudio) {
+              window.evalCurrentAudio.pause();
+              window.evalCurrentAudio = null;
+            }
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+            window.evalCurrentAudio = cardAudio;
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+          } catch (e) {
+            console.warn('Card audio play error:', e);
+          }
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+          window.SoundSystem.playSuccess();
+        }
+
+        // Remove any pre-existing modal if present
+        const oldModal = document.getElementById('eval-success-modal');
+        if (oldModal) oldModal.remove();
+
+        // FULL SCREEN MODAL: attached to document.body so the blur covers the entire website!
+        const modal = document.createElement('div');
+        modal.id = 'eval-success-modal';
+        modal.className = 'j1-success-modal show';
+
+        // Background Fireworks Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        // Initial burst triplet
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        // Continuous festive bursts while card is showing
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Center Celebration Card (exact same sizing and styles as other journeys)
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-success-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = chosenSrc;
+        cardImg.alt = 'Bravo !';
+        cardImg.draggable = false;
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'j1-success-continue-btn';
+        continueBtn.setAttribute('title', 'Continuer vers la prochaine activité');
+        continueBtn.setAttribute('aria-label', 'Continuer');
+
+        let clicked = false;
+        continueBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+          this._evalShowingSuccess = false;
+
+          // Play default chime sound
+          if (typeof playEvalClickSound === 'function') {
+            playEvalClickSound();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (cardAudio) {
+            try {
+              cardAudio.pause();
+              cardAudio.currentTime = 0;
+            } catch (e) {}
+            cardAudio = null;
+          }
+          if (window.evalCurrentAudio) {
+            try {
+              window.evalCurrentAudio.pause();
+              window.evalCurrentAudio = null;
+            } catch (e) {}
+          }
+
+          setTimeout(() => {
+            isRunning = false;
+            if (burstTimer) clearTimeout(burstTimer);
+            if (animId) cancelAnimationFrame(animId);
+            window.removeEventListener('resize', resizeCanvas);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            modal.remove();
+
+            this.currentExIndex++;
+            this.loadEvaluationActivity();
+          }, 240);
+        };
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(continueBtn);
+        modal.appendChild(cardBox);
+        document.body.appendChild(modal);
+
+        // Trigger entrance animation
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
+      showEvaluationEndCelebration() {
+        const container = document.getElementById('exercise-content-area');
+        if (!container) return;
+        container.innerHTML = '';
+
+        // Play celebration audio
+        try {
+          if (window.evalCurrentAudio) {
+            window.evalCurrentAudio.pause();
+            window.evalCurrentAudio = null;
+          }
+          window.evalCurrentAudio = new Audio(encodeURI('contiuer/Felicitation.mp3'));
+          window.evalCurrentAudio.play().catch(() => {});
+        } catch(e) {}
+
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; user-select: none;';
+
+        const imgContainer = document.createElement('div');
+        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 85vh;';
+
+        const bgImg = document.createElement('img');
+        bgImg.src = 'evalution/pop up end.png';
+        bgImg.draggable = false;
+        bgImg.style.cssText = 'display: block; max-width: 95vw; max-height: 75vh; width: auto; height: auto;';
+
+        imgContainer.appendChild(bgImg);
+
+        // Score display overlay
+        const scoreBadge = document.createElement('div');
+        scoreBadge.style.cssText = 'position: absolute; top: 64%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50;';
+
+        const saved = this.lastSavedEvaluation;
+        const autoScore = saved ? saved.autoScore : this.computeAutoScore();
+        const p = (saved && saved.answers) ? {
+          id: saved.studentId,
+          nom: saved.studentNom,
+          prenom: saved.studentPrenom,
+          classe: saved.studentClasse
+        } : ((this.evalAnswers && this.evalAnswers.profile) || { id: '—', nom: 'Élève', prenom: '', classe: '' });
+
+        const studentTag = '<div style="font-family: \'Nunito\', sans-serif; font-size: clamp(14px, 1.8vw, 22px); font-weight: 800; color: #1e3a8a; margin-top: 6px; text-shadow: 1px 1px 0 #fff; background: rgba(255,255,255,0.92); padding: 5px 18px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); white-space: nowrap;">' +
+          'Élève : ' + (p.prenom || '') + ' ' + (p.nom || '') + (p.classe ? ' • ' + p.classe : '') + ' • ID : ' + (p.id || '—') +
+        '</div>';
+
+        scoreBadge.innerHTML =
+          '<div style="font-family: sans-serif; font-size: clamp(36px, 4.8vw, 64px); font-weight: 900; color: #e11d48; text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 0 6px 14px rgba(0,0,0,0.3); letter-spacing: 1.5px;">' +
+            autoScore + ' / 50 pts' +
+          '</div>' +
+          '<div style="font-family: \'Nunito\', sans-serif; font-size: clamp(12px, 1.4vw, 18px); font-weight: 800; color: #047857; margin-top: 3px; background: rgba(255,255,255,0.95); padding: 3px 14px; border-radius: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">' +
+            '⭐ Score automatique : ' + autoScore + '/50 pts • Écriture /10 en attente de correction' +
+          '</div>' +
+          studentTag;
+        imgContainer.appendChild(scoreBadge);
+
+        // Finish button at bottom
+        const finishBtn = document.createElement('button');
+        finishBtn.textContent = "TERMINER L'ÉVALUATION";
+        finishBtn.style.cssText = 'position: absolute; bottom: 4%; left: 50%; transform: translateX(-50%); padding: 12px 32px; background: linear-gradient(135deg, #10b981, #059669); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(14px, 1.8vw, 20px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4); cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease; z-index: 100;';
+        finishBtn.onmouseenter = () => { finishBtn.style.transform = 'translateX(-50%) scale(1.05)'; finishBtn.style.filter = 'brightness(1.1)'; };
+        finishBtn.onmouseleave = () => { finishBtn.style.transform = 'translateX(-50%) scale(1)'; finishBtn.style.filter = 'brightness(1)'; };
+
+        finishBtn.onclick = () => {
+          if (typeof playEvalClickSound === 'function') playEvalClickSound();
+          if (window.evalCurrentAudio) {
+            window.evalCurrentAudio.pause();
+            window.evalCurrentAudio = null;
+          }
+          this.close();
+        };
+        imgContainer.appendChild(finishBtn);
+
+        wrapper.appendChild(imgContainer);
+        container.appendChild(wrapper);
+
+        // Confetti fireworks
+        this.triggerEvaluationFireworks();
+      },
+
+      triggerEvaluationFireworks() {
+        const colors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+        for (let i = 0; i < 60; i++) {
+          const conf = document.createElement('div');
+          conf.style.cssText = 'position: fixed; width: ' + (8 + Math.random() * 8) + 'px; height: ' + (8 + Math.random() * 8) + 'px; background: ' + colors[Math.floor(Math.random() * colors.length)] + '; border-radius: ' + (Math.random() > 0.5 ? '50%' : '2px') + '; z-index: 99999; top: ' + (15 + Math.random() * 60) + 'vh; left: ' + (15 + Math.random() * 70) + 'vw; pointer-events: none; opacity: 1; transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1), opacity 1.2s ease;';
+          document.body.appendChild(conf);
+
+          setTimeout(() => {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 60 + Math.random() * 140;
+            conf.style.transform = 'translate(' + (Math.cos(angle) * dist) + 'px, ' + (Math.sin(angle) * dist) + 'px) rotate(' + (Math.random() * 360) + 'deg)';
+            conf.style.opacity = '0';
+          }, 20);
+
+          setTimeout(() => conf.remove(), 1300);
+        }
       }
+
     };
 
     document.addEventListener('DOMContentLoaded', () => {

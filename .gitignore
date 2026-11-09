@@ -12,6 +12,7 @@ desktop.ini
 # Temporary & Log Files
 *.log
 *.tmp
+scratch/
 
 # User documents, executables and temporary media
 *.exe
