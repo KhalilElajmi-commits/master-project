@@ -17647,32 +17647,28 @@ showJourney2EndCelebration() {
 
         imgContainer.appendChild(bgImg);
 
-        // Score display overlay
-        const scoreBadge = document.createElement('div');
-        scoreBadge.style.cssText = 'position: absolute; top: 64%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50;';
+        const ro = new ResizeObserver(() => {
+          const rect = bgImg.getBoundingClientRect();
+          imgContainer.style.setProperty('--img-width', rect.width + 'px');
+          imgContainer.style.setProperty('--img-height', rect.height + 'px');
+        });
+        ro.observe(bgImg);
 
+        // Final score inside designated box (left: 43.5%, top: 61.2%, width: 10.1%, height: 11.6%)
         const saved = this.lastSavedEvaluation;
-        const autoScore = saved ? saved.autoScore : this.computeAutoScore();
-        const p = (saved && saved.answers) ? {
-          id: saved.studentId,
-          nom: saved.studentNom,
-          prenom: saved.studentPrenom,
-          classe: saved.studentClasse
-        } : ((this.evalAnswers && this.evalAnswers.profile) || { id: '—', nom: 'Élève', prenom: '', classe: '' });
+        let points = 10;
+        if (saved && typeof saved.autoScore === 'number') {
+          points = saved.autoScore > 10 ? Math.round(saved.autoScore / 5) : saved.autoScore;
+        } else if (typeof this.evalScore === 'number') {
+          points = this.evalScore > 10 ? Math.round(this.evalScore / 5) : this.evalScore;
+        }
+        points = Math.min(10, Math.max(0, points));
 
-        const studentTag = '<div style="font-family: \'Nunito\', sans-serif; font-size: clamp(14px, 1.8vw, 22px); font-weight: 800; color: #1e3a8a; margin-top: 6px; text-shadow: 1px 1px 0 #fff; background: rgba(255,255,255,0.92); padding: 5px 18px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); white-space: nowrap;">' +
-          'Élève : ' + (p.prenom || '') + ' ' + (p.nom || '') + (p.classe ? ' • ' + p.classe : '') + ' • ID : ' + (p.id || '—') +
-        '</div>';
-
-        scoreBadge.innerHTML =
-          '<div style="font-family: sans-serif; font-size: clamp(36px, 4.8vw, 64px); font-weight: 900; color: #e11d48; text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 0 6px 14px rgba(0,0,0,0.3); letter-spacing: 1.5px;">' +
-            autoScore + ' / 50 pts' +
-          '</div>' +
-          '<div style="font-family: \'Nunito\', sans-serif; font-size: clamp(12px, 1.4vw, 18px); font-weight: 800; color: #047857; margin-top: 3px; background: rgba(255,255,255,0.95); padding: 3px 14px; border-radius: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">' +
-            '⭐ Score automatique : ' + autoScore + '/50 pts • Écriture /10 en attente de correction' +
-          '</div>' +
-          studentTag;
-        imgContainer.appendChild(scoreBadge);
+        const scoreBox = document.createElement('div');
+        scoreBox.id = 'eval-final-score-box';
+        scoreBox.style.cssText = 'position: absolute; left: 43.5%; top: 60.5%; width: 10.1%; height: 11.6%; display: flex; align-items: center; justify-content: center; z-index: 50; pointer-events: none; user-select: none; font-family: "Segoe UI", "Nunito", Arial, sans-serif; font-weight: 900; font-size: clamp(30px, calc(var(--img-height, 600px) * 0.11), 80px); color: #3b1b49; line-height: 1;';
+        scoreBox.textContent = points;
+        imgContainer.appendChild(scoreBox);
 
         // Finish button at bottom
         const finishBtn = document.createElement('button');
