@@ -1396,10 +1396,61 @@
         return out;
       }
     };
+  </script>
 
-    /* ==========================================================================
-       Firebase AI Logic / Gemini Developer API Service for Student Evaluation
-       ========================================================================== */
+  <!-- Firebase AI Logic SDK (Official Modular ESM with GoogleAIBackend & App Check) -->
+  <script type="module">
+    import { initializeApp, getApps } from "https://esm.sh/@firebase/app@0.16.5";
+    import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://esm.sh/@firebase/app-check@0.8.12?deps=@firebase/app@0.16.5";
+    import { getAI, getGenerativeModel, GoogleAIBackend } from "https://esm.sh/@firebase/ai@3.0.0?deps=@firebase/app@0.16.5";
+
+    let aiModelPromise = null;
+
+    async function initFirebaseAiLogic() {
+      if (aiModelPromise) return aiModelPromise;
+
+      aiModelPromise = (async () => {
+        // 1. Initialize modular FirebaseApp (named to guarantee zero conflict with Compat instance)
+        const modularApp = getApps().find(a => a.name === "ecriproAiApp") || initializeApp(firebaseConfig, "ecriproAiApp");
+
+        // 2. Initialize App Check on this modular app with the registered reCAPTCHA Enterprise provider
+        try {
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+          }
+          const siteKey = window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LcY3rUqAAAAABcdef1234567890abcdef123456';
+          initializeAppCheck(modularApp, {
+            provider: new ReCaptchaEnterpriseProvider(siteKey),
+            isTokenAutoRefreshEnabled: true
+          });
+          console.log("[Firebase AI Logic] App Check registered on modular app");
+        } catch (acErr) {
+          console.warn("[Firebase AI Logic] App Check note:", acErr.message);
+        }
+
+        // 3. Initialize Firebase AI Logic with Gemini Developer API backend (GoogleAIBackend)
+        const ai = getAI(modularApp, {
+          backend: new GoogleAIBackend()
+        });
+
+        // 4. Retrieve Generative Model with temperature 0.2 and JSON response type
+        const model = getGenerativeModel(ai, {
+          model: "gemini-2.0-flash",
+          generationConfig: {
+            temperature: 0.2,
+            topP: 0.8,
+            maxOutputTokens: 1200,
+            responseMimeType: "application/json"
+          }
+        });
+
+        console.log("[Firebase AI Logic] Generative model initialized with GoogleAIBackend (gemini-2.0-flash)");
+        return model;
+      })();
+
+      return aiModelPromise;
+    }
+
     window.GeminiAIService = {
       model: "gemini-2.0-flash",
 
@@ -1422,7 +1473,7 @@
           ? answers.chronology.join(" -> ")
           : "Non spécifié";
 
-        const systemInstruction = `Tu es un professeur de français de l'école primaire évaluant la production écrite d'un élève de 4ème année primaire (élèves âgés de 9 à 10 ans).
+        const prompt = `Tu es un professeur de français de l'école primaire évaluant la production écrite d'un élève de 4ème année primaire (élèves âgés de 9 à 10 ans).
 Niveau : Français 4ème année primaire (début de production d'écrits autonomes).
 Module : Module 1 — Évaluation : Je construis mon histoire.
 
@@ -1488,101 +1539,28 @@ Retourne UNIQUEMENT un objet JSON valide (aucun commentaire, pas de balises mark
   "status": "evaluated"
 }`;
 
-        const reqBody = {
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: systemInstruction }]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            topP: 0.8,
-            maxOutputTokens: 1200,
-            responseMimeType: "application/json"
-          }
-        };
+        console.log("[GeminiAIService] Requesting evaluation via Firebase AI Logic model.generateContent()...");
+        const model = await initFirebaseAiLogic();
 
-        const activeKey = window.GEMINI_API_KEY || firebaseConfig.apiKey;
-        let lastError = null;
+        // 12-second timeout protection
+        const generatePromise = model.generateContent(prompt);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout dépassé lors de l'évaluation IA")), 12000)
+        );
 
-        // 1. Try Firebase AI Logic / Vertex AI for Firebase endpoint
-        try {
-          const appCheckToken = window.FirebaseService ? await window.FirebaseService.getAppCheckToken() : null;
-          const vertexUrl = `https://firebasevertexai.googleapis.com/v1beta/projects/${firebaseConfig.projectId}/locations/us-central1/publishers/google/models/${this.model}:generateContent?key=${activeKey}`;
-          
-          const headers = { 'Content-Type': 'application/json' };
-          if (appCheckToken) {
-            headers['X-Firebase-AppCheck'] = appCheckToken;
-          }
+        const result = await Promise.race([generatePromise, timeoutPromise]);
+        const response = await result.response;
+        const rawText = response.text();
 
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 12000);
-
-          console.log("[GeminiAIService] Calling Firebase AI Logic endpoint...");
-          const res = await fetch(vertexUrl, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(reqBody),
-            signal: controller.signal
-          });
-          clearTimeout(timer);
-
-          if (res.ok) {
-            const data = await res.json();
-            return this._processGeminiResponse(data);
-          } else {
-            const errBody = await res.text();
-            console.warn("[GeminiAIService] Firebase AI Logic HTTP " + res.status + ":", errBody);
-            lastError = new Error(`Firebase AI Logic HTTP ${res.status}: ${errBody}`);
-          }
-        } catch (vErr) {
-          console.warn("[GeminiAIService] Firebase AI Logic attempt error:", vErr.message);
-          lastError = vErr;
-        }
-
-        // 2. Try Gemini Developer API endpoint (generativelanguage.googleapis.com)
-        try {
-          const devUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${activeKey}`;
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 12000);
-
-          console.log("[GeminiAIService] Calling Gemini Developer API endpoint...");
-          const res = await fetch(devUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(reqBody),
-            signal: controller.signal
-          });
-          clearTimeout(timer);
-
-          if (res.ok) {
-            const data = await res.json();
-            return this._processGeminiResponse(data);
-          } else {
-            const errBody = await res.text();
-            console.warn("[GeminiAIService] Gemini Developer API HTTP " + res.status + ":", errBody);
-            lastError = new Error(`Gemini Developer API HTTP ${res.status}: ${errBody}`);
-          }
-        } catch (dErr) {
-          console.warn("[GeminiAIService] Gemini Developer API attempt error:", dErr.message);
-          lastError = dErr;
-        }
-
-        throw lastError || new Error("Failed to reach Gemini evaluation service");
+        return this._processGeminiResponse(rawText);
       },
 
-      _processGeminiResponse(data) {
-        if (!data || !data.candidates || !data.candidates.length) {
-          throw new Error("Réponse vide ou invalide reçue de Gemini");
-        }
-        const candidate = data.candidates[0];
-        const parts = candidate.content && candidate.content.parts;
-        if (!parts || !parts.length || !parts[0].text) {
-          throw new Error("Contenu textuel manquant dans la réponse de Gemini");
+      _processGeminiResponse(rawText) {
+        if (!rawText || typeof rawText !== 'string') {
+          throw new Error("Réponse textuelle vide ou invalide reçue de Gemini");
         }
 
-        let raw = parts[0].text.trim();
+        let raw = rawText.trim();
         if (raw.startsWith("```json")) raw = raw.substring(7);
         else if (raw.startsWith("```")) raw = raw.substring(3);
         if (raw.endsWith("```")) raw = raw.substring(0, raw.length - 3);
@@ -1620,6 +1598,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun commentaire, pas de balises mark
         return parsed;
       }
     };
+  </script>
   </script>
 </head>
 
@@ -18044,6 +18023,7 @@ showJourney2EndCelebration() {
       }
 
     };
+    window.ExerciseSystem = ExerciseSystem;
 
     document.addEventListener('DOMContentLoaded', () => {
       MapSystem.init();
