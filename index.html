@@ -18534,12 +18534,14 @@ showJourney2EndCelebration() {
             : '⏳ Note globale non calculée : correction incomplète';
           breakdownCard.appendChild(warnPill);
 
-          // Surface actionable error diagnostics explaining why grading failed
+          // Surface actionable error diagnostics explaining why grading failed (compact so buttons stay in view)
           const failedStates = qStates.filter(q => q.status === 'failed' && q.entry && (q.entry.error || q.entry.errorDetails));
           if (failedStates.length > 0) {
+            imgContainer.style.maxHeight = '48vh';
+            bgImg.style.maxHeight = '48vh';
             const diagBox = document.createElement('div');
             diagBox.id = 'eval-error-diagnostics';
-            diagBox.style.cssText = 'width: 100%; margin-top: 4px; padding: 8px 12px; border-radius: 12px; background: #fff7ed; border: 1.5px solid #fdba74; color: #7c2d12; font-size: 12px; line-height: 1.45; text-align: left;';
+            diagBox.style.cssText = 'width: 100%; max-height: 96px; overflow-y: auto; margin-top: 2px; padding: 7px 12px; border-radius: 12px; background: #fff7ed; border: 1.5px solid #fdba74; color: #7c2d12; font-size: 12px; line-height: 1.4; text-align: left;';
 
             const isFileAppCheckBlocked = (window.location && window.location.protocol === 'file:') ||
               failedStates.some(q => q.entry.errorDetails && q.entry.errorDetails.isFileProtocol && q.entry.errorDetails.isAppCheckError);
@@ -18559,13 +18561,23 @@ showJourney2EndCelebration() {
               diagBox.appendChild(authHint);
             }
 
-            failedStates.forEach(q => {
+            const firstMsg = failedStates[0].entry.error || failedStates[0].entry.errorDetails?.message || 'Erreur lors de la correction IA';
+            const allSameMsg = failedStates.length > 1 && failedStates.every(q => (q.entry.error || q.entry.errorDetails?.message) === firstMsg);
+            if (allSameMsg) {
               const line = document.createElement('div');
-              const details = q.entry.errorDetails || {};
-              const attemptTxt = details.attempt ? ` (tentative ${details.attempt})` : '';
-              line.textContent = `• Question ${q.num}${attemptTxt} : ${q.entry.error || details.message || 'Erreur lors de la correction IA'}`;
+              const qNums = failedStates.map(q => q.num).join(', ');
+              const attemptTxt = failedStates[0].entry.errorDetails?.attempt ? ` (tentative ${failedStates[0].entry.errorDetails.attempt})` : '';
+              line.textContent = `• Questions ${qNums}${attemptTxt} : ${firstMsg}`;
               diagBox.appendChild(line);
-            });
+            } else {
+              failedStates.forEach(q => {
+                const line = document.createElement('div');
+                const details = q.entry.errorDetails || {};
+                const attemptTxt = details.attempt ? ` (tentative ${details.attempt})` : '';
+                line.textContent = `• Question ${q.num}${attemptTxt} : ${q.entry.error || details.message || 'Erreur lors de la correction IA'}`;
+                diagBox.appendChild(line);
+              });
+            }
             breakdownCard.appendChild(diagBox);
           }
 
