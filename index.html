@@ -18323,15 +18323,15 @@ showJourney2EndCelebration() {
         };
 
         const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; user-select: none; padding: 10px; box-sizing: border-box;';
+        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; user-select: none; padding: 12px; box-sizing: border-box;';
 
         const imgContainer = document.createElement('div');
-        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 62vh;';
+        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 74vh;';
 
         const bgImg = document.createElement('img');
         bgImg.src = 'evalution/pop up end.png';
         bgImg.draggable = false;
-        bgImg.style.cssText = 'display: block; max-width: 95vw; max-height: 62vh; width: auto; height: auto;';
+        bgImg.style.cssText = 'display: block; max-width: 95vw; max-height: 74vh; width: auto; height: auto;';
         imgContainer.appendChild(bgImg);
 
         const ro = new ResizeObserver(() => {
@@ -18350,21 +18350,11 @@ showJourney2EndCelebration() {
 
         wrapper.appendChild(imgContainer);
 
-        // Per-question breakdown panel strictly reflecting saved Firestore values
-        const breakdownCard = document.createElement('div');
-        breakdownCard.id = 'eval-results-breakdown';
-        breakdownCard.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; background: rgba(255, 255, 255, 0.94); padding: 10px 18px; border-radius: 18px; border: 2px solid #cbd5e1; box-shadow: 0 6px 20px rgba(0,0,0,0.18); font-family: "Nunito", "Segoe UI", sans-serif; max-width: 92vw; z-index: 90;';
-        breakdownCard.innerHTML = '<span style="font-weight:800; color:#1e40af;">⏳ Chargement des scores depuis Firebase...</span>';
-        wrapper.appendChild(breakdownCard);
-
-        // Bottom controls row (Detail/Retry + Terminer)
-        const controlsRow = document.createElement('div');
-        controlsRow.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; z-index: 100;';
-
         const finishBtn = document.createElement('button');
         finishBtn.id = 'eval-finish-btn';
+        finishBtn.type = 'button';
         finishBtn.textContent = "TERMINER L'ÉVALUATION";
-        finishBtn.style.cssText = 'padding: 11px 28px; background: linear-gradient(135deg, #10b981, #059669); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(14px, 1.6vw, 18px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4); cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease;';
+        finishBtn.style.cssText = 'padding: 12px 32px; background: linear-gradient(135deg, #10b981, #059669); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(14px, 1.6vw, 19px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4); cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease; z-index: 100;';
         finishBtn.onmouseenter = () => { finishBtn.style.transform = 'scale(1.05)'; finishBtn.style.filter = 'brightness(1.1)'; };
         finishBtn.onmouseleave = () => { finishBtn.style.transform = 'scale(1)'; finishBtn.style.filter = 'brightness(1)'; };
         finishBtn.onclick = () => {
@@ -18377,45 +18367,7 @@ showJourney2EndCelebration() {
           this.resetInMemoryEvaluationState();
           this.close();
         };
-        controlsRow.appendChild(finishBtn);
-
-        const newEvalBtn = document.createElement('button');
-        newEvalBtn.id = 'eval-new-evaluation-btn';
-        newEvalBtn.type = 'button';
-        newEvalBtn.textContent = '📝 Nouvelle évaluation';
-        newEvalBtn.style.cssText = 'padding: 11px 22px; background: linear-gradient(135deg, #6366f1, #4338ca); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(13px, 1.4vw, 16px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 18px rgba(67, 56, 202, 0.35); cursor: pointer; transition: transform 0.15s ease;';
-        newEvalBtn.onmouseenter = () => { newEvalBtn.style.transform = 'scale(1.05)'; };
-        newEvalBtn.onmouseleave = () => { newEvalBtn.style.transform = 'scale(1)'; };
-        newEvalBtn.onclick = () => {
-          if (this._evalRetrying) return;
-          if (window.evalCurrentAudio) {
-            window.evalCurrentAudio.pause();
-            window.evalCurrentAudio = null;
-          }
-          const detailsModal = document.getElementById('eval-details-modal');
-          if (detailsModal) detailsModal.remove();
-          const historyModal = document.getElementById('eval-history-modal');
-          if (historyModal) historyModal.remove();
-          this.startNewEvaluationSession({ render: true });
-        };
-        controlsRow.insertBefore(newEvalBtn, finishBtn);
-
-        const savedHistory = this.getEvaluationHistory();
-        if (savedHistory.length > 0) {
-          const historyBtn = document.createElement('button');
-          historyBtn.id = 'eval-history-results-btn';
-          historyBtn.type = 'button';
-          historyBtn.textContent = `📂 Historique (${savedHistory.length})`;
-          historyBtn.style.cssText = 'padding: 11px 20px; background: rgba(30, 58, 138, 0.92); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(13px, 1.4vw, 16px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 18px rgba(30, 58, 138, 0.3); cursor: pointer; transition: transform 0.15s ease;';
-          historyBtn.onmouseenter = () => { historyBtn.style.transform = 'scale(1.05)'; };
-          historyBtn.onmouseleave = () => { historyBtn.style.transform = 'scale(1)'; };
-          historyBtn.onclick = () => {
-            this.openEvaluationHistoryModal();
-          };
-          controlsRow.insertBefore(historyBtn, finishBtn);
-        }
-
-        wrapper.appendChild(controlsRow);
+        wrapper.appendChild(finishBtn);
         container.appendChild(wrapper);
 
         // Authoritative score retrieval from Firestore (no hardcoded scores, no Gemini call on load)
@@ -18439,72 +18391,36 @@ showJourney2EndCelebration() {
           fetchFailed = true;
         }
 
-        // Fall back to in-memory submitted payload for display ONLY if Firebase read failed/offline
         const effectiveDoc = fsDoc || (this.lastSavedEvaluation && this.lastSavedEvaluation.docId === docId ? this.lastSavedEvaluation : null);
         const writingEval = effectiveDoc && effectiveDoc.writingEvaluation ? effectiveDoc.writingEvaluation : null;
         const qMap = writingEval && writingEval.questions ? writingEval.questions : {};
         const qKeys = ['q1', 'q2', 'q3'];
         const rubric = window.EVALUATION_RUBRIC_CONFIG;
 
-        const qStates = qKeys.map((k, idx) => {
+        const qStates = qKeys.map((k) => {
           const entry = qMap[k] || {};
           const cfgMax = rubric && rubric.questions[k] ? rubric.questions[k].maxScore : 0;
           const maxScore = (typeof entry.maxScore === 'number' && entry.maxScore > 0) ? entry.maxScore : cfgMax;
           const isEvaluated = entry.status === 'evaluated' && typeof entry.score === 'number' && !Number.isNaN(entry.score) && entry.score >= 0 && entry.score <= maxScore;
           return {
-            key: k,
-            num: idx + 1,
-            entry,
+            score: entry.score,
             maxScore,
-            isEvaluated,
-            status: entry.status || (fetchFailed ? 'error' : 'pending')
+            isEvaluated
           };
         });
 
         const maxSum = Math.round((qStates.reduce((acc, q) => acc + q.maxScore, 0) + Number.EPSILON) * 100) / 100;
         const allEvaluated = !fetchFailed && Boolean(fsDoc) && qStates.every(q => q.isEvaluated) && Math.abs(maxSum - 10) <= 0.01;
 
-        breakdownCard.innerHTML = '';
-        qStates.forEach(q => {
-          const pill = document.createElement('div');
-          const bg = q.isEvaluated ? '#ecfdf5' : (q.status === 'failed' || fetchFailed ? '#fef2f2' : '#fffbeb');
-          const border = q.isEvaluated ? '#6ee7b7' : (q.status === 'failed' || fetchFailed ? '#fca5a5' : '#fcd34d');
-          const txtColor = q.isEvaluated ? '#065f46' : (q.status === 'failed' || fetchFailed ? '#991b1b' : '#92400e');
-          pill.style.cssText = `padding: 6px 12px; border-radius: 12px; background: ${bg}; border: 1.5px solid ${border}; color: ${txtColor}; font-size: clamp(12px, 1.3vw, 15px); font-weight: 800;`;
-          const valText = q.isEvaluated
-            ? `${fmtScore(q.entry.score)} / ${fmtScore(q.maxScore)}`
-            : (q.status === 'failed' ? '⚠️ Échec correction' : '⏳ En attente');
-          pill.textContent = `Question ${q.num} : ${valText}`;
-          breakdownCard.appendChild(pill);
-        });
-
         if (allEvaluated) {
           // Compute overall total strictly as sum of the 3 saved Firebase question scores
-          const overallTotal = Math.round((qStates.reduce((acc, q) => acc + q.entry.score, 0) + Number.EPSILON) * 100) / 100;
+          const overallTotal = Math.round((qStates.reduce((acc, q) => acc + q.score, 0) + Number.EPSILON) * 100) / 100;
           const totalDisplay = fmtScore(overallTotal);
 
           scoreBox.style.fontSize = totalDisplay.length >= 3
             ? 'clamp(20px, calc(var(--img-height, 550px) * 0.078), 50px)'
             : 'clamp(28px, calc(var(--img-height, 550px) * 0.105), 72px)';
           scoreBox.textContent = totalDisplay;
-
-          const totalPill = document.createElement('div');
-          totalPill.style.cssText = 'padding: 6px 14px; border-radius: 12px; background: #eff6ff; border: 2px solid #3b82f6; color: #1e3a8a; font-size: clamp(13px, 1.4vw, 16px); font-weight: 900;';
-          totalPill.textContent = `Total : ${totalDisplay} / 10`;
-          breakdownCard.appendChild(totalPill);
-
-          // Detail modal button
-          const detailBtn = document.createElement('button');
-          detailBtn.id = 'eval-details-btn';
-          detailBtn.textContent = '📋 Voir la correction détaillée';
-          detailBtn.style.cssText = 'padding: 11px 22px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(13px, 1.4vw, 16px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 18px rgba(29, 78, 216, 0.35); cursor: pointer; transition: transform 0.15s ease;';
-          detailBtn.onmouseenter = () => { detailBtn.style.transform = 'scale(1.05)'; };
-          detailBtn.onmouseleave = () => { detailBtn.style.transform = 'scale(1)'; };
-          detailBtn.onclick = () => {
-            if (typeof playEvalClickSound === 'function') playEvalClickSound();
-            this.openEvaluationDetailsModal(fsDoc, overallTotal);
-          };
-          controlsRow.insertBefore(detailBtn, newEvalBtn);
 
           // Play celebration audio & fireworks when all questions are evaluated
           try {
@@ -18520,100 +18436,6 @@ showJourney2EndCelebration() {
           // Incomplete, failed, or unreachable Firestore read: NEVER fabricate a total score
           scoreBox.style.fontSize = 'clamp(22px, calc(var(--img-height, 550px) * 0.085), 56px)';
           scoreBox.textContent = '--';
-
-          const warnPill = document.createElement('div');
-          warnPill.style.cssText = 'padding: 6px 14px; border-radius: 12px; background: #fef2f2; border: 2px solid #ef4444; color: #991b1b; font-size: clamp(12px, 1.3vw, 15px); font-weight: 800;';
-          warnPill.textContent = fetchFailed
-            ? '⚠️ Impossible de charger les notes depuis Firebase'
-            : '⏳ Note globale non calculée : correction incomplète';
-          breakdownCard.appendChild(warnPill);
-
-          // Surface actionable error diagnostics explaining why grading failed (compact so buttons stay in view)
-          const failedStates = qStates.filter(q => q.status === 'failed' && q.entry && (q.entry.error || q.entry.errorDetails));
-          if (failedStates.length > 0) {
-            imgContainer.style.maxHeight = '48vh';
-            bgImg.style.maxHeight = '48vh';
-            const diagBox = document.createElement('div');
-            diagBox.id = 'eval-error-diagnostics';
-            diagBox.style.cssText = 'width: 100%; max-height: 96px; overflow-y: auto; margin-top: 2px; padding: 7px 12px; border-radius: 12px; background: #fff7ed; border: 1.5px solid #fdba74; color: #7c2d12; font-size: 12px; line-height: 1.4; text-align: left;';
-
-            const isFileAppCheckBlocked = (window.location && window.location.protocol === 'file:') ||
-              failedStates.some(q => q.entry.errorDetails && q.entry.errorDetails.isFileProtocol && q.entry.errorDetails.isAppCheckError);
-
-            if (isFileAppCheckBlocked) {
-              const envHint = document.createElement('div');
-              envHint.style.cssText = 'font-weight: 800; color: #b45309; margin-bottom: 4px;';
-              envHint.textContent = '🌐 Page ouverte en fichier local (file://) : Google reCAPTCHA App Check bloque la requête IA hors serveur web (http://localhost ou https://). Ouvre le site via un serveur web puis clique sur « Réessayer la correction ».';
-              diagBox.appendChild(envHint);
-            }
-
-            const preflightBlocked = failedStates.every(q => q.entry.errorDetails && q.entry.errorDetails.reachedGemini === false);
-            if (preflightBlocked) {
-              const authHint = document.createElement('div');
-              authHint.style.cssText = 'font-weight: 800; color: #991b1b; margin-bottom: 4px;';
-              authHint.textContent = "🔐 Authentification App Check échouée avant l'envoi à Gemini : aucune requête IA n'a été lancée.";
-              diagBox.appendChild(authHint);
-            }
-
-            const firstMsg = failedStates[0].entry.error || failedStates[0].entry.errorDetails?.message || 'Erreur lors de la correction IA';
-            const allSameMsg = failedStates.length > 1 && failedStates.every(q => (q.entry.error || q.entry.errorDetails?.message) === firstMsg);
-            if (allSameMsg) {
-              const line = document.createElement('div');
-              const qNums = failedStates.map(q => q.num).join(', ');
-              const attemptTxt = failedStates[0].entry.errorDetails?.attempt ? ` (tentative ${failedStates[0].entry.errorDetails.attempt})` : '';
-              line.textContent = `• Questions ${qNums}${attemptTxt} : ${firstMsg}`;
-              diagBox.appendChild(line);
-            } else {
-              failedStates.forEach(q => {
-                const line = document.createElement('div');
-                const details = q.entry.errorDetails || {};
-                const attemptTxt = details.attempt ? ` (tentative ${details.attempt})` : '';
-                line.textContent = `• Question ${q.num}${attemptTxt} : ${q.entry.error || details.message || 'Erreur lors de la correction IA'}`;
-                diagBox.appendChild(line);
-              });
-            }
-            breakdownCard.appendChild(diagBox);
-          }
-
-          const retryBtn = document.createElement('button');
-          retryBtn.id = 'eval-retry-grading-btn';
-          retryBtn.textContent = '🔄 Réessayer la correction';
-          retryBtn.style.cssText = 'padding: 11px 22px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(13px, 1.4vw, 16px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 18px rgba(217, 119, 6, 0.35); cursor: pointer;';
-          retryBtn.onclick = async () => {
-            if (this._evalRetrying) return;
-            this._evalRetrying = true;
-            retryBtn.disabled = true;
-            retryBtn.textContent = '⏳ Correction en cours...';
-            try {
-              const sourceDoc = effectiveDoc;
-              if (sourceDoc) {
-                this.lastEvalDocId = sourceDoc.docId || docId;
-                this.evalSessionId = sourceDoc.sessionId || this.evalSessionId;
-                if (!this.evalAnswers) this.evalAnswers = { profile: null, q1: '', q2: '', q3: '', text: '' };
-                if (!this.evalAnswers.profile && sourceDoc.studentId) {
-                  this.evalAnswers.profile = {
-                    id: sourceDoc.studentId,
-                    nom: sourceDoc.studentNom || '',
-                    prenom: sourceDoc.studentPrenom || '',
-                    classe: sourceDoc.studentClasse || ''
-                  };
-                }
-                if (sourceDoc.answers) {
-                  this.evalAnswers.q1 = sourceDoc.answers.q1 || this.evalAnswers.q1 || '';
-                  this.evalAnswers.q2 = sourceDoc.answers.q2 || this.evalAnswers.q2 || '';
-                  this.evalAnswers.q3 = sourceDoc.answers.q3 || this.evalAnswers.q3 || '';
-                }
-                this.evalQuestionResults = qMap || this.evalQuestionResults;
-              }
-              await this.submitEvaluationToFirestore('completed');
-            } catch (err) {
-              console.warn('[Retry] Grading retry error:', err);
-            } finally {
-              this._evalRetrying = false;
-            }
-            this.showEvaluationEndCelebration();
-          };
-          controlsRow.insertBefore(retryBtn, newEvalBtn);
         }
       },
 
