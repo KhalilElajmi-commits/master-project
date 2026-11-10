@@ -585,6 +585,66 @@
       pointer-events: none;
     }
 
+    /* ─── Teacher Portal Button (Top-Left on Home, Fneck Intro, & Map) ── */
+    #btn-teacher-portal {
+      position: absolute;
+      top: 66px;
+      left: 20px;
+      width: clamp(58px, 6.0vw, 86px);
+      height: auto;
+      aspect-ratio: 263 / 284;
+      z-index: 96;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      padding: 0;
+      outline: none;
+      opacity: 1;
+      pointer-events: auto;
+      filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+      transition: opacity 0.6s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    #btn-teacher-portal:hover {
+      transform: scale(1.08) translateY(-2px);
+      filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55));
+    }
+
+    #btn-teacher-portal:active {
+      transform: scale(0.95) translateY(1px);
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+    }
+
+    #btn-teacher-portal.teacher-btn-hidden {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    #btn-teacher-portal.teacher-btn-exercise-hidden {
+      display: none !important;
+    }
+
+    #btn-teacher-portal img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+      #btn-teacher-portal {
+        top: 108px;
+        left: 16px;
+        width: 56px;
+      }
+    }
+
     /* ─── Fneck Guide Layer ─────────────────────────────────────────── */
     #fneck-layer {
       position: absolute;
@@ -2251,6 +2311,11 @@ ${criteriaSchema}
       <img src="journe 1/skip botten.png" alt="Passer" draggable="false" />
     </button>
 
+    <!-- ── TEACHER PORTAL BUTTON ── -->
+    <button id="btn-teacher-portal" type="button" aria-label="Espace Enseignant" title="Espace Enseignant">
+      <img src="evalution/botten tet.png" alt="Espace Enseignant" draggable="false" />
+    </button>
+
     <div id="interactive-tap-stage"></div>
 
     <!-- EXERCISE STAGE -->
@@ -2532,9 +2597,220 @@ ${criteriaSchema}
     }
 
     const btnSkipIntro = document.getElementById('btn-skip-intro');
+    const btnTeacherPortal = document.getElementById('btn-teacher-portal');
+
+    /**
+     * Controls Espace Enseignant button visibility across home, cloud transition, map, and active exercises.
+     */
+    const setTeacherButtonHiddenForClouds = (hidden, transitionMs = 600) => {
+      if (!btnTeacherPortal) return;
+      btnTeacherPortal.style.transition = `opacity ${transitionMs}ms ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease`;
+      btnTeacherPortal.classList.toggle('teacher-btn-hidden', Boolean(hidden));
+    };
+
+    const syncTeacherButtonForExerciseStage = () => {
+      if (!btnTeacherPortal) return;
+      const stage = document.getElementById('exercise-stage');
+      const inExercise = Boolean(stage && stage.classList.contains('active'));
+      btnTeacherPortal.classList.toggle('teacher-btn-exercise-hidden', inExercise);
+    };
+
+    (function initTeacherPortalSystem() {
+      const exerciseStageEl = document.getElementById('exercise-stage');
+      if (exerciseStageEl && typeof MutationObserver !== 'undefined') {
+        const obs = new MutationObserver(syncTeacherButtonForExerciseStage);
+        obs.observe(exerciseStageEl, { attributes: true, attributeFilter: ['class'] });
+        syncTeacherButtonForExerciseStage();
+      }
+
+      const TeacherPortal = {
+        open() {
+          const existing = document.getElementById('teacher-portal-modal');
+          if (existing) existing.remove();
+
+          const modal = document.createElement('div');
+          modal.id = 'teacher-portal-modal';
+          modal.className = 'j1-success-modal';
+
+          const cardBox = document.createElement('div');
+          cardBox.id = 'teacher-portal-card';
+          cardBox.style.cssText = 'position: relative; display: inline-block; max-width: 92vw; max-height: 84vh; z-index: 10; animation: j1CardPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;';
+
+          const cardImg = document.createElement('img');
+          cardImg.src = 'evalution/espace.png';
+          cardImg.alt = 'Espace Enseignant';
+          cardImg.draggable = false;
+          cardImg.style.cssText = 'display: block; max-width: 92vw; max-height: 84vh; width: auto; height: auto; filter: drop-shadow(0 20px 45px rgba(0, 0, 0, 0.65));';
+          cardBox.appendChild(cardImg);
+
+          const syncSizeVars = () => {
+            const w = cardImg.clientWidth || cardImg.getBoundingClientRect().width;
+            const h = cardImg.clientHeight || cardImg.getBoundingClientRect().height;
+            if (w > 0 && h > 0) {
+              cardBox.style.setProperty('--img-width', w + 'px');
+              cardBox.style.setProperty('--img-height', h + 'px');
+            }
+          };
+          const ro = new ResizeObserver(syncSizeVars);
+          ro.observe(cardImg);
+          cardImg.addEventListener('load', syncSizeVars);
+
+          const codeInput = document.createElement('input');
+          codeInput.id = 'teacher-code-input';
+          codeInput.type = 'text';
+          codeInput.placeholder = 'Ex. : 4A-001';
+          codeInput.autocomplete = 'off';
+          codeInput.spellcheck = false;
+          codeInput.setAttribute('aria-label', 'Code de la classe ou évaluation');
+          codeInput.style.cssText = [
+            'position: absolute',
+            'left: 41.4%',
+            'top: 55.4%',
+            'width: 22.2%',
+            'height: 7.7%',
+            'background: transparent',
+            'border: none',
+            'outline: none',
+            'border-radius: 9999px',
+            'font-family: "Nunito", "Segoe UI", sans-serif',
+            'font-weight: 800',
+            'font-size: clamp(14px, calc(var(--img-height, 550px) * 0.032), 26px)',
+            'color: #1e293b',
+            'padding: 0 10px',
+            'box-sizing: border-box',
+            'z-index: 30'
+          ].join('; ') + ';';
+          codeInput.onfocus = () => {
+            codeInput.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.35)';
+          };
+          codeInput.onblur = () => {
+            codeInput.style.boxShadow = 'none';
+          };
+          cardBox.appendChild(codeInput);
+
+          const statusBanner = document.createElement('div');
+          statusBanner.id = 'teacher-portal-status';
+          statusBanner.style.cssText = 'position: absolute; left: 50%; top: 89%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.96); color: #1e293b; border: 2px solid #cbd5e1; border-radius: 9999px; padding: 7px 18px; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(12px, calc(var(--img-height, 550px) * 0.025), 16px); white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,0.22); display: none; z-index: 40;';
+          cardBox.appendChild(statusBanner);
+
+          const showStatus = (msg, isError) => {
+            statusBanner.textContent = msg;
+            statusBanner.style.color = isError ? '#b91c1c' : '#065f46';
+            statusBanner.style.borderColor = isError ? '#fca5a5' : '#6ee7b7';
+            statusBanner.style.display = 'block';
+          };
+
+          const consultBtn = document.createElement('button');
+          consultBtn.id = 'teacher-consult-btn';
+          consultBtn.type = 'button';
+          consultBtn.setAttribute('aria-label', 'Consulter');
+          consultBtn.title = 'Consulter les résultats';
+          consultBtn.style.cssText = 'position: absolute; left: 65.4%; top: 55.1%; width: 16.3%; height: 8.1%; border-radius: 9999px; background: transparent; border: none; outline: none; cursor: pointer; z-index: 35; transition: background 0.15s ease, box-shadow 0.15s ease;';
+          consultBtn.onmouseenter = () => {
+            consultBtn.style.background = 'rgba(255, 255, 255, 0.12)';
+            consultBtn.style.boxShadow = '0 0 14px rgba(34, 197, 94, 0.45)';
+          };
+          consultBtn.onmouseleave = () => {
+            consultBtn.style.background = 'transparent';
+            consultBtn.style.boxShadow = 'none';
+          };
+
+          codeInput.addEventListener('input', () => {
+            codeInput.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.35)';
+            if (statusBanner.style.display !== 'none') {
+              statusBanner.style.display = 'none';
+            }
+          });
+
+          const handleConsult = () => {
+            const code = codeInput.value.trim();
+            if (!code) {
+              showStatus("⚠️ Saisis un code pour consulter les évaluations.", true);
+              codeInput.style.boxShadow = '0 0 0 2.5px rgba(239, 68, 68, 0.65)';
+              codeInput.animate([
+                { transform: 'translateX(-4px)' },
+                { transform: 'translateX(4px)' },
+                { transform: 'translateX(-2px)' },
+                { transform: 'translateX(2px)' },
+                { transform: 'translateX(0)' }
+              ], { duration: 220 });
+              codeInput.focus();
+              return;
+            }
+            codeInput.style.boxShadow = 'none';
+            this.lastEnteredCode = code;
+            showStatus(`🔑 Code « ${code} » prêt — consultation en cours de préparation.`, false);
+          };
+
+          consultBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleConsult();
+          });
+          codeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleConsult();
+            }
+          });
+          cardBox.appendChild(consultBtn);
+
+          const closeBtn = document.createElement('button');
+          closeBtn.id = 'teacher-close-btn';
+          closeBtn.type = 'button';
+          closeBtn.setAttribute('aria-label', 'Fermer');
+          closeBtn.title = 'Fermer';
+          closeBtn.style.cssText = 'position: absolute; left: 77.8%; top: 23.0%; width: 8.8%; height: 15.2%; border-radius: 50%; background: transparent; border: none; outline: none; cursor: pointer; z-index: 40; transition: background 0.15s ease;';
+          closeBtn.onmouseenter = () => { closeBtn.style.background = 'rgba(255, 255, 255, 0.14)'; };
+          closeBtn.onmouseleave = () => { closeBtn.style.background = 'transparent'; };
+          cardBox.appendChild(closeBtn);
+
+          let closing = false;
+          const closeModal = () => {
+            if (closing) return;
+            closing = true;
+            document.removeEventListener('keydown', onEscKey);
+            modal.classList.remove('show');
+            cardBox.style.transform = 'scale(0.88)';
+            cardBox.style.opacity = '0';
+            cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+            ro.disconnect();
+            setTimeout(() => modal.remove(), 220);
+          };
+
+          const onEscKey = (e) => {
+            if (e.key === 'Escape') closeModal();
+          };
+          document.addEventListener('keydown', onEscKey);
+
+          closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeModal();
+          });
+          cardBox.addEventListener('click', (e) => e.stopPropagation());
+          modal.addEventListener('click', closeModal);
+
+          modal.appendChild(cardBox);
+          document.body.appendChild(modal);
+          requestAnimationFrame(() => {
+            modal.classList.add('show');
+            setTimeout(() => codeInput.focus(), 120);
+          });
+        }
+      };
+
+      window.TeacherPortal = TeacherPortal;
+
+      if (btnTeacherPortal) {
+        btnTeacherPortal.addEventListener('click', (e) => {
+          e.stopPropagation();
+          TeacherPortal.open();
+        });
+      }
+    })();
 
     function skipToMap() {
       stopFneckAudio();
+      setTeacherButtonHiddenForClouds(true, 400);
       // Hide skip button
       if (btnSkipIntro) {
         btnSkipIntro.classList.remove('visible');
@@ -2560,14 +2836,17 @@ ${criteriaSchema}
       // Hide start screen UI
       if (buttonsGroup) buttonsGroup.classList.add('fade-out');
 
-      // Instantly or swiftly clean up clouds layer
+      // Silently or swiftly clean up clouds layer
       const cloudLayer = document.getElementById('clouds-layer');
       if (cloudLayer) {
         cloudLayer.style.transition = 'opacity 0.4s ease';
         cloudLayer.style.opacity = '0';
         setTimeout(() => {
           cloudLayer.style.display = 'none';
+          setTeacherButtonHiddenForClouds(false, 500);
         }, 400);
+      } else {
+        setTeacherButtonHiddenForClouds(false, 500);
       }
 
       const logo = document.getElementById('logo-container');
@@ -2728,6 +3007,7 @@ ${criteriaSchema}
         const cloudLayer = document.getElementById('clouds-layer');
         cloudLayer.style.transition = 'opacity 1.5s ease';
         cloudLayer.style.opacity = '0';
+        setTeacherButtonHiddenForClouds(true, 1500);
 
         // Also fade out the logo!
         const logo = document.getElementById('logo-container');
@@ -2762,6 +3042,7 @@ ${criteriaSchema}
           if (logo) logo.style.display = 'none';
           if (initialBg) initialBg.style.display = 'none';
           if (homeAmbient) homeAmbient.style.display = 'none';
+          setTeacherButtonHiddenForClouds(false, 600);
         }, 1500);
       }, 2200);
     });
