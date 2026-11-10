@@ -1985,22 +1985,40 @@ ${criteriaSchema}
         }
         console.log(`[GeminiAIService] Requesting independent evaluation for ${qKey} (image attached: ${Boolean(imagePart)}, reachedGemini: true)...`);
 
-        const generatePromise = model.generateContent(contentPayload);
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout dépassé lors de la correction de ${qKey}`)), 30000)
-        );
-
-        try {
+        const generateWithTimeout = async () => {
+          const generatePromise = model.generateContent(contentPayload);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout dépassé lors de la correction de ${qKey}`)), 30000)
+          );
           const result = await Promise.race([generatePromise, timeoutPromise]);
           const response = await result.response;
           const rawText = response.text();
           return normalizeQuestionEvaluation(rawText, qKey, qConfig, studentAnswer, Boolean(imagePart), this.model);
-        } catch (genErr) {
-          if (lastAiDiagnostics) {
-            lastAiDiagnostics.lastErrorCode = genErr.code || genErr.name || 'gemini/request-failed';
-            lastAiDiagnostics.lastErrorMessage = genErr.message || String(genErr);
+        };
+
+        const isTransientError = (err) => {
+          if (!err || err.isAppCheckFatal) return false;
+          const msg = `${err.code || ''} ${err.message || err}`;
+          if (/appCheck|recaptcha|401|403/i.test(msg)) return false;
+          return /fetch-error|Failed to fetch|network|timeout|Timeout dépassé|high demand|429|500|502|503|504|unavailable/i.test(msg);
+        };
+
+        const retryDelaysMs = [1200, 2400];
+        for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+          try {
+            return await generateWithTimeout();
+          } catch (genErr) {
+            if (attempt < retryDelaysMs.length && isTransientError(genErr)) {
+              console.warn(`[GeminiAIService] Transient error for ${qKey} (attempt ${attempt + 1}), retrying in ${retryDelaysMs[attempt]}ms:`, genErr.message || genErr);
+              await new Promise(resolve => setTimeout(resolve, retryDelaysMs[attempt]));
+              continue;
+            }
+            if (lastAiDiagnostics) {
+              lastAiDiagnostics.lastErrorCode = genErr.code || genErr.name || 'gemini/request-failed';
+              lastAiDiagnostics.lastErrorMessage = genErr.message || String(genErr);
+            }
+            throw genErr;
           }
-          throw genErr;
         }
       },
 
