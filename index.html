@@ -1358,51 +1358,276 @@
         return { success: restSuccess, method: 'rest', docId };
       },
 
+      async getEvaluation(docId) {
+        this.init();
+        if (!docId) {
+          return { success: false, exists: false, error: 'Identifiant du document manquant' };
+        }
+
+        // 1. Primary live read via Firestore REST API (no stale local cache)
+        try {
+          const restUrl = "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents/evaluations/" + encodeURIComponent(docId) + "?key=" + firebaseConfig.apiKey + "&t=" + Date.now();
+          const response = await fetch(restUrl, { method: 'GET', cache: 'no-store' });
+          if (response.status === 404) {
+            return { success: true, exists: false, data: null, method: 'rest', docId };
+          }
+          if (response.ok) {
+            const doc = await response.json();
+            const data = this._fromFirestoreFields(doc.fields || {});
+            return { success: true, exists: true, data, method: 'rest', docId };
+          }
+          const errText = await response.text();
+          console.warn("[FirebaseService] REST get HTTP " + response.status + ":", errText);
+        } catch (restErr) {
+          console.warn("[FirebaseService] REST get network error:", restErr.message);
+        }
+
+        // 2. Fallback read via Firebase Compat SDK (with strict 3s timeout)
+        if (this.db) {
+          try {
+            const sdkRead = this.db.collection('evaluations').doc(docId).get({ source: 'server' });
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SDK read timeout')), 3000));
+            const snap = await Promise.race([sdkRead, timeout]);
+            if (snap && snap.exists) {
+              return { success: true, exists: true, data: snap.data(), method: 'sdk', docId };
+            }
+            return { success: true, exists: false, data: null, method: 'sdk', docId };
+          } catch (sdkErr) {
+            console.warn("[FirebaseService] SDK read fallback note:", sdkErr.message);
+          }
+        }
+
+        return { success: false, exists: false, error: "Impossible de lire les résultats depuis Firestore", docId };
+      },
+
+      _toFirestoreValue(val) {
+        if (val === null || val === undefined) return { nullValue: null };
+        if (typeof val === 'boolean') return { booleanValue: val };
+        if (typeof val === 'number') {
+          if (!Number.isFinite(val)) return { nullValue: null };
+          return Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+        }
+        if (typeof val === 'string') return { stringValue: val };
+        if (Array.isArray(val)) {
+          return {
+            arrayValue: {
+              values: val.map(v => this._toFirestoreValue(v))
+            }
+          };
+        }
+        if (typeof val === 'object') {
+          return { mapValue: { fields: this._toFirestoreFields(val) } };
+        }
+        return { stringValue: String(val) };
+      },
+
       _toFirestoreFields(obj) {
         const out = {};
+        if (!obj || typeof obj !== 'object') return out;
         for (const k of Object.keys(obj)) {
-          const val = obj[k];
-          if (val === null || val === undefined) {
-            out[k] = { nullValue: null };
-          } else if (typeof val === 'boolean') {
-            out[k] = { booleanValue: val };
-          } else if (typeof val === 'number') {
-            if (Number.isInteger(val)) {
-              out[k] = { integerValue: String(val) };
-            } else {
-              out[k] = { doubleValue: val };
-            }
-          } else if (typeof val === 'string') {
-            out[k] = { stringValue: val };
-          } else if (Array.isArray(val)) {
-            out[k] = {
-              arrayValue: {
-                values: val.map(v => {
-                  if (v === null || v === undefined) return { nullValue: null };
-                  if (typeof v === 'object') return { mapValue: { fields: this._toFirestoreFields(v) } };
-                  if (typeof v === 'boolean') return { booleanValue: v };
-                  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-                  return { stringValue: String(v) };
-                })
-              }
-            };
-          } else if (typeof val === 'object') {
-            out[k] = { mapValue: { fields: this._toFirestoreFields(val) } };
-          }
+          out[k] = this._toFirestoreValue(obj[k]);
+        }
+        return out;
+      },
+
+      _fromFirestoreValue(val) {
+        if (!val || typeof val !== 'object') return null;
+        if ('nullValue' in val) return null;
+        if ('booleanValue' in val) return Boolean(val.booleanValue);
+        if ('integerValue' in val) return Number(val.integerValue);
+        if ('doubleValue' in val) return Number(val.doubleValue);
+        if ('stringValue' in val) return val.stringValue;
+        if ('timestampValue' in val) return val.timestampValue;
+        if ('arrayValue' in val) {
+          const vals = val.arrayValue && Array.isArray(val.arrayValue.values) ? val.arrayValue.values : [];
+          return vals.map(v => this._fromFirestoreValue(v));
+        }
+        if ('mapValue' in val) {
+          return this._fromFirestoreFields((val.mapValue && val.mapValue.fields) || {});
+        }
+        return null;
+      },
+
+      _fromFirestoreFields(fields) {
+        const out = {};
+        if (!fields || typeof fields !== 'object') return out;
+        for (const k of Object.keys(fields)) {
+          out[k] = this._fromFirestoreValue(fields[k]);
         }
         return out;
       }
     };
   </script>
 
-  <!-- Firebase AI Logic SDK (Official Modular ESM with GoogleAIBackend & App Check) -->
+  <!-- Centralized Official Evaluation Rubric & Firebase AI Logic (Modular ESM) -->
   <script type="module">
     import { initializeApp, getApps } from "https://esm.sh/@firebase/app@0.16.5";
     import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from "https://esm.sh/@firebase/app-check@0.8.12?deps=@firebase/app@0.16.5";
     import { getAI, getGenerativeModel, GoogleAIBackend } from "https://esm.sh/@firebase/ai@3.0.0?deps=@firebase/app@0.16.5";
 
+    const roundScore = (val) => Math.round((Number(val) + Number.EPSILON) * 100) / 100;
+
+    // Centralized, configurable rubric adhering to official 4ème Français barème totals:
+    // C1 (4.5) + C3 (3.0) + C6 (1.5) + C7 (1.0) = 10.0 pts; C2, C4, C5 preserved as qualitative indicators only.
+    window.EVALUATION_RUBRIC_CONFIG = {
+      version: "4eme_officiel_v1",
+      educationalLevel: "Français 4ème année primaire (élèves âgés de 9 à 10 ans)",
+      moduleName: "Module 1 — Évaluation : Je construis mon histoire",
+      overallMaxScore: 10,
+      officialCriteriaTotals: {
+        C1: { code: "C1", name: "Adéquation avec la situation", max: 4.5 },
+        C3: { code: "C3", name: "Correction linguistique", max: 3.0 },
+        C6: { code: "C6", name: "Richesse du vocabulaire", max: 1.5 },
+        C7: {
+          code: "C7",
+          name: "Critère de perfectionnement",
+          max: 1.0,
+          definition: "Originalité des idées / richesse de l'expression et présentation soignée (orthographe, majuscule, ponctuation)"
+        }
+      },
+      qualitativeIndicators: {
+        C2: { code: "C2", name: "Lisibilité et présentation matérielle", hasSeparatePoints: false },
+        C4: { code: "C4", name: "Orthographe", hasSeparatePoints: false },
+        C5: { code: "C5", name: "Cohérence du sens", hasSeparatePoints: false }
+      },
+      questions: {
+        q1: {
+          id: "q1",
+          number: 1,
+          title: "La situation — Question 1",
+          imageSrc: "evalution/1.png",
+          consigne: "Je regarde l'image et je réponds à la question.",
+          questionText: "1. Où vont les élèves ?",
+          sceneSummary: "Deux parents accompagnent une fille (cartable rose) et un garçon (cartable bleu) vers l'entrée d'une école primaire ornée du drapeau tunisien, avec un bus scolaire jaune et d'autres élèves qui entrent.",
+          expectedUnderstanding: "L'élève doit identifier où vont les élèves (à l'école / à l'école primaire / vers leur école). Toute formulation française claire exprimant cette destination est acceptée.",
+          maxScore: 3.0,
+          criteria: {
+            C1: { name: "Adéquation avec la situation", max: 1.5, description: "La réponse répond exactement à « Où vont les élèves ? » en accord avec l'illustration." },
+            C3: { name: "Correction linguistique", max: 1.0, description: "Phrase compréhensible, ordre des mots correct et conjugaison/accords justes pour la 4ème année." },
+            C6: { name: "Richesse du vocabulaire", max: 0.5, description: "Mots justes et pertinents liés au contexte scolaire (école, école primaire, se diriger, aller...)." }
+          }
+        },
+        q2: {
+          id: "q2",
+          number: 2,
+          title: "La situation — Question 2",
+          imageSrc: "evalution/2.png",
+          consigne: "Je regarde l'image et je réponds à la question.",
+          questionText: "2. Que font-ils ?",
+          sceneSummary: "Six élèves portant leurs cartables sont alignés en rang dans le couloir devant la porte ouverte de la salle « Classe 4ème A », prêts à entrer en classe.",
+          expectedUnderstanding: "L'élève doit décrire ce que font les élèves sur l'image (ils font la queue / se mettent en rang / attendent devant la porte de la classe pour entrer en classe). Toute formulation juste décrivant cette scène est acceptée.",
+          maxScore: 3.0,
+          criteria: {
+            C1: { name: "Adéquation avec la situation", max: 1.5, description: "La réponse décrit fidèlement l'action des élèves devant la porte de la classe 4ème A." },
+            C3: { name: "Correction linguistique", max: 1.0, description: "Syntaxe correcte et accord sujet-verbe au pluriel (ils...) adaptés au niveau 4ème." },
+            C6: { name: "Richesse du vocabulaire", max: 0.5, description: "Emploi de verbes et expressions précis (faire la queue, se mettre en rang, attendre, entrer en classe...)." }
+          }
+        },
+        q3: {
+          id: "q3",
+          number: 3,
+          title: "La situation — Question 3",
+          imageSrc: "evalution/3.png",
+          consigne: "Je regarde l'image et je réponds à la question.",
+          questionText: "3. Que fait la nouvelle élève ?",
+          sceneSummary: "À l'intérieur de la classe, le maître devant le tableau vert accueille d'un geste bienveillant une nouvelle élève souriante debout face aux camarades assis à leurs tables.",
+          expectedUnderstanding: "L'élève doit décrire ce que fait la nouvelle élève (elle se présente devant le maître et ses camarades / salue la classe / parle pour faire connaissance). Toute formulation pertinente exprimant cette scène d'accueil et de présentation est acceptée.",
+          maxScore: 4.0,
+          criteria: {
+            C1: { name: "Adéquation avec la situation", max: 1.5, description: "La réponse interprète correctement la situation de la nouvelle élève face au maître et aux camarades." },
+            C3: { name: "Correction linguistique", max: 1.0, description: "Construction correcte de la phrase (temps, accords, pronoms) adaptée au niveau 4ème." },
+            C6: { name: "Richesse du vocabulaire", max: 0.5, description: "Vocabulaire adapté à l'accueil en classe (se présenter, saluer, camarades, maître, classe...)." },
+            C7: { name: "Critère de perfectionnement", max: 1.0, description: "Originalité des idées / richesse de l'expression et présentation soignée (orthographe, majuscule en début de phrase, ponctuation finale)." }
+          }
+        }
+      }
+    };
+
+    function validateRubricConfig(config) {
+      if (!config || !config.questions) {
+        throw new Error("Configuration du barème introuvable.");
+      }
+      const qKeys = ["q1", "q2", "q3"];
+      let totalMax = 0;
+      const criterionSums = {};
+
+      for (const qKey of qKeys) {
+        const q = config.questions[qKey];
+        if (!q || typeof q.maxScore !== "number" || q.maxScore <= 0) {
+          throw new Error("Configuration invalide pour la question " + qKey);
+        }
+        let qCritSum = 0;
+        for (const [cCode, cDef] of Object.entries(q.criteria || {})) {
+          qCritSum = roundScore(qCritSum + cDef.max);
+          criterionSums[cCode] = roundScore((criterionSums[cCode] || 0) + cDef.max);
+        }
+        if (Math.abs(qCritSum - q.maxScore) > 0.01) {
+          throw new Error(`La somme des critères de ${qKey} (${qCritSum}) ne correspond pas à son maximum (${q.maxScore}).`);
+        }
+        totalMax = roundScore(totalMax + q.maxScore);
+      }
+
+      if (Math.abs(totalMax - config.overallMaxScore) > 0.01) {
+        throw new Error(`La somme des maximums des 3 questions (${totalMax}) doit être exactement égale à ${config.overallMaxScore}.`);
+      }
+
+      for (const [cCode, totalDef] of Object.entries(config.officialCriteriaTotals || {})) {
+        const actual = criterionSums[cCode] || 0;
+        if (Math.abs(actual - totalDef.max) > 0.01) {
+          throw new Error(`Le total configuré pour ${cCode} (${actual}) ne correspond pas au barème officiel (${totalDef.max}).`);
+        }
+      }
+
+      return true;
+    }
+
+    // Validate rubric integrity immediately on load
+    validateRubricConfig(window.EVALUATION_RUBRIC_CONFIG);
+
     let aiModelPromise = null;
     let modularAppCheckInstance = null;
+    const inlineImageCache = new Map();
+
+    async function loadImageAsInlineData(imageSrc) {
+      if (!imageSrc) return null;
+      if (inlineImageCache.has(imageSrc)) {
+        return inlineImageCache.get(imageSrc);
+      }
+      try {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        const loaded = await new Promise((resolve, reject) => {
+          img.onload = () => resolve(true);
+          img.onerror = () => reject(new Error("Échec de chargement image: " + imageSrc));
+          img.src = encodeURI(imageSrc);
+        });
+        if (!loaded || !img.naturalWidth) return null;
+
+        const maxDim = 768;
+        const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+        const targetW = Math.max(1, Math.round(img.naturalWidth * scale));
+        const targetH = Math.max(1, Math.round(img.naturalHeight * scale));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, targetW, targetH);
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        const base64 = dataUrl.split(",")[1];
+        if (!base64) return null;
+
+        const part = { inlineData: { data: base64, mimeType: "image/jpeg" } };
+        inlineImageCache.set(imageSrc, part);
+        return part;
+      } catch (imgErr) {
+        console.warn("[GeminiAIService] Image inline fallback (description texte utilisée):", imgErr.message);
+        return null;
+      }
+    }
 
     async function initFirebaseAiLogic() {
       if (aiModelPromise) return aiModelPromise;
@@ -1461,157 +1686,252 @@
         return model;
       })();
 
+      // Reset promise on failure so user retries can recover cleanly
+      aiModelPromise.catch(() => { aiModelPromise = null; });
       return aiModelPromise;
     }
 
-    window.GeminiAIService = {
-      model: "gemini-3.5-flash-lite",
+    function buildQuestionPrompt(qConfig, studentAnswer, rubricConfig) {
+      const criteriaLines = Object.entries(qConfig.criteria)
+        .map(([code, def], idx) => `${idx + 1}. ${code} — ${def.name} (Maximum : ${def.max} point${def.max > 1 ? 's' : ''}) :\n   - ${def.description}`)
+        .join("\n");
 
-      async evaluateWriting(evaluationContext) {
-        if (!evaluationContext) throw new Error("Evaluation context is required");
+      const criteriaSchema = Object.entries(qConfig.criteria)
+        .map(([code, def]) => `    "${code}": { "name": "${def.name}", "score": 0, "max": ${def.max}, "justification": "" }`)
+        .join(",\n");
 
-        const answers = evaluationContext.answers || {};
-        const writingObj = answers.writing || {};
-        const studentText = (writingObj.text || evaluationContext.text || '').trim();
+      return `Tu es un professeur de français de l'école primaire évaluant UNIQUEMENT la réponse d'un élève de 4ème année primaire à UNE question précise illustrée ci-joint.
+Niveau : ${rubricConfig.educationalLevel}
+Module : ${rubricConfig.moduleName}
 
-        if (!studentText) {
-          throw new Error("Aucun texte fourni par l'élève à évaluer.");
-        }
+CONSIGNE DE L'ACTIVITÉ :
+« ${qConfig.consigne} »
 
-        const situation = answers.situation || "Non spécifié";
-        const character = answers.character || "Non spécifié";
-        const place = answers.place || "Non spécifié";
-        const time = answers.time || "Non spécifié";
-        const chronology = Array.isArray(answers.chronology) && answers.chronology.length > 0
-          ? answers.chronology.join(" -> ")
-          : "Non spécifié";
+QUESTION N°${qConfig.number} :
+« ${qConfig.questionText} »
 
-        const prompt = `Tu es un professeur de français de l'école primaire évaluant la production écrite d'un élève de 4ème année primaire (élèves âgés de 9 à 10 ans).
-Niveau : Français 4ème année primaire (début de production d'écrits autonomes).
-Module : Module 1 — Évaluation : Je construis mon histoire.
+CONTEXTE VISUEL DE L'ILLUSTRATION :
+${qConfig.sceneSummary}
+(Réfère-toi également à l'image jointe pour vérifier la compréhension exacte de la scène.)
 
-CONSIGNE OFFICIELLE :
-« Raconte ton histoire ! Écris au moins 3 phrases en utilisant les éléments précédents (situation, personnage, lieu et temps). »
+ATTENTE PÉDAGOGIQUE (SOUPLESSE DE FORMULATION) :
+${qConfig.expectedUnderstanding}
+IMPORTANT : N'exige jamais une phrase modèle unique mot pour mot. Accepte toute formulation différente dès lors qu'elle communique clairement le sens attendu en lien avec l'image.
 
-CONTEXTE ET CHOIX DE L'ÉLÈVE :
-- Situation : ${situation}
-- Personnage : ${character}
-- Lieu : ${place}
-- Moment : ${time}
-- Chronologie des événements : ${chronology}
-
-PRODUCTION ÉCRITE DE L'ÉLÈVE :
+RÉPONSE ÉCRITE DE L'ÉLÈVE :
 """
-${studentText}
+${studentAnswer}
 """
 
-GRILLE OFFICIELLE D'ÉVALUATION (TOTAL EXACT SUR 10 POINTS) :
-Évalue chaque critère de manière rigoureuse, indépendante, équitable et bienveillante :
-1. C1 — Adéquation à la consigne (Maximum : 2 points) :
-   - Respect du sujet et présence d'au moins 3 phrases.
-   - Présence et cohérence des éléments choisis (personnage, lieu, temps, situation).
-2. C5 — Cohérence du récit (Maximum : 2 points) :
-   - Enchaînement chronologique logique des événements.
-   - Présence de connecteurs temporels/logiques (d'abord, puis, ensuite, enfin, etc.).
-3. C3 — Correction linguistique (Maximum : 2 points) :
-   - Construction des phrases (Sujet + Verbe + Complément).
-   - Conjugaison correcte et cohérence des temps verbaux.
-4. C4 — Orthographe (Maximum : 2 points) :
-   - Orthographe d'usage des mots courants.
-   - Accords sujet-verbe et accords dans le groupe nominal (genre et nombre).
-5. C6 — Vocabulaire (Maximum : 1 point) :
-   - Richesse et pertinence du vocabulaire adapté au niveau 4ème.
-6. C2 + C7 — Présentation et ponctuation (Maximum : 1 point) :
-   - Majuscules en début de phrase et aux noms propres, ponctuation finale (points).
+BARÈME OFFICIEL APPLICABLE À CETTE QUESTION (TOTAL MAXIMUM : ${qConfig.maxScore} POINTS) :
+Évalue chaque critère individuellement et rigoureusement (utilise des demi-points ou quarts de point si nécessaire, sans jamais dépasser le maximum de chaque critère) :
+${criteriaLines}
 
-RÈGLE STRICTE SUR LES TEXTES INVENTÉS OU CHARABIA :
-Si le texte de l'élève est un charabia incompréhensible, une suite de lettres aléatoires ou répétitives (ex: "zdzadzdzad..."), ou totalement hors de propos, attribue 0 point à TOUS les critères sans exception et un score total de 0/10. N'accorde JAMAIS de points simplement parce qu'il y a des lettres ou 3 blocs de texte.
+INDICATEURS QUALITATIFS À PRÉSERVER SANS POINTS SÉPARÉS :
+N'invente JAMAIS de note chiffrée séparée pour C2, C4 ou C5. Indique uniquement leur observation pédagogique sous "indicators" ("maîtrisé", "en_cours", ou "à_renforcer") :
+- C2 — Lisibilité et présentation matérielle
+- C4 — Orthographe d'usage et grammaticale
+- C5 — Cohérence du sens
 
-RÈGLE DU SCORE TOTAL :
-Le champ "score" doit obligatoirement être égal à la somme arithmétique exacte des notes attribuées aux 6 critères ci-dessus (C1 + C5 + C3 + C4 + C6 + C2_C7). Ne dépasse jamais le maximum d'aucun critère.
+RÈGLE STRICTE SUR LE CHARABIA OU TEXTE VIDE DE SENS :
+Si la réponse est un charabia aléatoire (ex. "zdzadz", "qsdfg") ou totalement hors-sujet, attribue 0 point à TOUS les critères.
 
-FORMAT DE RÉPONSE OBLIGATOIRE :
-Retourne UNIQUEMENT un objet JSON valide (aucun commentaire, pas de balises markdown) sous ce format :
+FORMAT DE RÉPONSE JSON STRICTEMENT OBLIGATOIRE :
+Retourne UNIQUEMENT un objet JSON valide (sans texte ni balises markdown) avec cette structure exacte :
 {
-  "score": 0,
-  "maxScore": 10,
+  "questionId": "${qConfig.id}",
   "criteria": {
-    "C1": { "name": "Adéquation à la consigne", "score": 0, "max": 2, "feedback": "" },
-    "C5": { "name": "Cohérence du récit", "score": 0, "max": 2, "feedback": "" },
-    "C3": { "name": "Correction linguistique", "score": 0, "max": 2, "feedback": "" },
-    "C4": { "name": "Orthographe", "score": 0, "max": 2, "feedback": "" },
-    "C6": { "name": "Vocabulaire", "score": 0, "max": 1, "feedback": "" },
-    "C2_C7": { "name": "Présentation et ponctuation", "score": 0, "max": 1, "feedback": "" }
+${criteriaSchema}
+  },
+  "indicators": {
+    "C2": { "name": "Lisibilité et présentation matérielle", "level": "maîtrisé", "observation": "" },
+    "C4": { "name": "Orthographe", "level": "maîtrisé", "observation": "" },
+    "C5": { "name": "Cohérence du sens", "level": "maîtrisé", "observation": "" }
   },
   "strengths": [],
   "mistakes": [
     { "original": "", "correction": "", "explanation": "" }
   ],
-  "corrections": [],
-  "feedback": "",
-  "status": "evaluated"
+  "suggestedCorrection": "",
+  "feedback": ""
 }`;
+    }
 
-        console.log("[GeminiAIService] Requesting evaluation via Firebase AI Logic model.generateContent()...");
+    function normalizeQuestionEvaluation(rawText, qKey, qConfig, studentAnswer, usedImageContext, modelName) {
+      if (!rawText || typeof rawText !== "string") {
+        throw new Error(`Réponse vide reçue de Gemini pour ${qKey}.`);
+      }
+      let clean = rawText.trim();
+      if (clean.startsWith("```json")) clean = clean.substring(7);
+      else if (clean.startsWith("```")) clean = clean.substring(3);
+      if (clean.endsWith("```")) clean = clean.substring(0, clean.length - 3);
+      clean = clean.trim();
+
+      const parsed = JSON.parse(clean);
+      if (!parsed || typeof parsed !== "object" || !parsed.criteria || typeof parsed.criteria !== "object") {
+        throw new Error(`Format JSON incomplet retourné par Gemini pour ${qKey}.`);
+      }
+
+      const normalizedCriteria = {};
+      let sum = 0;
+
+      for (const [cCode, cCfg] of Object.entries(qConfig.criteria)) {
+        const rawCrit = parsed.criteria[cCode];
+        if (!rawCrit || typeof rawCrit.score !== "number" || Number.isNaN(rawCrit.score)) {
+          throw new Error(`Score manquant ou invalide pour le critère ${cCode} sur ${qKey}.`);
+        }
+        const clampedScore = roundScore(Math.max(0, Math.min(cCfg.max, rawCrit.score)));
+        normalizedCriteria[cCode] = {
+          code: cCode,
+          name: cCfg.name,
+          score: clampedScore,
+          max: cCfg.max,
+          justification: typeof rawCrit.justification === "string" ? rawCrit.justification.trim() : ""
+        };
+        sum = roundScore(sum + clampedScore);
+      }
+
+      const validatedScore = roundScore(Math.max(0, Math.min(qConfig.maxScore, sum)));
+
+      const normalizedIndicators = {};
+      const indDefs = window.EVALUATION_RUBRIC_CONFIG.qualitativeIndicators;
+      for (const [iCode, iDef] of Object.entries(indDefs)) {
+        const rawInd = (parsed.indicators && parsed.indicators[iCode]) || {};
+        normalizedIndicators[iCode] = {
+          code: iCode,
+          name: iDef.name,
+          hasSeparatePoints: false,
+          level: typeof rawInd.level === "string" ? rawInd.level : "en_cours",
+          observation: typeof rawInd.observation === "string" ? rawInd.observation.trim() : ""
+        };
+      }
+
+      const mistakes = Array.isArray(parsed.mistakes)
+        ? parsed.mistakes.filter(m => m && (m.original || m.correction || m.explanation)).map(m => ({
+            original: String(m.original || ""),
+            correction: String(m.correction || ""),
+            explanation: String(m.explanation || "")
+          }))
+        : [];
+
+      const strengths = Array.isArray(parsed.strengths) ? parsed.strengths.map(s => String(s)) : [];
+
+      return {
+        questionId: qKey,
+        questionNumber: qConfig.number,
+        questionText: qConfig.questionText,
+        answer: studentAnswer,
+        score: validatedScore,
+        maxScore: qConfig.maxScore,
+        criteria: normalizedCriteria,
+        indicators: normalizedIndicators,
+        strengths,
+        mistakes,
+        suggestedCorrection: typeof parsed.suggestedCorrection === "string" ? parsed.suggestedCorrection.trim() : "",
+        feedback: typeof parsed.feedback === "string" && parsed.feedback.trim() ? parsed.feedback.trim() : "Bonne participation !",
+        status: "evaluated",
+        evaluatedAt: new Date().toISOString(),
+        model: modelName,
+        usedImageContext: Boolean(usedImageContext)
+      };
+    }
+
+    window.GeminiAIService = {
+      model: "gemini-3.5-flash-lite",
+
+      validateRubric() {
+        return validateRubricConfig(window.EVALUATION_RUBRIC_CONFIG);
+      },
+
+      async evaluateQuestion(qKey, studentAnswer) {
+        this.validateRubric();
+        const qConfig = window.EVALUATION_RUBRIC_CONFIG.questions[qKey];
+        if (!qConfig) {
+          throw new Error("Question inconnue dans le barème : " + qKey);
+        }
+        const trimmed = (studentAnswer || "").trim();
+        if (!trimmed) {
+          throw new Error(`Aucune réponse fournie pour la question ${qConfig.number}.`);
+        }
+
         const model = await initFirebaseAiLogic();
+        const imagePart = await loadImageAsInlineData(qConfig.imageSrc);
+        const prompt = buildQuestionPrompt(qConfig, studentAnswer, window.EVALUATION_RUBRIC_CONFIG);
+        const contentPayload = imagePart ? [prompt, imagePart] : prompt;
 
-        // 25-second timeout protection
-        const generatePromise = model.generateContent(prompt);
+        console.log(`[GeminiAIService] Requesting independent evaluation for ${qKey} (image attached: ${Boolean(imagePart)})...`);
+
+        const generatePromise = model.generateContent(contentPayload);
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout dépassé lors de l'évaluation IA")), 25000)
+          setTimeout(() => reject(new Error(`Timeout dépassé lors de la correction de ${qKey}`)), 30000)
         );
 
         const result = await Promise.race([generatePromise, timeoutPromise]);
         const response = await result.response;
         const rawText = response.text();
 
-        return this._processGeminiResponse(rawText);
+        return normalizeQuestionEvaluation(rawText, qKey, qConfig, studentAnswer, Boolean(imagePart), this.model);
       },
 
-      _processGeminiResponse(rawText) {
-        if (!rawText || typeof rawText !== 'string') {
-          throw new Error("Réponse textuelle vide ou invalide reçue de Gemini");
+      buildEvaluationSummary(questionsMap) {
+        this.validateRubric();
+        const rubric = window.EVALUATION_RUBRIC_CONFIG;
+        const qKeys = ["q1", "q2", "q3"];
+
+        for (const k of qKeys) {
+          const ev = questionsMap && questionsMap[k];
+          if (!ev || ev.status !== "evaluated" || typeof ev.score !== "number" || Number.isNaN(ev.score)) {
+            return null;
+          }
+          const maxAllowed = rubric.questions[k].maxScore;
+          if (ev.score < 0 || ev.score > maxAllowed) {
+            throw new Error(`Score invalide détecté pour ${k} : ${ev.score}/${maxAllowed}`);
+          }
         }
 
-        let raw = rawText.trim();
-        if (raw.startsWith("```json")) raw = raw.substring(7);
-        else if (raw.startsWith("```")) raw = raw.substring(3);
-        if (raw.endsWith("```")) raw = raw.substring(0, raw.length - 3);
-        raw = raw.trim();
+        const q1 = questionsMap.q1;
+        const q2 = questionsMap.q2;
+        const q3 = questionsMap.q3;
 
-        const parsed = JSON.parse(raw);
-
-        // Sanitize criteria & enforce 10-point scale
-        parsed.criteria = parsed.criteria || {};
-        const maxes = { C1: 2, C5: 2, C3: 2, C4: 2, C6: 1, C2_C7: 1 };
-        let sum = 0;
-
-        for (const [key, max] of Object.entries(maxes)) {
-          const c = parsed.criteria[key] || {};
-          let pts = typeof c.score === 'number' ? c.score : 0;
-          pts = Math.max(0, Math.min(max, pts));
-          c.score = pts;
-          c.max = max;
-          parsed.criteria[key] = c;
-          sum += pts;
+        const maxSum = roundScore(q1.maxScore + q2.maxScore + q3.maxScore);
+        if (Math.abs(maxSum - rubric.overallMaxScore) > 0.01) {
+          throw new Error(`Somme des maximums invalide (${maxSum} != ${rubric.overallMaxScore}).`);
         }
 
-        // Sum equals score
-        sum = Math.round(sum * 10) / 10;
-        parsed.score = Math.max(0, Math.min(10, sum));
-        parsed.maxScore = 10;
-        parsed.strengths = Array.isArray(parsed.strengths) ? parsed.strengths : [];
-        parsed.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : [];
-        parsed.corrections = Array.isArray(parsed.corrections) ? parsed.corrections : [];
-        parsed.feedback = typeof parsed.feedback === 'string' ? parsed.feedback : "Bravo pour ton travail !";
-        parsed.status = "evaluated";
-        parsed.evaluatedAt = new Date().toISOString();
-        parsed.model = this.model;
+        const totalScore = roundScore(Math.max(0, Math.min(rubric.overallMaxScore, q1.score + q2.score + q3.score)));
 
-        return parsed;
+        const criteriaTotals = {};
+        for (const [cCode, cDef] of Object.entries(rubric.officialCriteriaTotals)) {
+          let earned = 0;
+          for (const k of qKeys) {
+            const qCrit = questionsMap[k].criteria && questionsMap[k].criteria[cCode];
+            if (qCrit && typeof qCrit.score === "number") {
+              earned = roundScore(earned + qCrit.score);
+            }
+          }
+          criteriaTotals[cCode] = {
+            code: cCode,
+            name: cDef.name,
+            score: Math.min(cDef.max, earned),
+            max: cDef.max
+          };
+        }
+
+        return {
+          totalScore,
+          maxScore: rubric.overallMaxScore,
+          questionScores: {
+            q1: { score: q1.score, maxScore: q1.maxScore },
+            q2: { score: q2.score, maxScore: q2.maxScore },
+            q3: { score: q3.score, maxScore: q3.maxScore }
+          },
+          criteriaTotals,
+          combinedStrengths: [...(q1.strengths || []), ...(q2.strengths || []), ...(q3.strengths || [])].slice(0, 6),
+          status: "evaluated",
+          summarizedAt: new Date().toISOString()
+        };
       }
     };
-  </script>
   </script>
 </head>
 
@@ -2954,8 +3274,9 @@ Retourne UNIQUEMENT un objet JSON valide (aucun commentaire, pas de balises mark
           if (!this.restoreEvaluationSession()) {
             this.currentExIndex = 0;
             this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-            this.evalAnswers = { profile: null, situation: null, character: null, place: null, time: null, chronology: [], text: '' };
-            this.evalScores = { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null };
+            this.evalAnswers = { profile: null, q1: '', q2: '', q3: '', text: '' };
+            this.evalScores = { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null, q1: null, q2: null, q3: null };
+            this.evalQuestionResults = { q1: null, q2: null, q3: null };
             this.evalScore = 0;
           }
           document.getElementById('exercise-stage').classList.add('active');
@@ -16551,17 +16872,32 @@ showJourney2EndCelebration() {
       },
 
       // --- EVALUATION SESSION & FIRESTORE INTEGRATION ---
+      getEvaluationDocId() {
+        const profile = (this.evalAnswers && this.evalAnswers.profile) || {};
+        const studentId = (profile.id || 'ANON').trim() || 'ANON';
+        if (!this.evalSessionId) {
+          this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        }
+        const safeStudentId = studentId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const docId = 'eval_' + safeStudentId + '_' + this.evalSessionId;
+        this.lastEvalDocId = docId;
+        return docId;
+      },
+
       saveEvaluationSession() {
         try {
           const sessionData = {
+            version: 2,
             currentExIndex: this.currentExIndex,
             evalAnswers: this.evalAnswers || {},
             evalScores: this.evalScores || {},
+            evalQuestionResults: this.evalQuestionResults || { q1: null, q2: null, q3: null },
             evalScore: this.computeAutoScore(),
             evalSessionId: this.evalSessionId || (this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
+            lastEvalDocId: this.lastEvalDocId || null,
             updatedAt: new Date().toISOString()
           };
-          localStorage.setItem('ecripro_eval_session', JSON.stringify(sessionData));
+          localStorage.setItem('ecripro_eval_session_v2', JSON.stringify(sessionData));
         } catch (e) {
           console.warn('Failed to save evaluation session to localStorage:', e);
         }
@@ -16569,18 +16905,20 @@ showJourney2EndCelebration() {
 
       restoreEvaluationSession() {
         try {
-          const raw = localStorage.getItem('ecripro_eval_session');
+          const raw = localStorage.getItem('ecripro_eval_session_v2');
           if (!raw) return false;
           const sessionData = JSON.parse(raw);
-          if (sessionData && sessionData.evalAnswers) {
+          if (sessionData && sessionData.version === 2 && sessionData.evalAnswers) {
             this.evalAnswers = sessionData.evalAnswers;
-            this.evalScores = sessionData.evalScores || { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null };
+            this.evalScores = sessionData.evalScores || { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null, q1: null, q2: null, q3: null };
+            this.evalQuestionResults = sessionData.evalQuestionResults || { q1: null, q2: null, q3: null };
             this.evalScore = this.computeAutoScore();
             this.evalSessionId = sessionData.evalSessionId || ('sess_' + Date.now());
-            if (typeof sessionData.currentExIndex === 'number' && sessionData.currentExIndex >= 0 && sessionData.currentExIndex <= 6) {
+            this.lastEvalDocId = sessionData.lastEvalDocId || null;
+            if (typeof sessionData.currentExIndex === 'number' && sessionData.currentExIndex >= 0 && sessionData.currentExIndex <= 4) {
               this.currentExIndex = sessionData.currentExIndex;
             }
-            console.log('Evaluation session restored successfully:', sessionData);
+            console.log('Evaluation v2 session restored successfully:', sessionData);
             return true;
           }
         } catch (e) {
@@ -16591,7 +16929,7 @@ showJourney2EndCelebration() {
 
       clearEvaluationSession() {
         try {
-          localStorage.removeItem('ecripro_eval_session');
+          localStorage.removeItem('ecripro_eval_session_v2');
         } catch (e) {}
       },
 
@@ -16625,29 +16963,57 @@ showJourney2EndCelebration() {
         return text.trim().split(/\s+/).filter(w => w.trim().length > 0).length;
       },
 
-      async submitEvaluationToFirestore(statusOverride) {
+      async submitEvaluationToFirestore(statusOverride, options = {}) {
         if (window.FirebaseService) {
           window.FirebaseService.init();
         }
 
         const profile = (this.evalAnswers && this.evalAnswers.profile) || {};
-        const studentId = (profile.id || 'ANON').trim();
+        const studentId = (profile.id || 'ANON').trim() || 'ANON';
         const studentNom = (profile.nom || '').trim();
         const studentPrenom = (profile.prenom || '').trim();
         const studentClasse = (profile.classe || '').trim();
-
-        if (!this.evalSessionId) {
-          this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-        }
-
-        const safeStudentId = studentId.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const docId = 'eval_' + safeStudentId + '_' + this.evalSessionId;
+        const docId = this.getEvaluationDocId();
 
         const autoScore = this.computeAutoScore();
-        const writingText = (this.evalAnswers && (this.evalAnswers.text || (this.evalAnswers.writing && this.evalAnswers.writing.text)))
-          ? (this.evalAnswers.text || this.evalAnswers.writing.text).trim()
-          : '';
+        const q1Answer = (this.evalAnswers && typeof this.evalAnswers.q1 === 'string') ? this.evalAnswers.q1.trim() : '';
+        const q2Answer = (this.evalAnswers && typeof this.evalAnswers.q2 === 'string') ? this.evalAnswers.q2.trim() : '';
+        const q3Answer = (this.evalAnswers && typeof this.evalAnswers.q3 === 'string') ? this.evalAnswers.q3.trim() : '';
+        const combinedText = [q1Answer, q2Answer, q3Answer].filter(Boolean).join('\n\n');
         const currentStatus = statusOverride || 'completed';
+
+        const rubric = window.EVALUATION_RUBRIC_CONFIG;
+        const prevQuestions = this.evalQuestionResults || { q1: null, q2: null, q3: null };
+
+        // Initialize or preserve per-question entries cleanly
+        const buildInitialQuestionEntry = (qKey, answerText) => {
+          const existing = prevQuestions[qKey];
+          if (existing && existing.status === 'evaluated' && existing.answer === answerText) {
+            return existing;
+          }
+          const qCfg = rubric ? rubric.questions[qKey] : null;
+          return {
+            questionId: qKey,
+            questionNumber: qCfg ? qCfg.number : Number(qKey.replace('q', '')),
+            questionText: qCfg ? qCfg.questionText : qKey,
+            answer: answerText,
+            score: null,
+            maxScore: qCfg ? qCfg.maxScore : 0,
+            criteria: existing && existing.criteria ? existing.criteria : {},
+            indicators: existing && existing.indicators ? existing.indicators : {},
+            strengths: [],
+            mistakes: [],
+            feedback: null,
+            suggestedCorrection: null,
+            status: currentStatus === 'completed' ? 'pending' : 'in_progress'
+          };
+        };
+
+        const questionsMap = {
+          q1: buildInitialQuestionEntry('q1', q1Answer),
+          q2: buildInitialQuestionEntry('q2', q2Answer),
+          q3: buildInitialQuestionEntry('q3', q3Answer)
+        };
 
         const payload = {
           studentId: studentId,
@@ -16655,40 +17021,63 @@ showJourney2EndCelebration() {
           studentPrenom: studentPrenom,
           studentClasse: studentClasse,
           sessionId: this.evalSessionId,
+          docId: docId,
+          evaluationVersion: "v2_3questions",
           module: "Module 1",
           journey: "Évaluation — Je construis mon histoire",
           submittedAt: new Date().toISOString(),
           status: currentStatus,
           autoScore: autoScore,
-          maxAutoScore: 50,
+          maxAutoScore: 0,
           writingStatus: currentStatus === 'completed' ? "pending_teacher_grading" : "in_progress",
           writingScore: null,
-          maxTotalScore: 60,
+          totalScore: null,
+          finalScoreOutOf10: null,
+          maxTotalScore: 10,
+          rubricConfig: rubric ? {
+            version: rubric.version,
+            overallMaxScore: rubric.overallMaxScore,
+            questionMaxScores: {
+              q1: rubric.questions.q1.maxScore,
+              q2: rubric.questions.q2.maxScore,
+              q3: rubric.questions.q3.maxScore
+            }
+          } : null,
           answers: {
-            situation: this.evalAnswers ? (this.evalAnswers.situation || null) : null,
-            character: this.evalAnswers ? (this.evalAnswers.character || null) : null,
-            place: this.evalAnswers ? (this.evalAnswers.place || null) : null,
-            time: this.evalAnswers ? (this.evalAnswers.time || null) : null,
-            chronology: (this.evalAnswers && Array.isArray(this.evalAnswers.chronology)) ? this.evalAnswers.chronology : [],
+            q1: q1Answer,
+            q2: q2Answer,
+            q3: q3Answer,
             writing: {
-              text: writingText,
-              sentenceCount: this.getSentenceCount(writingText),
-              wordCount: this.getWordCount(writingText)
+              q1: q1Answer,
+              q2: q2Answer,
+              q3: q3Answer,
+              text: combinedText,
+              sentenceCount: this.getSentenceCount(combinedText),
+              wordCount: this.getWordCount(combinedText)
             }
           },
           scoresBreakdown: {
-            situation: (this.evalScores && this.evalScores.situation) || 0,
-            character: (this.evalScores && this.evalScores.character) || 0,
-            place: (this.evalScores && this.evalScores.place) || 0,
-            time: (this.evalScores && this.evalScores.time) || 0,
-            chronology: (this.evalScores && this.evalScores.chronology) || 0,
+            q1: null,
+            q2: null,
+            q3: null,
             writing: null
+          },
+          writingEvaluation: {
+            rubricVersion: rubric ? rubric.version : "4eme_officiel_v1",
+            questions: questionsMap,
+            question1Evaluation: questionsMap.q1,
+            question2Evaluation: questionsMap.q2,
+            question3Evaluation: questionsMap.q3,
+            totalScore: null,
+            maxScore: 10,
+            summary: null,
+            status: currentStatus === 'completed' ? "pending" : "in_progress"
           }
         };
 
         this.lastSavedEvaluation = payload;
 
-        // Step 1: Initial immediate save to Firestore (guarantees student submission is never lost)
+        // Step 1: Persist initial answers immediately to Firestore so student responses are never lost
         if (window.FirebaseService) {
           try {
             await window.FirebaseService.saveEvaluation(docId, payload);
@@ -16697,54 +17086,122 @@ showJourney2EndCelebration() {
           }
         }
 
-        // Step 2: Trigger genuine AI Evaluation with Gemini Developer API & Firebase AI Logic
-        if (currentStatus === 'completed' && writingText && window.GeminiAIService) {
-          try {
-            console.log('[GeminiAI] Starting genuine evaluation for student:', studentId);
-            const aiEval = await window.GeminiAIService.evaluateWriting(payload);
-            if (aiEval && typeof aiEval.score === 'number') {
-              console.log('[GeminiAI] Evaluation completed successfully. Writing score:', aiEval.score);
-              payload.writingScore = aiEval.score;
-              payload.writingStatus = "evaluated";
-              payload.scoresBreakdown.writing = aiEval.score;
-              payload.totalScore = autoScore + aiEval.score;
-              payload.finalScoreOutOf10 = Math.round((autoScore + aiEval.score) / 6);
-              payload.aiEvaluation = aiEval;
-              payload.answers.writing.aiEvaluation = aiEval;
+        // Step 2: Independent per-question evaluation via Gemini AI (ONLY on final submission / retry)
+        if (currentStatus === 'completed' && window.GeminiAIService) {
+          const answerMap = { q1: q1Answer, q2: q2Answer, q3: q3Answer };
+          const qKeys = ['q1', 'q2', 'q3'];
 
-              this.lastSavedEvaluation = payload;
+          for (let i = 0; i < qKeys.length; i++) {
+            const qKey = qKeys[i];
+            const ans = answerMap[qKey];
+            const existing = questionsMap[qKey];
 
-              // Step 3: Update Firestore with the AI evaluation results
-              if (window.FirebaseService) {
-                await window.FirebaseService.saveEvaluation(docId, payload);
-              }
+            // Idempotency guard: skip questions already evaluated for the exact same answer
+            if (existing && existing.status === 'evaluated' && existing.answer === ans && typeof existing.score === 'number') {
+              console.log(`[GeminiAI] Skipping already-evaluated ${qKey} (idempotent guard). Score: ${existing.score}/${existing.maxScore}`);
+              continue;
             }
-          } catch (aiErr) {
-            console.warn('[GeminiAI] Evaluation notice (preserved as pending):', aiErr.message);
-            payload.writingStatus = "pending_teacher_grading";
-            payload.writingScore = null;
-            payload.aiEvaluationError = {
-              message: aiErr.message,
-              timestamp: new Date().toISOString()
-            };
-            if (window.FirebaseService) {
-              try {
-                await window.FirebaseService.saveEvaluation(docId, payload);
-              } catch (saveErr) {}
+
+            if (typeof options.onProgress === 'function') {
+              try { options.onProgress(i + 1, qKeys.length, qKey); } catch (e) {}
+            }
+
+            try {
+              console.log(`[GeminiAI] Evaluating ${qKey} independently for student:`, studentId);
+              const qEval = await window.GeminiAIService.evaluateQuestion(qKey, ans);
+              questionsMap[qKey] = qEval;
+              this.evalQuestionResults[qKey] = qEval;
+            } catch (qErr) {
+              console.warn(`[GeminiAI] Question ${qKey} evaluation failed (preserved as failed, never scored as 0):`, qErr.message);
+              const qCfg = rubric.questions[qKey];
+              const failedEntry = {
+                questionId: qKey,
+                questionNumber: qCfg.number,
+                questionText: qCfg.questionText,
+                answer: ans,
+                score: null,
+                maxScore: qCfg.maxScore,
+                criteria: {},
+                indicators: {},
+                strengths: [],
+                mistakes: [],
+                feedback: null,
+                suggestedCorrection: null,
+                error: qErr.message,
+                status: 'failed',
+                failedAt: new Date().toISOString()
+              };
+              questionsMap[qKey] = failedEntry;
+              this.evalQuestionResults[qKey] = failedEntry;
             }
           }
-        }
 
-        if (currentStatus === 'completed') {
-          // Clear in-progress session since submitted
-          this.clearEvaluationSession();
+          // Reconcile per-question breakdown and final summary strictly from validated results
+          payload.writingEvaluation.questions = questionsMap;
+          payload.writingEvaluation.question1Evaluation = questionsMap.q1;
+          payload.writingEvaluation.question2Evaluation = questionsMap.q2;
+          payload.writingEvaluation.question3Evaluation = questionsMap.q3;
 
-          // Save persistent record of completion in localStorage
+          payload.scoresBreakdown.q1 = (questionsMap.q1.status === 'evaluated' && typeof questionsMap.q1.score === 'number') ? questionsMap.q1.score : null;
+          payload.scoresBreakdown.q2 = (questionsMap.q2.status === 'evaluated' && typeof questionsMap.q2.score === 'number') ? questionsMap.q2.score : null;
+          payload.scoresBreakdown.q3 = (questionsMap.q3.status === 'evaluated' && typeof questionsMap.q3.score === 'number') ? questionsMap.q3.score : null;
+          this.evalScores.q1 = payload.scoresBreakdown.q1;
+          this.evalScores.q2 = payload.scoresBreakdown.q2;
+          this.evalScores.q3 = payload.scoresBreakdown.q3;
+
+          let summary = null;
+          try {
+            summary = window.GeminiAIService.buildEvaluationSummary(questionsMap);
+          } catch (sumErr) {
+            console.error('[GeminiAI] Rubric validation error while summarizing:', sumErr.message);
+          }
+
+          if (summary && summary.status === 'evaluated') {
+            payload.writingEvaluation.totalScore = summary.totalScore;
+            payload.writingEvaluation.summary = summary;
+            payload.writingEvaluation.status = 'evaluated';
+            payload.writingStatus = 'evaluated';
+            payload.writingScore = summary.totalScore;
+            payload.scoresBreakdown.writing = summary.totalScore;
+            payload.totalScore = summary.totalScore;
+            payload.finalScoreOutOf10 = summary.totalScore;
+            payload.aiEvaluation = summary;
+            this.evalScores.writing = summary.totalScore;
+            console.log(`[GeminiAI] All 3 questions evaluated independently! Final total: ${summary.totalScore}/10`);
+          } else {
+            const hasFailed = qKeys.some(k => questionsMap[k]?.status === 'failed');
+            payload.writingEvaluation.totalScore = null;
+            payload.writingEvaluation.summary = null;
+            payload.writingEvaluation.status = hasFailed ? 'partial_error' : 'pending';
+            payload.writingStatus = hasFailed ? 'grading_failed' : 'pending_teacher_grading';
+            payload.writingScore = null;
+            payload.scoresBreakdown.writing = null;
+            payload.totalScore = null;
+            payload.finalScoreOutOf10 = null;
+            this.evalScores.writing = null;
+          }
+
+          this.lastSavedEvaluation = payload;
+          this.saveEvaluationSession();
+
+          // Step 3: Persist updated independent grades + summary to Firestore
+          if (window.FirebaseService) {
+            try {
+              await window.FirebaseService.saveEvaluation(docId, payload);
+            } catch (saveErr) {
+              console.error('[Firebase] Error saving AI evaluation results:', saveErr);
+            }
+          }
+
+          // Clear in-progress session cleanly once completed & fully evaluated
+          if (payload.writingStatus === 'evaluated') {
+            this.clearEvaluationSession();
+          }
+
           try {
             localStorage.setItem('ecripro_eval_completed_' + studentId, JSON.stringify({
               docId,
               submittedAt: payload.submittedAt,
-              autoScore: autoScore,
               writingScore: payload.writingScore,
               writingStatus: payload.writingStatus,
               totalScore: payload.totalScore
@@ -16758,7 +17215,7 @@ showJourney2EndCelebration() {
       loadEvaluationActivity() {
         const EVAL_POPUPS = [
           {
-            src: 'evalution/first.png',
+            src: 'evalution/id.png',
             type: 'profile',
             fields: [
               { id: 'id', label: 'ID', left: 56.0, top: 48.5, width: 35.5, height: 6.0, placeholder: 'Ex: 1042', required: true },
@@ -16770,197 +17227,28 @@ showJourney2EndCelebration() {
           },
           {
             src: 'evalution/1.png',
-            type: 'situation',
-            options: [
-              {
-                id: 'school',
-                title: "Vive l'école !",
-                left: 21.5,
-                top: 36.5,
-                width: 36.2,
-                height: 53.5,
-                checkbox: { left: 25.8, top: 69.8, width: 5.1, height: 4.8 },
-                correct: true
-              },
-              {
-                id: 'baby',
-                title: "Bienvenue dans la famille !",
-                left: 58.2,
-                top: 36.0,
-                width: 39.1,
-                height: 54.7,
-                checkbox: { left: 62.2, top: 69.0, width: 5.4, height: 4.9 },
-                correct: true
-              }
-            ],
-            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+            type: 'eval_question',
+            questionKey: 'q1',
+            questionNumber: 1,
+            placeholder: "Écris ta réponse ici... (Ex : Les élèves vont à...)",
+            writingBox: { left: 21.0, top: 69.2, width: 72.0, height: 22.8, lineHeightRatio: 0.055, fontSizeRatio: 0.029 }
           },
           {
             src: 'evalution/2.png',
-            type: 'mcq',
-            category: 'character',
-            options: [
-              {
-                id: 'eleve',
-                title: "Une élève",
-                left: 10.3,
-                top: 39.0,
-                width: 26.8,
-                height: 38.7,
-                checkbox: { left: 14.3, top: 69.1, width: 5.4, height: 5.2 },
-                correct: true
-              },
-              {
-                id: 'maitresse',
-                title: "La maîtresse",
-                left: 37.9,
-                top: 38.6,
-                width: 29.7,
-                height: 39.4,
-                checkbox: { left: 40.5, top: 69.5, width: 5.5, height: 5.3 },
-                correct: false
-              },
-              {
-                id: 'directeur',
-                title: "Le directeur",
-                left: 67.6,
-                top: 38.4,
-                width: 28.0,
-                height: 39.3,
-                checkbox: { left: 69.7, top: 69.7, width: 5.5, height: 5.0 },
-                correct: false
-              }
-            ],
-            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+            type: 'eval_question',
+            questionKey: 'q2',
+            questionNumber: 2,
+            placeholder: "Écris ta réponse ici... (Ex : Ils se mettent en rang...)",
+            writingBox: { left: 20.8, top: 67.4, width: 72.2, height: 22.5, lineHeightRatio: 0.053, fontSizeRatio: 0.029 }
           },
           {
             src: 'evalution/3.png',
-            type: 'mcq',
-            category: 'place',
-            options: [
-              {
-                id: 'ecole',
-                title: "L'école",
-                left: 10.4,
-                top: 36.7,
-                width: 27.7,
-                height: 41.4,
-                checkbox: { left: 13.6, top: 68.7, width: 6.7, height: 5.8 },
-                correct: true
-              },
-              {
-                id: 'maternite',
-                title: "La maternité",
-                left: 38.6,
-                top: 37.0,
-                width: 29.4,
-                height: 41.6,
-                checkbox: { left: 40.8, top: 68.7, width: 6.1, height: 4.9 },
-                correct: false
-              },
-              {
-                id: 'plage',
-                title: "La plage",
-                left: 68.9,
-                top: 37.4,
-                width: 27.2,
-                height: 40.7,
-                checkbox: { left: 70.7, top: 69.1, width: 6.3, height: 5.2 },
-                correct: false
-              }
-            ],
-            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
-          },
-          {
-            src: 'evalution/4.png',
-            type: 'mcq',
-            category: 'time',
-            options: [
-              {
-                id: 'rentree',
-                title: "Le premier jour d'école",
-                left: 11.5,
-                top: 35.1,
-                width: 29.9,
-                height: 41.5,
-                checkbox: { left: 14.6, top: 65.2, width: 6.3, height: 5.8 },
-                correct: true
-              },
-              {
-                id: 'nuit',
-                title: "La nuit",
-                left: 41.4,
-                top: 35.0,
-                width: 28.0,
-                height: 41.9,
-                checkbox: { left: 44.5, top: 65.8, width: 6.6, height: 5.3 },
-                correct: false
-              },
-              {
-                id: 'vacances',
-                title: "Pendant les vacances",
-                left: 69.6,
-                top: 35.0,
-                width: 27.5,
-                height: 41.4,
-                checkbox: { left: 71.0, top: 65.7, width: 6.5, height: 5.3 },
-                correct: false
-              }
-            ],
-            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
-          },
-          {
-            src: 'evalution/5.png',
-            type: 'chronology',
-            columns: [
-              {
-                id: 'entre',
-                text: 'Elle entre dans la classe.',
-                left: 8.2,
-                top: 35.1,
-                width: 21.9,
-                height: 45.4,
-                circle: { left: 7.7, top: 33.8, width: 8.0, height: 7.8 },
-                expectedStep: 3
-              },
-              {
-                id: 'commence',
-                text: 'Elle commence une activité.',
-                left: 30.6,
-                top: 34.6,
-                width: 22.0,
-                height: 46.7,
-                circle: { left: 30.0, top: 33.2, width: 8.6, height: 8.4 },
-                expectedStep: 4
-              },
-              {
-                id: 'arrive',
-                text: "L'élève arrive devant l'école.",
-                left: 53.3,
-                top: 35.7,
-                width: 21.7,
-                height: 46.0,
-                circle: { left: 52.7, top: 32.9, width: 8.9, height: 8.7 },
-                expectedStep: 1
-              },
-              {
-                id: 'rencontre',
-                text: 'Elle rencontre ses camarades.',
-                left: 75.9,
-                top: 35.3,
-                width: 22.4,
-                height: 45.7,
-                circle: { left: 77.1, top: 32.9, width: 8.4, height: 8.2 },
-                expectedStep: 2
-              }
-            ],
-            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
-          },
-          {
-            src: 'evalution/6.png',
-            type: 'writing',
-            writingBox: { left: 39.5, top: 23.5, width: 54.0, height: 58.0 },
-            valBtnPos: { left: 50.0, top: 92.5, width: 22.0, height: 7.5 }
+            type: 'eval_question',
+            questionKey: 'q3',
+            questionNumber: 3,
+            isFinalQuestion: true,
+            placeholder: "Écris ta réponse ici... (Ex : La nouvelle élève se présente...)",
+            writingBox: { left: 21.0, top: 69.0, width: 72.0, height: 22.8, lineHeightRatio: 0.055, fontSizeRatio: 0.029 }
           },
           {
             src: 'evalution/pop up end.png',
@@ -16973,10 +17261,13 @@ showJourney2EndCelebration() {
         container.innerHTML = '';
 
         if (!this.evalAnswers) {
-          this.evalAnswers = { profile: null, situation: null, character: null, place: null, time: null, chronology: [], text: '' };
+          this.evalAnswers = { profile: null, q1: '', q2: '', q3: '', text: '' };
         }
         if (!this.evalScores) {
-          this.evalScores = { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null };
+          this.evalScores = { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null, q1: null, q2: null, q3: null };
+        }
+        if (!this.evalQuestionResults) {
+          this.evalQuestionResults = { q1: null, q2: null, q3: null };
         }
         this.evalScore = this.computeAutoScore();
         this.saveEvaluationSession();
@@ -16990,10 +17281,10 @@ showJourney2EndCelebration() {
         if (!activity) return;
 
         const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; user-select: none;';
+        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; user-select: none;';
 
         const imgContainer = document.createElement('div');
-        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 85vh;';
+        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 75vh;';
 
         const bgImg = document.createElement('img');
         bgImg.src = activity.src;
@@ -17009,7 +17300,6 @@ showJourney2EndCelebration() {
         });
         ro.observe(bgImg);
 
-        // Default chime sound for every interaction inside evaluation (as requested by user)
         const playEvalClickSound = () => {
           try {
             const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.evalAudioCtx = window.evalAudioCtx || new (window.AudioContext || window.webkitAudioContext)());
@@ -17031,38 +17321,11 @@ showJourney2EndCelebration() {
         };
         window.playEvalClickSound = playEvalClickSound;
 
-        // Top Navigation: Back and Home buttons
-        const btnBack = document.createElement('div');
-        btnBack.style.cssText = 'position: absolute; top: 10.5%; left: 10.5%; width: 7%; height: 7%; transform: translate(-50%, -50%); cursor: pointer; border-radius: 50%; z-index: 100; transition: transform 0.15s ease;';
-        btnBack.setAttribute('title', 'Retour');
-        btnBack.onmouseenter = () => btnBack.style.transform = 'translate(-50%, -50%) scale(1.12)';
-        btnBack.onmouseleave = () => btnBack.style.transform = 'translate(-50%, -50%) scale(1)';
-        btnBack.onclick = () => {
-          playEvalClickSound();
-          if (this.currentExIndex > 0) {
-            this.currentExIndex--;
-            this.loadEvaluationActivity();
-          } else {
-            this.close();
-          }
-        };
-        imgContainer.appendChild(btnBack);
-
-        const btnHome = document.createElement('div');
-        btnHome.style.cssText = 'position: absolute; top: 10.5%; left: 88.5%; width: 7%; height: 7%; transform: translate(-50%, -50%); cursor: pointer; border-radius: 50%; z-index: 100; transition: transform 0.15s ease;';
-        btnHome.setAttribute('title', 'Retour à la carte');
-        btnHome.onmouseenter = () => btnHome.style.transform = 'translate(-50%, -50%) scale(1.12)';
-        btnHome.onmouseleave = () => btnHome.style.transform = 'translate(-50%, -50%) scale(1)';
-        btnHome.onclick = () => {
-          this.close();
-        };
-        imgContainer.appendChild(btnHome);
-
         // Explicit Close 'X' Button on top-right of evaluation screen
         const btnClose = document.createElement('button');
         btnClose.id = 'eval-close-x-btn';
         btnClose.innerHTML = '✖';
-        btnClose.setAttribute('title', 'Quitter l\'évaluation et revenir à la carte');
+        btnClose.setAttribute('title', "Quitter l'évaluation et revenir à la carte");
         btnClose.setAttribute('aria-label', 'Fermer');
         btnClose.style.cssText = 'position: fixed; top: 18px; right: 22px; width: 44px; height: 44px; border-radius: 50%; background: #ff4757; color: white; border: 3px solid white; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.35); z-index: 999999; transition: transform 0.15s ease, background 0.15s ease; outline: none;';
         btnClose.onmouseenter = () => { btnClose.style.transform = 'scale(1.12)'; btnClose.style.background = '#e03242'; };
@@ -17074,24 +17337,30 @@ showJourney2EndCelebration() {
         };
         wrapper.appendChild(btnClose);
 
-        // Feedback message element
+        // Feedback / progress banner element
         const feedbackEl = document.createElement('div');
-        feedbackEl.style.cssText = 'position: absolute; bottom: 1%; left: 50%; transform: translateX(-50%); font-family: sans-serif; font-weight: bold; font-size: 15px; color: #dc2626; background: rgba(255,255,255,0.95); padding: 6px 16px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; z-index: 90; text-align: center; white-space: nowrap;';
-        imgContainer.appendChild(feedbackEl);
+        feedbackEl.id = 'eval-feedback-banner';
+        feedbackEl.style.cssText = 'position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 15px; color: #1e293b; background: rgba(255,255,255,0.97); padding: 10px 20px; border-radius: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.22); border: 2px solid #cbd5e1; display: none; z-index: 999999; text-align: center; white-space: nowrap;';
+        wrapper.appendChild(feedbackEl);
 
-        const showFeedback = (msg) => {
+        let feedbackTimer = null;
+        const showFeedback = (msg, options = {}) => {
+          if (feedbackTimer) clearTimeout(feedbackTimer);
           feedbackEl.textContent = msg;
+          feedbackEl.style.color = options.isProgress ? '#1d4ed8' : '#dc2626';
+          feedbackEl.style.borderColor = options.isProgress ? '#93c5fd' : '#fca5a5';
           feedbackEl.style.display = 'block';
           feedbackEl.animate([
-            { transform: 'translateX(-50%) scale(0.9)', opacity: 0 },
+            { transform: 'translateX(-50%) scale(0.92)', opacity: 0 },
             { transform: 'translateX(-50%) scale(1)', opacity: 1 }
-          ], { duration: 200 });
-          setTimeout(() => {
-            feedbackEl.style.display = 'none';
-          }, 3200);
+          ], { duration: 180 });
+          if (!options.persistent) {
+            feedbackTimer = setTimeout(() => {
+              feedbackEl.style.display = 'none';
+            }, 3400);
+          }
         };
 
-        // Render Activity Content by Type
         let validateFn = null;
 
         if (activity.type === 'profile') {
@@ -17113,12 +17382,10 @@ showJourney2EndCelebration() {
               inp.style.background = 'rgba(37, 99, 235, 0.08)';
               inp.style.boxShadow = '0 0 0 2px rgba(37, 99, 235, 0.35)';
             };
-
             inp.onblur = () => {
               inp.style.background = 'transparent';
               inp.style.boxShadow = 'none';
             };
-
             inp.oninput = () => {
               inp.style.border = 'none';
               inp.style.background = 'rgba(37, 99, 235, 0.08)';
@@ -17149,7 +17416,6 @@ showJourney2EndCelebration() {
             imgContainer.appendChild(inp);
           });
 
-          // Focus first empty input automatically
           setTimeout(() => {
             const firstEmpty = activity.fields.find(f => !inputEls[f.id].value.trim());
             if (firstEmpty && inputEls[firstEmpty.id]) {
@@ -17198,7 +17464,6 @@ showJourney2EndCelebration() {
             } catch(e) {}
             this.saveEvaluationSession();
 
-            // Immediately register the student in Firebase Firestore online!
             this.submitEvaluationToFirestore('started').catch(err => {
               console.warn('[Firebase] Initial student sync notice:', err);
             });
@@ -17206,443 +17471,178 @@ showJourney2EndCelebration() {
             return true;
           };
 
-        } else if (activity.type === 'situation') {
-          let selectedOptId = this.evalAnswers.situation || null;
-
-          const updateSituationSelection = (optId) => {
-            selectedOptId = optId;
-            this.evalAnswers.situation = optId;
-            this.evalScores.situation = 10;
-            this.evalScore = this.computeAutoScore();
-            this.saveEvaluationSession();
-            activity.options.forEach(opt => {
-              const cardEl = document.getElementById('eval-sit-card-' + opt.id);
-              const tickEl = document.getElementById('eval-sit-tick-' + opt.id);
-              if (opt.id === optId) {
-                if (cardEl) {
-                  cardEl.style.border = '3.5px solid #22c55e';
-                  cardEl.style.backgroundColor = 'rgba(34, 197, 94, 0.08)';
-                  cardEl.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.25)';
-                  cardEl.style.transform = 'scale(1.015)';
-                }
-                if (tickEl) {
-                  tickEl.style.display = 'flex';
-                  tickEl.animate([
-                    { transform: 'scale(0) rotate(-15deg)' },
-                    { transform: 'scale(1.25) rotate(5deg)' },
-                    { transform: 'scale(1) rotate(0deg)' }
-                  ], { duration: 250, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
-                }
-              } else {
-                if (cardEl) {
-                  cardEl.style.border = '3.5px solid transparent';
-                  cardEl.style.backgroundColor = 'transparent';
-                  cardEl.style.boxShadow = 'none';
-                  cardEl.style.transform = 'scale(1)';
-                }
-                if (tickEl) {
-                  tickEl.style.display = 'none';
-                }
-              }
-            });
-          };
-
-          activity.options.forEach(opt => {
-            // Card / Image clickable area (Image 1 or Image 2)
-            const cardEl = document.createElement('div');
-            cardEl.id = 'eval-sit-card-' + opt.id;
-            cardEl.style.cssText = 'position: absolute; left: ' + opt.left + '%; top: ' + opt.top + '%; width: ' + opt.width + '%; height: ' + opt.height + '%; cursor: pointer; border-radius: 20px; transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); box-sizing: border-box; border: 3.5px solid transparent; z-index: 10;';
-
-            cardEl.onmouseenter = () => {
-              if (selectedOptId !== opt.id) {
-                cardEl.style.transform = 'scale(1.015)';
-                cardEl.style.backgroundColor = 'rgba(59, 130, 246, 0.06)';
-              }
-            };
-            cardEl.onmouseleave = () => {
-              if (selectedOptId !== opt.id) {
-                cardEl.style.transform = 'scale(1)';
-                cardEl.style.backgroundColor = 'transparent';
-              }
-            };
-
-            cardEl.onclick = () => { playEvalClickSound(); updateSituationSelection(opt.id); };
-            imgContainer.appendChild(cardEl);
-
-            // Checkbox tick container (Box 3 or Box 4)
-            const boxEl = document.createElement('div');
-            boxEl.id = 'eval-sit-box-' + opt.id;
-            boxEl.style.cssText = 'position: absolute; left: ' + opt.checkbox.left + '%; top: ' + opt.checkbox.top + '%; width: ' + opt.checkbox.width + '%; height: ' + opt.checkbox.height + '%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 25; border-radius: 8px;';
-
-            const tickEl = document.createElement('div');
-            tickEl.id = 'eval-sit-tick-' + opt.id;
-            tickEl.style.cssText = 'width: 100%; height: 100%; display: none; align-items: center; justify-content: center; pointer-events: none;';
-            tickEl.innerHTML = '<svg viewBox="0 0 24 24" style="width: 85%; height: 85%; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));"><path d="M4 12.5 L9.5 18 L20 5.5" fill="none" stroke="#16a34a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-            boxEl.appendChild(tickEl);
-            boxEl.onclick = (e) => {
-              e.stopPropagation();
+          // Overlay Valider button on profile card bottom
+          if (activity.valBtnPos) {
+            const btnWrapper = document.createElement('div');
+            btnWrapper.style.cssText = 'position: absolute; left: ' + activity.valBtnPos.left + '%; top: ' + activity.valBtnPos.top + '%; transform: translate(-50%, -50%); z-index: 80;';
+            const vbtn = document.createElement('img');
+            vbtn.src = 'journe 1/valider.png';
+            vbtn.style.cssText = 'width: calc(var(--img-width) * 0.22); height: auto; cursor: pointer; display: block; transition: transform 0.15s ease, filter 0.15s ease;';
+            vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
+            vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'brightness(1)'; };
+            vbtn.onclick = () => {
               playEvalClickSound();
-              updateSituationSelection(opt.id);
+              if (validateFn && validateFn()) {
+                vbtn.style.pointerEvents = 'none';
+                this.currentExIndex++;
+                this.loadEvaluationActivity();
+              }
             };
-            boxEl.onmouseenter = () => {
-              if (selectedOptId !== opt.id) cardEl.style.transform = 'scale(1.015)';
-            };
-            boxEl.onmouseleave = () => {
-              if (selectedOptId !== opt.id) cardEl.style.transform = 'scale(1)';
-            };
-
-            imgContainer.appendChild(boxEl);
-          });
-
-          // Restore previously chosen selection if any
-          if (selectedOptId) {
-            setTimeout(() => updateSituationSelection(selectedOptId), 40);
+            btnWrapper.appendChild(vbtn);
+            imgContainer.appendChild(btnWrapper);
           }
 
-          validateFn = () => {
-            if (!selectedOptId) {
-              showFeedback("💡 Clique sur une image ou coche pour faire ton choix !");
-              return false;
-            }
-            this.evalAnswers.situation = selectedOptId;
-            this.evalScores.situation = 10;
-            this.evalScore = this.computeAutoScore();
-            this.saveEvaluationSession();
-            return true;
-          };
+          wrapper.appendChild(imgContainer);
 
-        } else if (activity.type === 'mcq') {
-          let selectedOptId = this.evalAnswers[activity.category] || null;
+        } else if (activity.type === 'eval_question') {
+          const qKey = activity.questionKey;
+          const wb = activity.writingBox;
 
-          const updateMcqSelection = (optId) => {
-            selectedOptId = optId;
-            const chosen = activity.options.find(o => o.id === optId);
-            this.evalAnswers[activity.category] = optId;
-            this.evalScores[activity.category] = (chosen && chosen.correct) ? 10 : 0;
-            this.evalScore = this.computeAutoScore();
-            this.saveEvaluationSession();
-            activity.options.forEach(opt => {
-              const cardEl = document.getElementById('eval-mcq-card-' + opt.id);
-              const tickEl = document.getElementById('eval-mcq-tick-' + opt.id);
-              if (opt.id === optId) {
-                if (cardEl) {
-                  cardEl.style.border = '3.5px solid #22c55e';
-                  cardEl.style.backgroundColor = 'rgba(34, 197, 94, 0.08)';
-                  cardEl.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.25)';
-                  cardEl.style.transform = 'scale(1.015)';
-                }
-                if (tickEl) {
-                  tickEl.style.display = 'flex';
-                  tickEl.animate([
-                    { transform: 'scale(0) rotate(-15deg)' },
-                    { transform: 'scale(1.25) rotate(5deg)' },
-                    { transform: 'scale(1) rotate(0deg)' }
-                  ], { duration: 250, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
-                }
-              } else {
-                if (cardEl) {
-                  cardEl.style.border = '3.5px solid transparent';
-                  cardEl.style.backgroundColor = 'transparent';
-                  cardEl.style.boxShadow = 'none';
-                  cardEl.style.transform = 'scale(1)';
-                }
-                if (tickEl) {
-                  tickEl.style.display = 'none';
-                }
-              }
-            });
-          };
-
-          activity.options.forEach(opt => {
-            // Card / Image clickable area
-            const cardEl = document.createElement('div');
-            cardEl.id = 'eval-mcq-card-' + opt.id;
-            cardEl.style.cssText = 'position: absolute; left: ' + opt.left + '%; top: ' + opt.top + '%; width: ' + opt.width + '%; height: ' + opt.height + '%; cursor: pointer; border-radius: 18px; transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); box-sizing: border-box; border: 3.5px solid transparent; z-index: 10;';
-
-            cardEl.onmouseenter = () => {
-              if (selectedOptId !== opt.id) {
-                cardEl.style.transform = 'scale(1.015)';
-                cardEl.style.backgroundColor = 'rgba(59, 130, 246, 0.06)';
-              }
-            };
-            cardEl.onmouseleave = () => {
-              if (selectedOptId !== opt.id) {
-                cardEl.style.transform = 'scale(1)';
-                cardEl.style.backgroundColor = 'transparent';
-              }
-            };
-
-            cardEl.onclick = () => { playEvalClickSound(); updateMcqSelection(opt.id); };
-            imgContainer.appendChild(cardEl);
-
-            // Checkbox tick container if defined
-            if (opt.checkbox) {
-              const boxEl = document.createElement('div');
-              boxEl.id = 'eval-mcq-box-' + opt.id;
-              boxEl.style.cssText = 'position: absolute; left: ' + opt.checkbox.left + '%; top: ' + opt.checkbox.top + '%; width: ' + opt.checkbox.width + '%; height: ' + opt.checkbox.height + '%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 25; border-radius: 8px;';
-
-              const tickEl = document.createElement('div');
-              tickEl.id = 'eval-mcq-tick-' + opt.id;
-              tickEl.style.cssText = 'width: 100%; height: 100%; display: none; align-items: center; justify-content: center; pointer-events: none;';
-              tickEl.innerHTML = '<svg viewBox="0 0 24 24" style="width: 85%; height: 85%; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));"><path d="M4 12.5 L9.5 18 L20 5.5" fill="none" stroke="#16a34a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-              boxEl.appendChild(tickEl);
-              boxEl.onclick = (e) => {
-                e.stopPropagation();
-                playEvalClickSound();
-                updateMcqSelection(opt.id);
-              };
-              boxEl.onmouseenter = () => {
-                if (selectedOptId !== opt.id) cardEl.style.transform = 'scale(1.015)';
-              };
-              boxEl.onmouseleave = () => {
-                if (selectedOptId !== opt.id) cardEl.style.transform = 'scale(1)';
-              };
-
-              imgContainer.appendChild(boxEl);
-            }
-          });
-
-          // Restore previously chosen selection if any
-          if (selectedOptId) {
-            setTimeout(() => updateMcqSelection(selectedOptId), 40);
-          }
-
-          validateFn = () => {
-            if (!selectedOptId) {
-              const hintWord = activity.category === 'character' ? 'un personnage' : (activity.category === 'place' ? 'un lieu' : (activity.category === 'time' ? 'un moment' : 'une image'));
-              showFeedback("💡 Clique sur " + hintWord + " ou coche pour faire ton choix !");
-              return false;
-            }
-            const chosen = activity.options.find(o => o.id === selectedOptId);
-            this.evalAnswers[activity.category] = chosen.id;
-            this.evalScores[activity.category] = (chosen && chosen.correct) ? 10 : 0;
-            this.evalScore = this.computeAutoScore();
-            this.saveEvaluationSession();
-            if (chosen.correct) {
-              return true;
-            } else {
-              showFeedback("💡 Observe bien les images et réessaie !");
-              return false;
-            }
-          };
-
-        } else if (activity.type === 'chronology') {
-          const selectedOrder = (this.evalAnswers.chronology && Array.isArray(this.evalAnswers.chronology)) ? [...this.evalAnswers.chronology] : [];
-
-          const updateChronologyDisplay = () => {
-            activity.columns.forEach(col => {
-              const colEl = document.getElementById('eval-col-' + col.id);
-              const badgeEl = document.getElementById('eval-col-badge-' + col.id);
-              const pos = selectedOrder.indexOf(col.id);
-              if (pos !== -1) {
-                const step = pos + 1;
-                if (badgeEl) {
-                  badgeEl.textContent = step;
-                  badgeEl.style.display = 'flex';
-                }
-                if (colEl) {
-                  colEl.style.border = '3.5px solid #3b82f6';
-                  colEl.style.backgroundColor = 'rgba(59, 130, 246, 0.08)';
-                  colEl.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.2)';
-                }
-              } else {
-                if (badgeEl) {
-                  badgeEl.style.display = 'none';
-                }
-                if (colEl) {
-                  colEl.style.border = '3.5px solid transparent';
-                  colEl.style.backgroundColor = 'transparent';
-                  colEl.style.boxShadow = 'none';
-                }
-              }
-            });
-          };
-
-          const handleColClick = (colId) => {
-            const idx = selectedOrder.indexOf(colId);
-            if (idx !== -1) {
-              selectedOrder.splice(idx, 1);
-            } else {
-              if (selectedOrder.length >= 4) return;
-              selectedOrder.push(colId);
-              setTimeout(() => {
-                const badgeEl = document.getElementById('eval-col-badge-' + colId);
-                if (badgeEl) {
-                  badgeEl.animate([
-                    { transform: 'scale(0) rotate(-20deg)' },
-                    { transform: 'scale(1.25) rotate(5deg)' },
-                    { transform: 'scale(1) rotate(0deg)' }
-                  ], { duration: 240, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
-                }
-              }, 10);
-            }
-            updateChronologyDisplay();
-          };
-
-          activity.columns.forEach(col => {
-            // Card clickable area
-            const colEl = document.createElement('div');
-            colEl.id = 'eval-col-' + col.id;
-            colEl.style.cssText = 'position: absolute; left: ' + col.left + '%; top: ' + col.top + '%; width: ' + col.width + '%; height: ' + col.height + '%; cursor: pointer; border-radius: 18px; box-sizing: border-box; border: 3.5px solid transparent; transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 15;';
-
-            colEl.onmouseenter = () => {
-              if (!selectedOrder.includes(col.id)) {
-                colEl.style.transform = 'scale(1.015)';
-                colEl.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
-              }
-            };
-            colEl.onmouseleave = () => {
-              if (!selectedOrder.includes(col.id)) {
-                colEl.style.transform = 'scale(1)';
-                colEl.style.backgroundColor = 'transparent';
-              }
-            };
-            colEl.onclick = () => { playEvalClickSound(); handleColClick(col.id); };
-            imgContainer.appendChild(colEl);
-
-            // Circle badge container exactly at user circle coords
-            const circleCoords = col.circle || { left: col.left, top: col.top, width: 8, height: 8 };
-            const badge = document.createElement('div');
-            badge.id = 'eval-col-badge-' + col.id;
-            badge.style.cssText = 'position: absolute; left: ' + circleCoords.left + '%; top: ' + circleCoords.top + '%; width: ' + circleCoords.width + '%; height: ' + circleCoords.height + '%; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; border: 3px solid white; display: none; align-items: center; justify-content: center; font-family: "Nunito", "Segoe UI", sans-serif; font-size: clamp(20px, 2.8vw, 38px); font-weight: 900; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.45); cursor: pointer; z-index: 30; user-select: none;';
-            badge.onclick = (e) => {
-              e.stopPropagation();
-              playEvalClickSound();
-              handleColClick(col.id);
-            };
-            imgContainer.appendChild(badge);
-          });
-
-          // Restore previously chosen sequence if any
-          if (selectedOrder.length > 0) {
-            setTimeout(() => updateChronologyDisplay(), 40);
-          }
-
-          validateFn = () => {
-            if (selectedOrder.length !== 4) {
-              showFeedback("💡 Clique sur les 4 images dans l'ordre chronologique (1 à 4) !");
-              return false;
-            }
-            const isCorrect = this.isChronologyCorrect(selectedOrder);
-            this.evalAnswers.chronology = [...selectedOrder];
-            this.evalScores.chronology = isCorrect ? 10 : 0;
-            this.evalScore = this.computeAutoScore();
-            this.saveEvaluationSession();
-            if (isCorrect) {
-              return true;
-            } else {
-              showFeedback('💡 Observe bien le déroulement de la rentrée et réessaie !');
-              return false;
-            }
-          };
-
-        } else if (activity.type === 'writing') {
-          // Notebook lined textarea
-          const textWrapper = document.createElement('div');
-          textWrapper.style.cssText = 'position: absolute; left: ' + activity.writingBox.left + '%; top: ' + activity.writingBox.top + '%; width: ' + activity.writingBox.width + '%; height: ' + activity.writingBox.height + '%; display: flex; flex-direction: column; z-index: 50;';
-
+          // Transparent textarea aligned precisely over the 4 dotted lines inside the white answer card
           const textarea = document.createElement('textarea');
-          textarea.style.cssText = 'width: 100%; height: 85%; background: transparent; border: none; outline: none; resize: none; font-family: "Segoe UI", "Comic Sans MS", cursive, sans-serif; font-size: clamp(14px, 1.7vw, 22px); font-weight: 600; line-height: clamp(34px, 4.3vh, 56px); color: #1e3a8a; padding: 6px 12px; box-sizing: border-box;';
-          textarea.placeholder = "C'est le premier jour d'école. L'élève arrive dans la cour de l'école...";
-          textarea.value = this.evalAnswers.text || '';
+          textarea.id = 'eval-textarea-' + qKey;
+          textarea.style.cssText = [
+            'position: absolute',
+            `left: ${wb.left}%`,
+            `top: ${wb.top}%`,
+            `width: ${wb.width}%`,
+            `height: ${wb.height}%`,
+            'background: transparent',
+            'border: none',
+            'outline: none',
+            'resize: none',
+            'font-family: "Nunito", "Segoe UI", "Comic Sans MS", sans-serif',
+            `font-size: calc(var(--img-height, 600px) * ${wb.fontSizeRatio})`,
+            'font-weight: 700',
+            `line-height: calc(var(--img-height, 600px) * ${wb.lineHeightRatio})`,
+            'color: #1e3a8a',
+            'padding: calc(var(--img-height, 600px) * 0.008) 10px 0 10px',
+            'box-sizing: border-box',
+            'z-index: 50',
+            'overflow-y: auto'
+          ].join('; ') + ';';
+          textarea.placeholder = activity.placeholder || "Écris ta réponse ici...";
+          textarea.value = (this.evalAnswers && this.evalAnswers[qKey]) ? this.evalAnswers[qKey] : '';
 
-          const counter = document.createElement('div');
-          counter.style.cssText = 'height: 15%; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-family: sans-serif; font-size: 13px; font-weight: bold; color: #475569; background: rgba(255, 255, 255, 0.7); border-radius: 8px;';
-          
-          const updateCounters = () => {
-            const val = textarea.value.trim();
-            const sentenceCount = val ? val.split(/[.!?]+/).filter(s => s.trim().length > 0).length : 0;
-            const wordCount = val ? val.split(/\s+/).filter(w => w.trim().length > 0).length : 0;
-            counter.innerHTML = '<span>✍️ ' + sentenceCount + (sentenceCount > 1 ? ' phrases écrites' : ' phrase écrite') + ' (au moins 3)</span><span>📝 ' + wordCount + (wordCount > 1 ? ' mots' : ' mot') + '</span>';
-            if (sentenceCount >= 3) {
-              counter.style.color = '#15803d';
-            } else {
-              counter.style.color = '#475569';
-            }
+          textarea.onfocus = () => {
+            textarea.style.background = 'rgba(59, 130, 246, 0.04)';
+            textarea.style.borderRadius = '12px';
+          };
+          textarea.onblur = () => {
+            textarea.style.background = 'transparent';
           };
 
-          textarea.addEventListener('input', updateCounters);
-          updateCounters();
+          const wordCountBadge = document.createElement('div');
+          wordCountBadge.style.cssText = 'font-family: "Nunito", "Segoe UI", sans-serif; font-size: 14px; font-weight: 800; color: #334155; background: rgba(255,255,255,0.92); padding: 6px 14px; border-radius: 20px; border: 2px solid #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,0.12);';
 
-          textWrapper.appendChild(textarea);
-          textWrapper.appendChild(counter);
-          imgContainer.appendChild(textWrapper);
+          const updateWordBadge = () => {
+            const val = textarea.value.trim();
+            const words = this.getWordCount(val);
+            const qCfg = window.EVALUATION_RUBRIC_CONFIG ? window.EVALUATION_RUBRIC_CONFIG.questions[qKey] : null;
+            const maxLabel = qCfg ? ` • Barème : /${qCfg.maxScore} pts` : '';
+            wordCountBadge.textContent = `✍️ Question ${activity.questionNumber}/3 • ${words} ${words > 1 ? 'mots' : 'mot'}${maxLabel}`;
+          };
 
           textarea.addEventListener('input', () => {
-            this.evalAnswers.text = textarea.value;
+            this.evalAnswers[qKey] = textarea.value;
             this.saveEvaluationSession();
+            updateWordBadge();
           });
+          updateWordBadge();
+
+          imgContainer.appendChild(textarea);
+          wrapper.appendChild(imgContainer);
+
+          // Focus textarea smoothly
+          setTimeout(() => textarea.focus(), 120);
 
           validateFn = () => {
             const val = textarea.value.trim();
-            const sentenceCount = this.getSentenceCount(val);
-            if (sentenceCount < 3) {
-              showFeedback('💡 Écris au moins 3 phrases complètes pour raconter ton histoire !');
+            if (val.length < 2) {
+              showFeedback("💡 Écris ta réponse pour la question " + activity.questionNumber + " avant de valider !");
+              textarea.focus();
               return false;
             }
-            this.evalAnswers.text = val;
-            this.evalScores.writing = null; // Teacher grading pending (target 10 points)
-            this.evalScore = this.computeAutoScore();
+            this.evalAnswers[qKey] = val;
             this.saveEvaluationSession();
             return true;
           };
-        }
 
-        // Valider button
-        if (activity.valBtnPos) {
-          const btnWrapper = document.createElement('div');
-          btnWrapper.style.cssText = 'position: absolute; left: ' + activity.valBtnPos.left + '%; top: ' + activity.valBtnPos.top + '%; transform: translate(-50%, -50%); z-index: 80;';
+          // Clean action bar BELOW the card image so the 4th dotted line and mascot are never covered
+          const actionBar = document.createElement('div');
+          actionBar.style.cssText = 'display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; z-index: 80; padding: 2px 10px;';
+
+          if (this.currentExIndex > 0) {
+            const backPill = document.createElement('button');
+            backPill.type = 'button';
+            backPill.textContent = '⬅ Précédent';
+            backPill.style.cssText = 'padding: 10px 18px; border-radius: 9999px; border: 2px solid #fff; background: rgba(51, 65, 85, 0.9); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.15s ease;';
+            backPill.onmouseenter = () => { backPill.style.transform = 'scale(1.05)'; };
+            backPill.onmouseleave = () => { backPill.style.transform = 'scale(1)'; };
+            backPill.onclick = () => {
+              if (this._evalSubmitting) return;
+              playEvalClickSound();
+              this.currentExIndex--;
+              this.loadEvaluationActivity();
+            };
+            actionBar.appendChild(backPill);
+          }
+
+          actionBar.appendChild(wordCountBadge);
 
           const vbtn = document.createElement('img');
+          vbtn.id = 'eval-valider-btn-' + qKey;
           vbtn.src = 'journe 1/valider.png';
-          vbtn.style.cssText = 'width: calc(var(--img-width) * 0.22); height: auto; cursor: pointer; display: block; transition: transform 0.15s ease, filter 0.15s ease;';
-
-          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
-          vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'brightness(1)'; };
+          vbtn.alt = 'Valider';
+          vbtn.style.cssText = 'height: clamp(46px, 7.2vh, 64px); width: auto; cursor: pointer; display: block; transition: transform 0.15s ease, filter 0.15s ease; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));';
+          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.06)'; vbtn.style.filter = 'brightness(1.08) drop-shadow(0 6px 14px rgba(0,0,0,0.3))'; };
+          vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'drop-shadow(0 4px 10px rgba(0,0,0,0.25))'; };
 
           vbtn.onclick = async () => {
             playEvalClickSound();
-            if (validateFn && validateFn()) {
-              if (activity.type === 'profile') {
-                vbtn.style.pointerEvents = 'none';
-                this.currentExIndex++;
-                this.loadEvaluationActivity();
-              } else if (activity.type === 'writing') {
-                if (this._evalSubmitting) return; // Prevent accidental duplicate submissions
-                this._evalSubmitting = true;
-                vbtn.style.pointerEvents = 'none';
-                vbtn.style.opacity = '0.6';
-                vbtn.style.cursor = 'wait';
-                showFeedback("⏳ Évaluation de ton texte avec l'IA...");
+            if (!(validateFn && validateFn())) return;
 
-                try {
-                  await this.submitEvaluationToFirestore();
-                } catch (e) {
-                  console.warn('Submission notice:', e);
-                } finally {
-                  this._evalSubmitting = false;
-                }
+            if (activity.isFinalQuestion) {
+              if (this._evalSubmitting) return; // Prevent accidental duplicate submission
+              this._evalSubmitting = true;
+              vbtn.style.pointerEvents = 'none';
+              vbtn.style.opacity = '0.6';
+              vbtn.style.cursor = 'wait';
+              showFeedback("⏳ Enregistrement et correction de la question 1/3...", { persistent: true, isProgress: true });
 
-                this.currentExIndex++;
-                this.loadEvaluationActivity();
-              } else {
-                vbtn.style.pointerEvents = 'none';
-                // Sync intermediate answers to Firestore in background
-                this.submitEvaluationToFirestore('in_progress').catch(err => {
-                  console.warn('[Firebase] Intermediate sync notice:', err);
+              try {
+                await this.submitEvaluationToFirestore('completed', {
+                  onProgress: (step, total) => {
+                    showFeedback(`⏳ Correction IA indépendante : question ${step}/${total}...`, { persistent: true, isProgress: true });
+                  }
                 });
-                this.showEvaluationSuccessPopup();
+              } catch (e) {
+                console.warn('Final evaluation submission notice:', e);
+              } finally {
+                this._evalSubmitting = false;
+                if (feedbackTimer) clearTimeout(feedbackTimer);
+                feedbackEl.style.display = 'none';
               }
+
+              this.currentExIndex++;
+              this.loadEvaluationActivity();
+            } else {
+              vbtn.style.pointerEvents = 'none';
+              // Persist intermediate answer asynchronously to Firestore, then advance directly Q1 -> Q2 -> Q3
+              this.submitEvaluationToFirestore('in_progress').catch(err => {
+                console.warn('[Firebase] Intermediate sync notice:', err);
+              });
+              this.currentExIndex++;
+              this.loadEvaluationActivity();
             }
           };
 
-          btnWrapper.appendChild(vbtn);
-          imgContainer.appendChild(btnWrapper);
+          actionBar.appendChild(vbtn);
+          wrapper.appendChild(actionBar);
+        } else {
+          wrapper.appendChild(imgContainer);
         }
 
-        wrapper.appendChild(imgContainer);
         container.appendChild(wrapper);
       },
 
@@ -17942,32 +17942,27 @@ showJourney2EndCelebration() {
         });
       },
 
-      showEvaluationEndCelebration() {
+      async showEvaluationEndCelebration() {
         const container = document.getElementById('exercise-content-area');
         if (!container) return;
         container.innerHTML = '';
 
-        // Play celebration audio
-        try {
-          if (window.evalCurrentAudio) {
-            window.evalCurrentAudio.pause();
-            window.evalCurrentAudio = null;
-          }
-          window.evalCurrentAudio = new Audio(encodeURI('contiuer/Felicitation.mp3'));
-          window.evalCurrentAudio.play().catch(() => {});
-        } catch(e) {}
+        const fmtScore = (n) => {
+          if (typeof n !== 'number' || Number.isNaN(n)) return '--';
+          const r = Math.round((n + Number.EPSILON) * 100) / 100;
+          return Number.isInteger(r) ? String(r) : String(r);
+        };
 
         const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; user-select: none;';
+        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; user-select: none; padding: 10px; box-sizing: border-box;';
 
         const imgContainer = document.createElement('div');
-        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 85vh;';
+        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 62vh;';
 
         const bgImg = document.createElement('img');
         bgImg.src = 'evalution/pop up end.png';
         bgImg.draggable = false;
-        bgImg.style.cssText = 'display: block; max-width: 95vw; max-height: 75vh; width: auto; height: auto;';
-
+        bgImg.style.cssText = 'display: block; max-width: 95vw; max-height: 62vh; width: auto; height: auto;';
         imgContainer.appendChild(bgImg);
 
         const ro = new ResizeObserver(() => {
@@ -17977,31 +17972,32 @@ showJourney2EndCelebration() {
         });
         ro.observe(bgImg);
 
-        // Final score inside designated box (left: 43.5%, top: 61.2%, width: 10.1%, height: 11.6%)
-        const saved = this.lastSavedEvaluation;
-        let points = 10;
-        if (saved && typeof saved.totalScore === 'number' && saved.writingStatus === 'evaluated') {
-          points = Math.round(saved.totalScore / 6);
-        } else if (saved && typeof saved.autoScore === 'number') {
-          points = saved.autoScore > 10 ? Math.round(saved.autoScore / 5) : saved.autoScore;
-        } else if (typeof this.evalScore === 'number') {
-          points = this.evalScore > 10 ? Math.round(this.evalScore / 5) : this.evalScore;
-        }
-        points = Math.min(10, Math.max(0, points));
-
+        // Score displayed inside the designated box on pop up end.png (positioned neatly above baked-in underline)
         const scoreBox = document.createElement('div');
         scoreBox.id = 'eval-final-score-box';
-        scoreBox.style.cssText = 'position: absolute; left: 43.5%; top: 60.5%; width: 10.1%; height: 11.6%; display: flex; align-items: center; justify-content: center; z-index: 50; pointer-events: none; user-select: none; font-family: "Segoe UI", "Nunito", Arial, sans-serif; font-weight: 900; font-size: clamp(30px, calc(var(--img-height, 600px) * 0.11), 80px); color: #3b1b49; line-height: 1;';
-        scoreBox.textContent = points;
+        scoreBox.style.cssText = 'position: absolute; left: 43.2%; top: 58.6%; width: 10.6%; height: 10.0%; display: flex; align-items: center; justify-content: center; z-index: 50; pointer-events: none; user-select: none; font-family: "Segoe UI", "Nunito", Arial, sans-serif; font-weight: 900; font-size: clamp(26px, calc(var(--img-height, 550px) * 0.105), 72px); color: #3b1b49; line-height: 1;';
+        scoreBox.textContent = '...';
         imgContainer.appendChild(scoreBox);
 
-        // Finish button at bottom
-        const finishBtn = document.createElement('button');
-        finishBtn.textContent = "TERMINER L'ÉVALUATION";
-        finishBtn.style.cssText = 'position: absolute; bottom: 4%; left: 50%; transform: translateX(-50%); padding: 12px 32px; background: linear-gradient(135deg, #10b981, #059669); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(14px, 1.8vw, 20px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4); cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease; z-index: 100;';
-        finishBtn.onmouseenter = () => { finishBtn.style.transform = 'translateX(-50%) scale(1.05)'; finishBtn.style.filter = 'brightness(1.1)'; };
-        finishBtn.onmouseleave = () => { finishBtn.style.transform = 'translateX(-50%) scale(1)'; finishBtn.style.filter = 'brightness(1)'; };
+        wrapper.appendChild(imgContainer);
 
+        // Per-question breakdown panel strictly reflecting saved Firestore values
+        const breakdownCard = document.createElement('div');
+        breakdownCard.id = 'eval-results-breakdown';
+        breakdownCard.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; background: rgba(255, 255, 255, 0.94); padding: 10px 18px; border-radius: 18px; border: 2px solid #cbd5e1; box-shadow: 0 6px 20px rgba(0,0,0,0.18); font-family: "Nunito", "Segoe UI", sans-serif; max-width: 92vw; z-index: 90;';
+        breakdownCard.innerHTML = '<span style="font-weight:800; color:#1e40af;">⏳ Chargement des scores depuis Firebase...</span>';
+        wrapper.appendChild(breakdownCard);
+
+        // Bottom controls row (Detail/Retry + Terminer)
+        const controlsRow = document.createElement('div');
+        controlsRow.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; z-index: 100;';
+
+        const finishBtn = document.createElement('button');
+        finishBtn.id = 'eval-finish-btn';
+        finishBtn.textContent = "TERMINER L'ÉVALUATION";
+        finishBtn.style.cssText = 'padding: 11px 28px; background: linear-gradient(135deg, #10b981, #059669); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(14px, 1.6vw, 18px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4); cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease;';
+        finishBtn.onmouseenter = () => { finishBtn.style.transform = 'scale(1.05)'; finishBtn.style.filter = 'brightness(1.1)'; };
+        finishBtn.onmouseleave = () => { finishBtn.style.transform = 'scale(1)'; finishBtn.style.filter = 'brightness(1)'; };
         finishBtn.onclick = () => {
           if (typeof playEvalClickSound === 'function') playEvalClickSound();
           if (window.evalCurrentAudio) {
@@ -18010,13 +18006,220 @@ showJourney2EndCelebration() {
           }
           this.close();
         };
-        imgContainer.appendChild(finishBtn);
+        controlsRow.appendChild(finishBtn);
 
-        wrapper.appendChild(imgContainer);
+        wrapper.appendChild(controlsRow);
         container.appendChild(wrapper);
 
-        // Confetti fireworks
-        this.triggerEvaluationFireworks();
+        // Authoritative score retrieval from Firestore (no hardcoded scores, no Gemini call on load)
+        const docId = this.lastEvalDocId || this.getEvaluationDocId();
+        let fsDoc = null;
+        let fetchFailed = false;
+
+        if (window.FirebaseService && typeof window.FirebaseService.getEvaluation === 'function') {
+          try {
+            const readRes = await window.FirebaseService.getEvaluation(docId);
+            if (readRes && readRes.success && readRes.exists && readRes.data) {
+              fsDoc = readRes.data;
+            } else if (!readRes || !readRes.success) {
+              fetchFailed = true;
+            }
+          } catch (readErr) {
+            console.warn('[Results] Error retrieving evaluation from Firestore:', readErr);
+            fetchFailed = true;
+          }
+        } else {
+          fetchFailed = true;
+        }
+
+        const writingEval = fsDoc && fsDoc.writingEvaluation ? fsDoc.writingEvaluation : null;
+        const qMap = writingEval && writingEval.questions ? writingEval.questions : {};
+        const qKeys = ['q1', 'q2', 'q3'];
+        const rubric = window.EVALUATION_RUBRIC_CONFIG;
+
+        const qStates = qKeys.map((k, idx) => {
+          const entry = qMap[k] || {};
+          const cfgMax = rubric && rubric.questions[k] ? rubric.questions[k].maxScore : 0;
+          const maxScore = (typeof entry.maxScore === 'number' && entry.maxScore > 0) ? entry.maxScore : cfgMax;
+          const isEvaluated = entry.status === 'evaluated' && typeof entry.score === 'number' && !Number.isNaN(entry.score) && entry.score >= 0 && entry.score <= maxScore;
+          return {
+            key: k,
+            num: idx + 1,
+            entry,
+            maxScore,
+            isEvaluated,
+            status: entry.status || (fetchFailed ? 'error' : 'pending')
+          };
+        });
+
+        const maxSum = Math.round((qStates.reduce((acc, q) => acc + q.maxScore, 0) + Number.EPSILON) * 100) / 100;
+        const allEvaluated = !fetchFailed && qStates.every(q => q.isEvaluated) && Math.abs(maxSum - 10) <= 0.01;
+
+        breakdownCard.innerHTML = '';
+        qStates.forEach(q => {
+          const pill = document.createElement('div');
+          const bg = q.isEvaluated ? '#ecfdf5' : (q.status === 'failed' || fetchFailed ? '#fef2f2' : '#fffbeb');
+          const border = q.isEvaluated ? '#6ee7b7' : (q.status === 'failed' || fetchFailed ? '#fca5a5' : '#fcd34d');
+          const txtColor = q.isEvaluated ? '#065f46' : (q.status === 'failed' || fetchFailed ? '#991b1b' : '#92400e');
+          pill.style.cssText = `padding: 6px 12px; border-radius: 12px; background: ${bg}; border: 1.5px solid ${border}; color: ${txtColor}; font-size: clamp(12px, 1.3vw, 15px); font-weight: 800;`;
+          const valText = q.isEvaluated
+            ? `${fmtScore(q.entry.score)} / ${fmtScore(q.maxScore)}`
+            : (q.status === 'failed' ? '⚠️ Échec correction' : '⏳ En attente');
+          pill.textContent = `Question ${q.num} : ${valText}`;
+          breakdownCard.appendChild(pill);
+        });
+
+        if (allEvaluated) {
+          // Compute overall total strictly as sum of the 3 saved Firebase question scores
+          const overallTotal = Math.round((qStates.reduce((acc, q) => acc + q.entry.score, 0) + Number.EPSILON) * 100) / 100;
+          const totalDisplay = fmtScore(overallTotal);
+
+          scoreBox.style.fontSize = totalDisplay.length >= 3
+            ? 'clamp(20px, calc(var(--img-height, 550px) * 0.078), 50px)'
+            : 'clamp(28px, calc(var(--img-height, 550px) * 0.105), 72px)';
+          scoreBox.textContent = totalDisplay;
+
+          const totalPill = document.createElement('div');
+          totalPill.style.cssText = 'padding: 6px 14px; border-radius: 12px; background: #eff6ff; border: 2px solid #3b82f6; color: #1e3a8a; font-size: clamp(13px, 1.4vw, 16px); font-weight: 900;';
+          totalPill.textContent = `Total : ${totalDisplay} / 10`;
+          breakdownCard.appendChild(totalPill);
+
+          // Detail modal button
+          const detailBtn = document.createElement('button');
+          detailBtn.id = 'eval-details-btn';
+          detailBtn.textContent = '📋 Voir la correction détaillée';
+          detailBtn.style.cssText = 'padding: 11px 22px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(13px, 1.4vw, 16px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 18px rgba(29, 78, 216, 0.35); cursor: pointer; transition: transform 0.15s ease;';
+          detailBtn.onmouseenter = () => { detailBtn.style.transform = 'scale(1.05)'; };
+          detailBtn.onmouseleave = () => { detailBtn.style.transform = 'scale(1)'; };
+          detailBtn.onclick = () => {
+            if (typeof playEvalClickSound === 'function') playEvalClickSound();
+            this.openEvaluationDetailsModal(fsDoc, overallTotal);
+          };
+          controlsRow.insertBefore(detailBtn, finishBtn);
+
+          // Play celebration audio & fireworks when all questions are evaluated
+          try {
+            if (window.evalCurrentAudio) {
+              window.evalCurrentAudio.pause();
+              window.evalCurrentAudio = null;
+            }
+            window.evalCurrentAudio = new Audio(encodeURI('contiuer/Felicitation.mp3'));
+            window.evalCurrentAudio.play().catch(() => {});
+          } catch(e) {}
+          this.triggerEvaluationFireworks();
+        } else {
+          // Incomplete, failed, or unreachable Firestore read: NEVER fabricate a total score
+          scoreBox.style.fontSize = 'clamp(22px, calc(var(--img-height, 550px) * 0.085), 56px)';
+          scoreBox.textContent = '--';
+
+          const warnPill = document.createElement('div');
+          warnPill.style.cssText = 'padding: 6px 14px; border-radius: 12px; background: #fef2f2; border: 2px solid #ef4444; color: #991b1b; font-size: clamp(12px, 1.3vw, 15px); font-weight: 800;';
+          warnPill.textContent = fetchFailed
+            ? '⚠️ Impossible de charger les notes depuis Firebase'
+            : '⏳ Note globale non calculée : correction incomplète';
+          breakdownCard.appendChild(warnPill);
+
+          const retryBtn = document.createElement('button');
+          retryBtn.id = 'eval-retry-grading-btn';
+          retryBtn.textContent = '🔄 Réessayer la correction';
+          retryBtn.style.cssText = 'padding: 11px 22px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(13px, 1.4vw, 16px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 18px rgba(217, 119, 6, 0.35); cursor: pointer;';
+          retryBtn.onclick = async () => {
+            if (this._evalRetrying) return;
+            this._evalRetrying = true;
+            retryBtn.disabled = true;
+            retryBtn.textContent = '⏳ Correction en cours...';
+            try {
+              if (fsDoc) {
+                if (!this.evalAnswers.profile && fsDoc.studentId) {
+                  this.evalAnswers.profile = {
+                    id: fsDoc.studentId,
+                    nom: fsDoc.studentNom || '',
+                    prenom: fsDoc.studentPrenom || '',
+                    classe: fsDoc.studentClasse || ''
+                  };
+                }
+                if (fsDoc.answers) {
+                  this.evalAnswers.q1 = fsDoc.answers.q1 || this.evalAnswers.q1 || '';
+                  this.evalAnswers.q2 = fsDoc.answers.q2 || this.evalAnswers.q2 || '';
+                  this.evalAnswers.q3 = fsDoc.answers.q3 || this.evalAnswers.q3 || '';
+                }
+                this.evalQuestionResults = qMap || this.evalQuestionResults;
+              }
+              await this.submitEvaluationToFirestore('completed');
+            } catch (err) {
+              console.warn('[Retry] Grading retry error:', err);
+            } finally {
+              this._evalRetrying = false;
+            }
+            this.showEvaluationEndCelebration();
+          };
+          controlsRow.insertBefore(retryBtn, finishBtn);
+        }
+      },
+
+      openEvaluationDetailsModal(fsDoc, overallTotal) {
+        const prev = document.getElementById('eval-details-modal');
+        if (prev) prev.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'eval-details-modal';
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(5px); z-index: 9999999; display: flex; align-items: center; justify-content: center; padding: 18px; box-sizing: border-box;';
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background: #ffffff; border-radius: 22px; max-width: 780px; width: 100%; max-height: 86vh; overflow-y: auto; padding: 22px 26px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); font-family: "Nunito", "Segoe UI", sans-serif; color: #1e293b;';
+
+        const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        const writingEval = (fsDoc && fsDoc.writingEvaluation) || {};
+        const questions = writingEval.questions || {};
+        const headerHtml = `
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
+            <div>
+              <h2 style="margin:0; font-size:20px; color:#1e3a8a;">📋 Correction détaillée — Total : ${escapeHtml(overallTotal)} / 10</h2>
+              <div style="font-size:13px; color:#64748b; margin-top:4px;">Élève : ${escapeHtml(fsDoc.studentPrenom || '')} ${escapeHtml(fsDoc.studentNom || '')} (${escapeHtml(fsDoc.studentClasse || '')})</div>
+            </div>
+            <button id="eval-details-close" style="width:36px; height:36px; border-radius:50%; border:none; background:#ef4444; color:#fff; font-weight:bold; cursor:pointer; font-size:16px;">✖</button>
+          </div>`;
+
+        const cardsHtml = ['q1', 'q2', 'q3'].map((k, idx) => {
+          const q = questions[k] || {};
+          const critOrder = ['C1', 'C3', 'C6', 'C7'];
+          const orderedCrits = Object.values(q.criteria || {}).sort((a, b) => critOrder.indexOf(a.code) - critOrder.indexOf(b.code));
+          const critHtml = orderedCrits.map(c =>
+            `<div style="font-size:13px; margin:4px 0;">• <strong>${escapeHtml(c.code)} — ${escapeHtml(c.name)} :</strong> <span style="color:#1d4ed8; font-weight:800;">${escapeHtml(c.score)} / ${escapeHtml(c.max)}</span>${c.justification ? ` — ${escapeHtml(c.justification)}` : ''}</div>`
+          ).join('');
+          const indOrder = ['C2', 'C4', 'C5'];
+          const orderedInds = Object.values(q.indicators || {}).sort((a, b) => indOrder.indexOf(a.code) - indOrder.indexOf(b.code));
+          const indHtml = orderedInds.map(ind =>
+            `<span style="display:inline-block; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:3px 8px; font-size:12px; margin:2px 4px 2px 0;"><strong>${escapeHtml(ind.code)} (${escapeHtml(ind.name)}) :</strong> ${escapeHtml(ind.level)}${ind.observation ? ` — ${escapeHtml(ind.observation)}` : ''}</span>`
+          ).join('');
+          const mistakesHtml = (q.mistakes || []).length
+            ? `<div style="margin-top:6px; font-size:13px; color:#991b1b;"><strong>Erreurs relevées :</strong><ul style="margin:4px 0 0 18px; padding:0;">${q.mistakes.map(m => `<li>« ${escapeHtml(m.original)} » → <strong>${escapeHtml(m.correction)}</strong> (${escapeHtml(m.explanation)})</li>`).join('')}</ul></div>`
+            : '';
+
+          return `
+            <div style="border:2px solid #dbeafe; border-radius:16px; padding:14px 16px; margin-bottom:14px; background:#f8fafc;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong style="font-size:16px; color:#0f172a;">Question ${idx + 1} : ${escapeHtml(q.questionText || '')}</strong>
+                <span style="background:#dbeafe; color:#1e40af; padding:4px 12px; border-radius:9999px; font-weight:900;">${escapeHtml(q.score)} / ${escapeHtml(q.maxScore)}</span>
+              </div>
+              <div style="background:#fff; border:1px solid #cbd5e1; border-radius:10px; padding:8px 12px; margin-bottom:8px; font-size:14px;">
+                <strong>Ta réponse :</strong> « ${escapeHtml(q.answer || '')} »
+              </div>
+              ${critHtml}
+              <div style="margin-top:6px;">${indHtml}</div>
+              ${mistakesHtml}
+              ${q.suggestedCorrection ? `<div style="margin-top:6px; font-size:13px; color:#065f46;"><strong>Exemple de correction :</strong> « ${escapeHtml(q.suggestedCorrection)} »</div>` : ''}
+              ${q.feedback ? `<div style="margin-top:6px; font-size:13px; color:#334155;"><strong>Avis du maître :</strong> ${escapeHtml(q.feedback)}</div>` : ''}
+            </div>`;
+        }).join('');
+
+        card.innerHTML = headerHtml + cardsHtml;
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        document.getElementById('eval-details-close').onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
       },
 
       triggerEvaluationFireworks() {
