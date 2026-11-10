@@ -3832,6 +3832,23 @@ ${criteriaSchema}
         introducedLevels: []
       },
 
+      isLevelUnlocked(levelOrId) {
+        const id = typeof levelOrId === 'object' && levelOrId !== null ? levelOrId.id : levelOrId;
+        const name = typeof levelOrId === 'object' && levelOrId !== null ? levelOrId.name : null;
+        if (id >= 1 && id <= 8) {
+          return id <= this.state.unlockedLevel;
+        }
+        // Evaluation (id 10 / Layer_7) unlocks only after completing all 8 preceding journeys (unlockedLevel >= 9)
+        if (id === 10 || name === 'Layer_7') {
+          return this.state.unlockedLevel >= 9;
+        }
+        return false;
+      },
+
+      getActiveTargetLevelId() {
+        return this.state.unlockedLevel >= 9 ? 10 : this.state.unlockedLevel;
+      },
+
       init() {
         this.loadProgress();
         this.renderMap();
@@ -3840,7 +3857,7 @@ ${criteriaSchema}
         this.updateVisuals(false);
 
         // Zoom toward the currently unlocked location
-        const targetLevel = MAP_LEVELS.find(l => l.id === this.state.unlockedLevel);
+        const targetLevel = MAP_LEVELS.find(l => l.id === this.getActiveTargetLevelId());
         if (targetLevel) {
           MapCamera.focusOn(targetLevel, 1.8, 2600);
           setTimeout(() => {
@@ -3866,6 +3883,21 @@ ${criteriaSchema}
 
       saveProgress() {
         localStorage.setItem('tunisiaMapProgress', JSON.stringify(this.state));
+      },
+
+      advanceAfterCompletion(completedLevelId) {
+        const nextLevelId = (Number(completedLevelId) || 1) + 1;
+        this.state.unlockedLevel = Math.max(this.state.unlockedLevel || 1, nextLevelId);
+        this.saveProgress();
+        this.updateVisuals(false);
+        const focusId = nextLevelId >= 9 ? 10 : nextLevelId;
+        const targetLevel = MAP_LEVELS.find(l => l.id === focusId);
+        if (targetLevel) {
+          MapCamera.focusOn(targetLevel, 1.8, 2000);
+          setTimeout(() => {
+            this.updateVisuals(true);
+          }, 2100);
+        }
       },
 
       renderMap() {
@@ -3906,12 +3938,13 @@ ${criteriaSchema}
       updateVisuals(showArrow = true) {
         const arrow = document.getElementById('tutorial-arrow');
         let arrowTarget = null;
+        const activeTargetId = this.getActiveTargetLevelId();
 
         MAP_LEVELS.forEach(level => {
           const overlay = document.getElementById("overlay-" + level.id);
           const hitbox = document.getElementById("hitbox-" + level.id);
 
-          const isUnlocked = (level.id <= 8 && level.id <= this.state.unlockedLevel) || level.id === 10 || level.name === 'Layer_7';
+          const isUnlocked = this.isLevelUnlocked(level);
           const isIntroduced = this.state.introducedLevels.includes(level.id);
 
           if (overlay) {
@@ -3927,7 +3960,7 @@ ${criteriaSchema}
             hitbox.style.pointerEvents = (level.id <= 8 || level.id === 10 || level.name === 'Layer_7') ? "auto" : "none";
           }
 
-          if (isUnlocked && !isIntroduced && level.id === this.state.unlockedLevel) {
+          if (isUnlocked && !isIntroduced && level.id === activeTargetId) {
             arrowTarget = level;
           }
         });
@@ -3943,7 +3976,7 @@ ${criteriaSchema}
       },
 
       handleLevelClick(levelId) {
-        if ((levelId > 8 || levelId > this.state.unlockedLevel) && levelId !== 10) {
+        if (!this.isLevelUnlocked(levelId)) {
           return;
         }
 
@@ -4052,7 +4085,7 @@ ${criteriaSchema}
       },
 
       startAdventureDramaticZoom() {
-        const targetLevel = MAP_LEVELS.find(l => l.id === this.state.unlockedLevel);
+        const targetLevel = MAP_LEVELS.find(l => l.id === this.getActiveTargetLevelId());
         if (targetLevel) {
           MapCamera.focusOn(targetLevel, 2.5, 3000);
           setTimeout(() => {
@@ -7064,16 +7097,7 @@ ${criteriaSchema}
 
       finishJourney6() {
         this.close();
-        MapSystem.state.unlockedLevel = window.currentSelectedLevel + 1;
-        MapSystem.saveProgress();
-        MapSystem.updateVisuals(false);
-        const targetLevel = MAP_LEVELS.find(l => l.id === MapSystem.state.unlockedLevel);
-        if (targetLevel) {
-          MapCamera.focusOn(targetLevel, 1.8, 2000);
-          setTimeout(() => {
-            MapSystem.updateVisuals(true);
-          }, 2100);
-        }
+        MapSystem.advanceAfterCompletion(window.currentSelectedLevel || 6);
       },
 
       loadJourney7Activity() {
@@ -10914,16 +10938,7 @@ ${criteriaSchema}
 
       finishJourney1() {
         this.close();
-        MapSystem.state.unlockedLevel = window.currentSelectedLevel + 1;
-        MapSystem.saveProgress();
-        MapSystem.updateVisuals(false);
-        const targetLevel = MAP_LEVELS.find(l => l.id === MapSystem.state.unlockedLevel);
-        if (targetLevel) {
-          MapCamera.focusOn(targetLevel, 1.8, 2000);
-          setTimeout(() => {
-            MapSystem.updateVisuals(true);
-          }, 2100);
-        }
+        MapSystem.advanceAfterCompletion(window.currentSelectedLevel || 1);
       },
 
 
@@ -11756,16 +11771,7 @@ ${criteriaSchema}
 
       finishJourney2() {
         this.close();
-        MapSystem.state.unlockedLevel = window.currentSelectedLevel + 1;
-        MapSystem.saveProgress();
-        MapSystem.updateVisuals(false);
-        const targetLevel = MAP_LEVELS.find(l => l.id === MapSystem.state.unlockedLevel);
-        if (targetLevel) {
-          MapCamera.focusOn(targetLevel, 1.8, 2000);
-          setTimeout(() => {
-            MapSystem.updateVisuals(true);
-          }, 2100);
-        }
+        MapSystem.advanceAfterCompletion(window.currentSelectedLevel || 2);
       },
 showJourney2SuccessPopup() {
 
@@ -14867,16 +14873,7 @@ showJourney2EndCelebration() {
 
       finishJourney3() {
         this.close();
-        MapSystem.state.unlockedLevel = window.currentSelectedLevel + 1;
-        MapSystem.saveProgress();
-        MapSystem.updateVisuals(false);
-        const targetLevel = MAP_LEVELS.find(l => l.id === MapSystem.state.unlockedLevel);
-        if (targetLevel) {
-          MapCamera.focusOn(targetLevel, 1.8, 2000);
-          setTimeout(() => {
-            MapSystem.updateVisuals(true);
-          }, 2100);
-        }
+        MapSystem.advanceAfterCompletion(window.currentSelectedLevel || 3);
       },
 
       loadJourney4Activity() {
@@ -16160,16 +16157,7 @@ showJourney2EndCelebration() {
 
       finishJourney4() {
         this.close();
-        MapSystem.state.unlockedLevel = window.currentSelectedLevel + 1;
-        MapSystem.saveProgress();
-        MapSystem.updateVisuals(false);
-        const targetLevel = MAP_LEVELS.find(l => l.id === MapSystem.state.unlockedLevel);
-        if (targetLevel) {
-          MapCamera.focusOn(targetLevel, 1.8, 2000);
-          setTimeout(() => {
-            MapSystem.updateVisuals(true);
-          }, 2100);
-        }
+        MapSystem.advanceAfterCompletion(window.currentSelectedLevel || 4);
       },
 
       loadJourney5Activity() {
@@ -17669,16 +17657,7 @@ showJourney2EndCelebration() {
 
       finishJourney5() {
         this.close();
-        MapSystem.state.unlockedLevel = window.currentSelectedLevel + 1;
-        MapSystem.saveProgress();
-        MapSystem.updateVisuals(false);
-        const targetLevel = MAP_LEVELS.find(l => l.id === MapSystem.state.unlockedLevel);
-        if (targetLevel) {
-          MapCamera.focusOn(targetLevel, 1.8, 2000);
-          setTimeout(() => {
-            MapSystem.updateVisuals(true);
-          }, 2100);
-        }
+        MapSystem.advanceAfterCompletion(window.currentSelectedLevel || 5);
       },
 
       loadExercise() {
