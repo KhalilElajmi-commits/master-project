@@ -18015,6 +18015,186 @@ showJourney2EndCelebration() {
         container.appendChild(wrapper);
       },
 
+      /**
+       * Creates and attaches a fullscreen canvas fireworks controller to a modal element.
+       * Exposes start() and stop() so callers can trigger bursts conditionally (e.g. score >= 6).
+       */
+      createModalFireworksController(modal) {
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        const initTimers = [];
+        let isRunning = false;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 300;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const playFireworkBurstSound = () => {
+          try {
+            const audioCtx = (window.SoundSystem && window.SoundSystem.ctx) ||
+              (window.evalAudioCtx = window.evalAudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            const chime = audioCtx.createOscillator();
+            const chimeGain = audioCtx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(audioCtx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible || particles.length > MAX_PARTICLES) return;
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x, y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const stop = () => {
+          isRunning = false;
+          while (initTimers.length) clearTimeout(initTimers.pop());
+          if (burstTimer) { clearTimeout(burstTimer); burstTimer = null; }
+          if (animId) { cancelAnimationFrame(animId); animId = null; }
+          particles = [];
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+
+        const loop = () => {
+          if (!isRunning || !modal.isConnected) {
+            stop();
+            return;
+          }
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+
+        const scheduleBurst = () => {
+          if (!isRunning || !modal.isConnected) {
+            stop();
+            return;
+          }
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            createBurst(
+              canvas.width * (0.15 + Math.random() * 0.70),
+              canvas.height * (0.15 + Math.random() * 0.40)
+            );
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId && modal.isConnected) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+
+        const start = () => {
+          if (isRunning) return;
+          isRunning = true;
+          resizeCanvas();
+          window.addEventListener('resize', resizeCanvas);
+          document.addEventListener('visibilitychange', handleVisibilityChange);
+          loop();
+          initTimers.push(setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80));
+          initTimers.push(setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280));
+          initTimers.push(setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480));
+          burstTimer = setTimeout(scheduleBurst, 900);
+        };
+
+        return { start, stop };
+      },
+
       showEvaluationSuccessPopup() {
         if (this._evalShowingSuccess) return;
         this._evalShowingSuccess = true;
@@ -18042,42 +18222,6 @@ showJourney2EndCelebration() {
 
         const chosenSrc = this.evalSuccessDeck.shift();
         this.lastEvalSuccessCard = chosenSrc;
-
-        // Web Audio synthesized sound generator for fireworks bursts and chimes
-        const playFireworkBurstSound = () => {
-          try {
-            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.evalAudioCtx = window.evalAudioCtx || new (window.AudioContext || window.webkitAudioContext)());
-            if (!ctx) return;
-            if (ctx.state === 'suspended') ctx.resume();
-            const now = ctx.currentTime;
-
-            // Soft celebratory pop sound
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
-            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
-            gain.gain.setValueAtTime(0.12, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 0.16);
-
-            // Twinkling spark chime
-            const chime = ctx.createOscillator();
-            const chimeGain = ctx.createGain();
-            chime.type = 'sine';
-            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
-            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
-            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
-            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
-            chime.connect(chimeGain);
-            chimeGain.connect(ctx.destination);
-            chime.start(now + 0.03);
-            chime.stop(now + 0.32);
-          } catch (e) {}
-        };
 
         // Play specific celebration audio corresponding to the chosen photo
         const AUDIO_MAP = {
@@ -18114,132 +18258,8 @@ showJourney2EndCelebration() {
         modal.id = 'eval-success-modal';
         modal.className = 'j1-success-modal show';
 
-        // Background Fireworks Canvas
-        const canvas = document.createElement('canvas');
-        canvas.id = 'j1-fireworks-canvas';
-        canvas.style.position = 'absolute';
-        canvas.style.top = '0';
-        canvas.style.left = '0';
-        canvas.style.width = '100%';
-        canvas.style.height = '100%';
-        canvas.style.pointerEvents = 'none';
-        canvas.style.zIndex = '1';
-        modal.appendChild(canvas);
-
-        const ctx = canvas.getContext('2d');
-        const resizeCanvas = () => {
-          canvas.width = window.innerWidth;
-          canvas.height = window.innerHeight;
-        };
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-
-        let particles = [];
-        let animId = null;
-        let burstTimer = null;
-        let isRunning = true;
-        let isTabVisible = !document.hidden;
-        const MAX_PARTICLES = 250;
-
-        const palettes = [
-          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
-          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
-          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
-        ];
-
-        const createBurst = (x, y) => {
-          if (!isRunning || !isTabVisible) return;
-          if (particles.length > MAX_PARTICLES) return;
-
-          const palette = palettes[Math.floor(Math.random() * palettes.length)];
-          const particleCount = 38 + Math.floor(Math.random() * 20);
-          for (let i = 0; i < particleCount; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 2.2 + Math.random() * 6.5;
-            particles.push({
-              x: x,
-              y: y,
-              vx: Math.cos(angle) * speed,
-              vy: Math.sin(angle) * speed,
-              size: 2 + Math.random() * 3,
-              color: palette[Math.floor(Math.random() * palette.length)],
-              alpha: 1,
-              decay: 0.015 + Math.random() * 0.018,
-              sparkle: Math.random() > 0.4
-            });
-          }
-          playFireworkBurstSound();
-        };
-
-        const loop = () => {
-          if (!isRunning) return;
-          if (!isTabVisible) {
-            animId = null;
-            return;
-          }
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.vy += 0.06;
-            p.vx *= 0.985;
-            p.vy *= 0.985;
-            p.alpha -= p.decay;
-
-            if (p.alpha <= 0) {
-              particles.splice(i, 1);
-              continue;
-            }
-
-            ctx.save();
-            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
-            ctx.fillStyle = p.color;
-            ctx.shadowColor = p.color;
-            ctx.shadowBlur = 6;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-          }
-          animId = requestAnimationFrame(loop);
-        };
-        loop();
-
-        // Initial burst triplet
-        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
-        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
-        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
-
-        // Continuous festive bursts while card is showing
-        const scheduleBurst = () => {
-          if (!isRunning) return;
-          if (isTabVisible && particles.length < MAX_PARTICLES) {
-            const x = canvas.width * (0.15 + Math.random() * 0.70);
-            const y = canvas.height * (0.15 + Math.random() * 0.40);
-            createBurst(x, y);
-          }
-          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
-        };
-        burstTimer = setTimeout(scheduleBurst, 900);
-
-        const handleVisibilityChange = () => {
-          if (document.hidden) {
-            isTabVisible = false;
-            particles = [];
-            if (animId) {
-              cancelAnimationFrame(animId);
-              animId = null;
-            }
-          } else {
-            isTabVisible = true;
-            particles = [];
-            if (isRunning && !animId) {
-              animId = requestAnimationFrame(loop);
-            }
-          }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        const fireworks = this.createModalFireworksController(modal);
+        fireworks.start();
 
         // Center Celebration Card (exact same sizing and styles as other journeys)
         const cardBox = document.createElement('div');
@@ -18263,7 +18283,6 @@ showJourney2EndCelebration() {
           clicked = true;
           this._evalShowingSuccess = false;
 
-          // Play default chime sound
           if (typeof playEvalClickSound === 'function') {
             playEvalClickSound();
           }
@@ -18288,11 +18307,7 @@ showJourney2EndCelebration() {
           }
 
           setTimeout(() => {
-            isRunning = false;
-            if (burstTimer) clearTimeout(burstTimer);
-            if (animId) cancelAnimationFrame(animId);
-            window.removeEventListener('resize', resizeCanvas);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            fireworks.stop();
             modal.remove();
 
             this.currentExIndex++;
@@ -18305,7 +18320,6 @@ showJourney2EndCelebration() {
         modal.appendChild(cardBox);
         document.body.appendChild(modal);
 
-        // Trigger entrance animation
         requestAnimationFrame(() => {
           modal.classList.add('show');
         });
@@ -18313,8 +18327,10 @@ showJourney2EndCelebration() {
 
       async showEvaluationEndCelebration() {
         const container = document.getElementById('exercise-content-area');
-        if (!container) return;
-        container.innerHTML = '';
+        if (container) container.innerHTML = '';
+
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
 
         const fmtScore = (n) => {
           if (typeof n !== 'number' || Number.isNaN(n)) return '--';
@@ -18322,53 +18338,91 @@ showJourney2EndCelebration() {
           return Number.isInteger(r) ? String(r) : String(r);
         };
 
-        const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; user-select: none; padding: 12px; box-sizing: border-box;';
+        // Fullscreen blurred celebration modal matching other journeys; clicking anywhere exits to the map
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+        modal.style.cursor = 'pointer';
+        modal.setAttribute('title', "Cliquer n'importe où pour retourner à la carte");
 
-        const imgContainer = document.createElement('div');
-        imgContainer.style.cssText = 'position: relative; display: inline-block; max-width: 95vw; max-height: 74vh;';
+        const fireworks = this.createModalFireworksController(modal);
 
-        const bgImg = document.createElement('img');
-        bgImg.src = 'evalution/pop up end.png';
-        bgImg.draggable = false;
-        bgImg.style.cssText = 'display: block; max-width: 95vw; max-height: 74vh; width: auto; height: auto;';
-        imgContainer.appendChild(bgImg);
+        const cardBox = document.createElement('div');
+        cardBox.id = 'eval-end-card-box';
+        cardBox.style.cssText = 'position: relative; display: inline-block; max-width: 92vw; max-height: 84vh; z-index: 10; animation: j1CardPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; cursor: pointer;';
 
-        const ro = new ResizeObserver(() => {
-          const rect = bgImg.getBoundingClientRect();
-          imgContainer.style.setProperty('--img-width', rect.width + 'px');
-          imgContainer.style.setProperty('--img-height', rect.height + 'px');
-        });
-        ro.observe(bgImg);
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = 'evalution/pop up end.png';
+        cardImg.alt = 'Félicitations !';
+        cardImg.draggable = false;
+        cardImg.style.cssText = 'display: block; max-width: 92vw; max-height: 84vh; width: auto; height: auto; filter: drop-shadow(0 20px 45px rgba(0, 0, 0, 0.7));';
+        cardBox.appendChild(cardImg);
+
+        const syncCardSizeVars = () => {
+          const w = cardImg.clientWidth || cardImg.getBoundingClientRect().width;
+          const h = cardImg.clientHeight || cardImg.getBoundingClientRect().height;
+          if (w > 0 && h > 0) {
+            cardBox.style.setProperty('--img-width', w + 'px');
+            cardBox.style.setProperty('--img-height', h + 'px');
+          }
+        };
+        const ro = new ResizeObserver(syncCardSizeVars);
+        ro.observe(cardImg);
+        cardImg.addEventListener('load', syncCardSizeVars);
 
         // Score displayed inside the designated box on pop up end.png (positioned neatly above baked-in underline)
         const scoreBox = document.createElement('div');
         scoreBox.id = 'eval-final-score-box';
         scoreBox.style.cssText = 'position: absolute; left: 43.2%; top: 58.6%; width: 10.6%; height: 10.0%; display: flex; align-items: center; justify-content: center; z-index: 50; pointer-events: none; user-select: none; font-family: "Segoe UI", "Nunito", Arial, sans-serif; font-weight: 900; font-size: clamp(26px, calc(var(--img-height, 550px) * 0.105), 72px); color: #3b1b49; line-height: 1;';
         scoreBox.textContent = '...';
-        imgContainer.appendChild(scoreBox);
+        cardBox.appendChild(scoreBox);
 
-        wrapper.appendChild(imgContainer);
+        let clicked = false;
+        const doFinish = (e) => {
+          if (e) e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
 
-        const finishBtn = document.createElement('button');
-        finishBtn.id = 'eval-finish-btn';
-        finishBtn.type = 'button';
-        finishBtn.textContent = "TERMINER L'ÉVALUATION";
-        finishBtn.style.cssText = 'padding: 12px 32px; background: linear-gradient(135deg, #10b981, #059669); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(14px, 1.6vw, 19px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4); cursor: pointer; transition: transform 0.15s ease, filter 0.15s ease; z-index: 100;';
-        finishBtn.onmouseenter = () => { finishBtn.style.transform = 'scale(1.05)'; finishBtn.style.filter = 'brightness(1.1)'; };
-        finishBtn.onmouseleave = () => { finishBtn.style.transform = 'scale(1)'; finishBtn.style.filter = 'brightness(1)'; };
-        finishBtn.onclick = () => {
-          if (typeof playEvalClickSound === 'function') playEvalClickSound();
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          } else if (typeof playEvalClickSound === 'function') {
+            playEvalClickSound();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
           if (window.evalCurrentAudio) {
-            window.evalCurrentAudio.pause();
+            try {
+              window.evalCurrentAudio.pause();
+              window.evalCurrentAudio.currentTime = 0;
+            } catch (err) {}
             window.evalCurrentAudio = null;
           }
+
+          fireworks.stop();
+          ro.disconnect();
           this.clearActiveEvaluationDraft();
           this.resetInMemoryEvaluationState();
-          this.close();
+
+          setTimeout(() => {
+            modal.remove();
+            this.close();
+          }, 240);
         };
-        wrapper.appendChild(finishBtn);
-        container.appendChild(wrapper);
+
+        cardBox.onclick = doFinish;
+        modal.onclick = doFinish;
+
+        modal.appendChild(cardBox);
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
 
         // Authoritative score retrieval from Firestore (no hardcoded scores, no Gemini call on load)
         const docId = this.lastEvalDocId || this.getEvaluationDocId();
@@ -18390,6 +18444,8 @@ showJourney2EndCelebration() {
         } else {
           fetchFailed = true;
         }
+
+        if (clicked || !modal.isConnected) return;
 
         const effectiveDoc = fsDoc || (this.lastSavedEvaluation && this.lastSavedEvaluation.docId === docId ? this.lastSavedEvaluation : null);
         const writingEval = effectiveDoc && effectiveDoc.writingEvaluation ? effectiveDoc.writingEvaluation : null;
@@ -18422,16 +18478,18 @@ showJourney2EndCelebration() {
             : 'clamp(28px, calc(var(--img-height, 550px) * 0.105), 72px)';
           scoreBox.textContent = totalDisplay;
 
-          // Play celebration audio & fireworks when all questions are evaluated
-          try {
-            if (window.evalCurrentAudio) {
-              window.evalCurrentAudio.pause();
-              window.evalCurrentAudio = null;
-            }
-            window.evalCurrentAudio = new Audio(encodeURI('contiuer/Felicitation.mp3'));
-            window.evalCurrentAudio.play().catch(() => {});
-          } catch(e) {}
-          this.triggerEvaluationFireworks();
+          // Trigger fireworks and celebration audio only when overall score is 6/10 or above
+          if (overallTotal >= 6) {
+            fireworks.start();
+            try {
+              if (window.evalCurrentAudio) {
+                window.evalCurrentAudio.pause();
+                window.evalCurrentAudio = null;
+              }
+              window.evalCurrentAudio = new Audio(encodeURI('contiuer/Felicitation.mp3'));
+              window.evalCurrentAudio.play().catch(() => {});
+            } catch (e) {}
+          }
         } else {
           // Incomplete, failed, or unreachable Firestore read: NEVER fabricate a total score
           scoreBox.style.fontSize = 'clamp(22px, calc(var(--img-height, 550px) * 0.085), 56px)';
@@ -18592,24 +18650,6 @@ showJourney2EndCelebration() {
 
         document.getElementById('eval-details-close').onclick = () => overlay.remove();
         overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
-      },
-
-      triggerEvaluationFireworks() {
-        const colors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-        for (let i = 0; i < 60; i++) {
-          const conf = document.createElement('div');
-          conf.style.cssText = 'position: fixed; width: ' + (8 + Math.random() * 8) + 'px; height: ' + (8 + Math.random() * 8) + 'px; background: ' + colors[Math.floor(Math.random() * colors.length)] + '; border-radius: ' + (Math.random() > 0.5 ? '50%' : '2px') + '; z-index: 99999; top: ' + (15 + Math.random() * 60) + 'vh; left: ' + (15 + Math.random() * 70) + 'vw; pointer-events: none; opacity: 1; transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1), opacity 1.2s ease;';
-          document.body.appendChild(conf);
-
-          setTimeout(() => {
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 60 + Math.random() * 140;
-            conf.style.transform = 'translate(' + (Math.cos(angle) * dist) + 'px, ' + (Math.sin(angle) * dist) + 'px) rotate(' + (Math.random() * 360) + 'deg)';
-            conf.style.opacity = '0';
-          }, 20);
-
-          setTimeout(() => conf.remove(), 1300);
-        }
       }
 
     };
