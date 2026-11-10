@@ -1253,6 +1253,46 @@
       appId: "1:991487211489:web:78ff29222442e9558304a0",
       measurementId: "G-5S0BCJBDK3"
     };
+    window.FIREBASE_APP_CONFIG = firebaseConfig;
+    window.RECAPTCHA_ENTERPRISE_SITE_KEY = '6LdAWhguAAAAANNbg2iJtYw636xDuZT2nB3l9q5E';
+
+    window.configureFirebaseAppCheckEnvironment = function() {
+      const host = (window.location && window.location.hostname) || '';
+      const proto = (window.location && window.location.protocol) || '';
+      const origin = (window.location && window.location.origin) || 'null';
+      const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+      const isFileProtocol = proto === 'file:';
+
+      let appCheckMode = 'recaptcha-enterprise';
+      // Official Firebase App Check debug token mechanism ONLY on local dev hosts when opted in at runtime.
+      // Never embed debug token secrets in code or enable debug mode on production hosts.
+      if (isLocalHost) {
+        try {
+          const urlParams = new URLSearchParams(window.location.search || '');
+          const queryDebug = urlParams.get('appcheck_debug');
+          const storedToken = localStorage.getItem('FIREBASE_APPCHECK_DEBUG_TOKEN') || sessionStorage.getItem('FIREBASE_APPCHECK_DEBUG_TOKEN');
+          if (storedToken && storedToken.trim()) {
+            self.FIREBASE_APPCHECK_DEBUG_TOKEN = storedToken.trim();
+            appCheckMode = 'debug-token-local';
+          } else if (queryDebug === '1' || localStorage.getItem('ecripro_appcheck_debug') === '1') {
+            self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+            appCheckMode = 'debug-token-local';
+          }
+        } catch (e) {}
+      }
+
+      return {
+        projectId: firebaseConfig.projectId,
+        appId: firebaseConfig.appId,
+        siteKey: window.RECAPTCHA_ENTERPRISE_SITE_KEY,
+        hostname: host || '(local-file)',
+        protocol: proto,
+        origin,
+        isLocalHost,
+        isFileProtocol,
+        appCheckMode
+      };
+    };
 
     window.FirebaseService = {
       app: null,
@@ -1261,6 +1301,7 @@
       appCheck: null,
       appCheckToken: null,
       initialized: false,
+      _compatAppCheckActivated: false,
 
       init() {
         if (this.initialized) return;
@@ -1278,19 +1319,20 @@
               }
             } catch(e) {}
 
-            // Initialize Firebase App Check with reCAPTCHA Enterprise provider
+            // Initialize Firebase App Check once on Compat app with reCAPTCHA Enterprise provider
             try {
-              if (typeof firebase.appCheck === 'function') {
-                const siteKey = window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LdAWhguAAAAANNbg2iJtYw636xDuZT2nB3l9q5E';
+              if (typeof firebase.appCheck === 'function' && !this._compatAppCheckActivated) {
+                const env = window.configureFirebaseAppCheckEnvironment();
                 this.appCheck = firebase.appCheck();
                 this.appCheck.activate(
-                  new firebase.appCheck.ReCaptchaEnterpriseProvider(siteKey),
+                  new firebase.appCheck.ReCaptchaEnterpriseProvider(env.siteKey),
                   true
                 );
-                console.log("[FirebaseService] App Check initialized with reCAPTCHA Enterprise provider");
+                this._compatAppCheckActivated = true;
+                console.log(`[FirebaseService] App Check initialized (project: ${env.projectId}, appId: ${env.appId}, mode: ${env.appCheckMode})`);
               }
             } catch (acErr) {
-              console.warn("[FirebaseService] App Check activation note:", acErr.message);
+              console.warn("[FirebaseService] App Check activation note:", acErr.code || '', acErr.message);
             }
 
             this.initialized = true;
@@ -1584,9 +1626,29 @@
     // Validate rubric integrity immediately on load
     validateRubricConfig(window.EVALUATION_RUBRIC_CONFIG);
 
-    let aiModelPromise = null;
+    let modularAppInstance = null;
     let modularAppCheckInstance = null;
+    let aiModelInstance = null;
+    let lastAiDiagnostics = null;
     const inlineImageCache = new Map();
+
+    function extractAppCheckExpiryMetadata(tokenResult) {
+      if (tokenResult && typeof tokenResult.expireTimeMillis === "number" && tokenResult.expireTimeMillis > 0) {
+        return new Date(tokenResult.expireTimeMillis).toISOString();
+      }
+      try {
+        const tok = tokenResult && tokenResult.token;
+        if (typeof tok === "string" && tok.split(".").length === 3) {
+          const b64 = tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+          const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+          const claims = JSON.parse(atob(padded));
+          if (claims && typeof claims.exp === "number" && claims.exp > 0) {
+            return new Date(claims.exp * 1000).toISOString();
+          }
+        }
+      } catch (e) {}
+      return null;
+    }
 
     async function loadImageAsInlineData(imageSrc) {
       if (!imageSrc) return null;
@@ -1630,49 +1692,102 @@
     }
 
     async function initFirebaseAiLogic() {
-      if (aiModelPromise) return aiModelPromise;
+      const cfg = window.FIREBASE_APP_CONFIG || firebaseConfig;
+      const env = typeof window.configureFirebaseAppCheckEnvironment === "function"
+        ? window.configureFirebaseAppCheckEnvironment()
+        : {
+            projectId: cfg.projectId,
+            appId: cfg.appId,
+            siteKey: window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LdAWhguAAAAANNbg2iJtYw636xDuZT2nB3l9q5E',
+            hostname: (window.location && window.location.hostname) || '(local-file)',
+            protocol: (window.location && window.location.protocol) || '',
+            origin: (window.location && window.location.origin) || 'null',
+            isFileProtocol: window.location && window.location.protocol === 'file:',
+            appCheckMode: 'recaptcha-enterprise'
+          };
 
-      aiModelPromise = (async () => {
-        // 1. Initialize modular FirebaseApp (named to guarantee zero conflict with Compat instance)
-        const modularApp = getApps().find(a => a.name === "ecriproAiApp") || initializeApp(firebaseConfig, "ecriproAiApp");
+      lastAiDiagnostics = {
+        projectId: env.projectId,
+        appId: env.appId,
+        hostname: env.hostname,
+        protocol: env.protocol,
+        origin: env.origin,
+        appCheckMode: env.appCheckMode,
+        appCheckInitialized: Boolean(modularAppCheckInstance),
+        hasToken: false,
+        tokenExpiresAt: null,
+        aiInitialized: Boolean(aiModelInstance),
+        reachedGemini: false,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        checkedAt: new Date().toISOString()
+      };
 
-        // 2. Initialize App Check with registered reCAPTCHA Enterprise site key
-        const siteKey = window.RECAPTCHA_ENTERPRISE_SITE_KEY || '6LdAWhguAAAAANNbg2iJtYw636xDuZT2nB3l9q5E';
-        if (!modularAppCheckInstance) {
-          try {
-            modularAppCheckInstance = initializeAppCheck(modularApp, {
-              provider: new ReCaptchaEnterpriseProvider(siteKey),
-              isTokenAutoRefreshEnabled: true
-            });
-            console.log("[Firebase AI Logic] App Check successfully initialized with reCAPTCHA Enterprise provider");
-          } catch (acErr) {
-            console.error("[Firebase AI Logic] App Check initialization error:", acErr);
-            throw new Error("Impossible d'initialiser App Check : " + acErr.message);
-          }
-        }
+      console.log(`[Firebase AI Logic] Step 1 - Initializing Modular App | projectId: ${env.projectId} | appId: ${env.appId} | host: ${env.hostname} | protocol: ${env.protocol} | mode: ${env.appCheckMode}`);
 
-        // 3. Pre-flight App Check token audit & retrieval verification
+      // Step 1: Initialize modular FirebaseApp (named to guarantee zero conflict with Compat instance)
+      modularAppInstance = modularAppInstance || getApps().find(a => a.name === "ecriproAiApp") || initializeApp(cfg, "ecriproAiApp");
+      if (!modularAppInstance.options || modularAppInstance.options.projectId !== "students-9d81b" || modularAppInstance.options.appId !== cfg.appId) {
+        const cfgErr = new Error(`Configuration Firebase incohérente (${modularAppInstance?.options?.projectId}/${modularAppInstance?.options?.appId}).`);
+        cfgErr.code = "appCheck/config-mismatch";
+        cfgErr.isAppCheckFatal = true;
+        lastAiDiagnostics.lastErrorCode = cfgErr.code;
+        lastAiDiagnostics.lastErrorMessage = cfgErr.message;
+        throw cfgErr;
+      }
+
+      // Step 2: Initialize App Check BEFORE any Firebase AI Logic call
+      if (!modularAppCheckInstance) {
         try {
-          const tokenResult = await getToken(modularAppCheckInstance, false);
-          if (!tokenResult || !tokenResult.token) {
-            throw new Error("Jeton App Check vide ou indisponible");
-          }
-          const expiresAt = tokenResult.expireTimeMillis
-            ? new Date(tokenResult.expireTimeMillis).toISOString()
-            : "inconnu";
-          console.log("[Firebase AI Logic] App Check token verified. HasToken: true. Expires at:", expiresAt);
-        } catch (tokenErr) {
-          console.error("[Firebase AI Logic] App Check token verification failed:", tokenErr.message);
-          throw new Error("Vérification du jeton App Check échouée : " + tokenErr.message);
+          modularAppCheckInstance = initializeAppCheck(modularAppInstance, {
+            provider: new ReCaptchaEnterpriseProvider(env.siteKey),
+            isTokenAutoRefreshEnabled: true
+          });
+          lastAiDiagnostics.appCheckInitialized = true;
+          console.log("[Firebase AI Logic] Step 2 - App Check initialized successfully.");
+        } catch (acErr) {
+          lastAiDiagnostics.appCheckInitialized = false;
+          lastAiDiagnostics.lastErrorCode = acErr.code || 'appCheck/init-failed';
+          lastAiDiagnostics.lastErrorMessage = acErr.message || String(acErr);
+          console.error("[Firebase AI Logic] Step 2 FAILED - App Check initialization error:", lastAiDiagnostics.lastErrorCode, lastAiDiagnostics.lastErrorMessage, "| Reached Gemini: false");
+          const wrapped = new Error("Impossible d'initialiser App Check : " + lastAiDiagnostics.lastErrorMessage);
+          wrapped.code = lastAiDiagnostics.lastErrorCode;
+          wrapped.isAppCheckFatal = true;
+          throw wrapped;
         }
+      }
 
-        // 4. Initialize Firebase AI Logic with Gemini Developer API backend (GoogleAIBackend)
-        const ai = getAI(modularApp, {
+      // Step 3: Mandatory App Check token acquisition BEFORE Firebase AI Logic request
+      try {
+        const tokenResult = await getToken(modularAppCheckInstance, false);
+        if (!tokenResult || !tokenResult.token) {
+          const emptyErr = new Error("Jeton App Check vide ou indisponible");
+          emptyErr.code = 'appCheck/empty-token';
+          throw emptyErr;
+        }
+        const expiresAt = extractAppCheckExpiryMetadata(tokenResult);
+        lastAiDiagnostics.hasToken = true;
+        lastAiDiagnostics.tokenExpiresAt = expiresAt;
+        console.log("[Firebase AI Logic] Step 3 - App Check token verified. HasToken: true. Expires at:", expiresAt || "unavailable (non-JWT)");
+      } catch (tokenErr) {
+        lastAiDiagnostics.hasToken = false;
+        lastAiDiagnostics.tokenExpiresAt = null;
+        lastAiDiagnostics.reachedGemini = false;
+        lastAiDiagnostics.lastErrorCode = tokenErr.code || 'appCheck/token-failed';
+        lastAiDiagnostics.lastErrorMessage = tokenErr.message || String(tokenErr);
+        console.error("[Firebase AI Logic] Step 3 FAILED - App Check token acquisition failed:", lastAiDiagnostics.lastErrorCode, lastAiDiagnostics.lastErrorMessage, "| Reached Gemini: false");
+        const wrapped = new Error("Vérification du jeton App Check échouée : " + lastAiDiagnostics.lastErrorMessage);
+        wrapped.code = lastAiDiagnostics.lastErrorCode;
+        wrapped.isAppCheckFatal = true;
+        throw wrapped;
+      }
+
+      // Step 4: Initialize Firebase AI Logic with Gemini Developer API backend (GoogleAIBackend)
+      if (!aiModelInstance) {
+        const ai = getAI(modularAppInstance, {
           backend: new GoogleAIBackend()
         });
-
-        // 5. Retrieve Generative Model with temperature 0.2 and JSON response type
-        const model = getGenerativeModel(ai, {
+        aiModelInstance = getGenerativeModel(ai, {
           model: "gemini-3.5-flash-lite",
           generationConfig: {
             temperature: 0.2,
@@ -1681,14 +1796,10 @@
             responseMimeType: "application/json"
           }
         });
-
-        console.log("[Firebase AI Logic] Generative model initialized with GoogleAIBackend (gemini-3.5-flash-lite)");
-        return model;
-      })();
-
-      // Reset promise on failure so user retries can recover cleanly
-      aiModelPromise.catch(() => { aiModelPromise = null; });
-      return aiModelPromise;
+        console.log("[Firebase AI Logic] Step 4 - Generative model initialized with GoogleAIBackend (gemini-3.5-flash-lite)");
+      }
+      lastAiDiagnostics.aiInitialized = true;
+      return aiModelInstance;
     }
 
     function buildQuestionPrompt(qConfig, studentAnswer, rubricConfig) {
@@ -1843,6 +1954,16 @@ ${criteriaSchema}
         return validateRubricConfig(window.EVALUATION_RUBRIC_CONFIG);
       },
 
+      getDiagnostics() {
+        return lastAiDiagnostics ? { ...lastAiDiagnostics } : null;
+      },
+
+      async ensureAiReady() {
+        this.validateRubric();
+        const model = await initFirebaseAiLogic();
+        return { ready: true, model, diagnostics: this.getDiagnostics() };
+      },
+
       async evaluateQuestion(qKey, studentAnswer) {
         this.validateRubric();
         const qConfig = window.EVALUATION_RUBRIC_CONFIG.questions[qKey];
@@ -1859,18 +1980,28 @@ ${criteriaSchema}
         const prompt = buildQuestionPrompt(qConfig, studentAnswer, window.EVALUATION_RUBRIC_CONFIG);
         const contentPayload = imagePart ? [prompt, imagePart] : prompt;
 
-        console.log(`[GeminiAIService] Requesting independent evaluation for ${qKey} (image attached: ${Boolean(imagePart)})...`);
+        if (lastAiDiagnostics) {
+          lastAiDiagnostics.reachedGemini = true;
+        }
+        console.log(`[GeminiAIService] Requesting independent evaluation for ${qKey} (image attached: ${Boolean(imagePart)}, reachedGemini: true)...`);
 
         const generatePromise = model.generateContent(contentPayload);
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error(`Timeout dépassé lors de la correction de ${qKey}`)), 30000)
         );
 
-        const result = await Promise.race([generatePromise, timeoutPromise]);
-        const response = await result.response;
-        const rawText = response.text();
-
-        return normalizeQuestionEvaluation(rawText, qKey, qConfig, studentAnswer, Boolean(imagePart), this.model);
+        try {
+          const result = await Promise.race([generatePromise, timeoutPromise]);
+          const response = await result.response;
+          const rawText = response.text();
+          return normalizeQuestionEvaluation(rawText, qKey, qConfig, studentAnswer, Boolean(imagePart), this.model);
+        } catch (genErr) {
+          if (lastAiDiagnostics) {
+            lastAiDiagnostics.lastErrorCode = genErr.code || genErr.name || 'gemini/request-failed';
+            lastAiDiagnostics.lastErrorMessage = genErr.message || String(genErr);
+          }
+          throw genErr;
+        }
       },
 
       buildEvaluationSummary(questionsMap) {
@@ -3271,13 +3402,10 @@ ${criteriaSchema}
           if (window.FirebaseService) {
             window.FirebaseService.init();
           }
+          // Only resume if there is an explicit unfinished in-progress draft (index 0..3).
+          // Finished or closed evaluations ALWAYS start a brand-new session on student registration.
           if (!this.restoreEvaluationSession()) {
-            this.currentExIndex = 0;
-            this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-            this.evalAnswers = { profile: null, q1: '', q2: '', q3: '', text: '' };
-            this.evalScores = { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null, q1: null, q2: null, q3: null };
-            this.evalQuestionResults = { q1: null, q2: null, q3: null };
-            this.evalScore = 0;
+            this.startNewEvaluationSession();
           }
           document.getElementById('exercise-stage').classList.add('active');
           document.getElementById('exercise-header').style.display = 'none';
@@ -8057,6 +8185,13 @@ ${criteriaSchema}
         }
         const oldModal = document.getElementById('j1-success-modal');
         if (oldModal) oldModal.remove();
+        const detailsModal = document.getElementById('eval-details-modal');
+        if (detailsModal) detailsModal.remove();
+        const historyModal = document.getElementById('eval-history-modal');
+        if (historyModal) historyModal.remove();
+        if (this.currentLevelId === 10 && this.evalPhase === 'submitted') {
+          this.resetInMemoryEvaluationState();
+        }
         document.getElementById('exercise-stage').classList.remove('active');
         document.getElementById('exercise-header').style.display = '';
         document.getElementById('exercise-footer').style.display = '';
@@ -16872,11 +17007,43 @@ showJourney2EndCelebration() {
       },
 
       // --- EVALUATION SESSION & FIRESTORE INTEGRATION ---
+      EVAL_ACTIVE_DRAFT_KEY: 'ecripro_eval_active_draft_v3',
+      EVAL_HISTORY_KEY: 'ecripro_eval_history_v3',
+      evalPhase: 'draft',
+
+      generateEvalSessionId() {
+        return 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      },
+
+      resetInMemoryEvaluationState() {
+        this.currentExIndex = 0;
+        this.evalPhase = 'draft';
+        this.evalSessionId = this.generateEvalSessionId();
+        this.evalAnswers = { profile: null, q1: '', q2: '', q3: '', text: '' };
+        this.evalScores = { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null, q1: null, q2: null, q3: null };
+        this.evalQuestionResults = { q1: null, q2: null, q3: null };
+        this.evalScore = 0;
+        this.lastEvalDocId = null;
+        this.lastSavedEvaluation = null;
+        this._evalSubmitting = false;
+        this._evalRetrying = false;
+        this._evalShowingSuccess = false;
+      },
+
+      startNewEvaluationSession(options = {}) {
+        this.clearActiveEvaluationDraft();
+        this.resetInMemoryEvaluationState();
+        console.log('[Evaluation] Started fresh evaluation session:', this.evalSessionId);
+        if (options.render) {
+          this.loadEvaluationActivity();
+        }
+      },
+
       getEvaluationDocId() {
         const profile = (this.evalAnswers && this.evalAnswers.profile) || {};
         const studentId = (profile.id || 'ANON').trim() || 'ANON';
         if (!this.evalSessionId) {
-          this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+          this.evalSessionId = this.generateEvalSessionId();
         }
         const safeStudentId = studentId.replace(/[^a-zA-Z0-9_-]/g, '_');
         const docId = 'eval_' + safeStudentId + '_' + this.evalSessionId;
@@ -16886,51 +17053,133 @@ showJourney2EndCelebration() {
 
       saveEvaluationSession() {
         try {
+          // Never persist finished/submitted/results screen states as a resumable entry draft
+          if (this.evalPhase === 'submitted' || typeof this.currentExIndex !== 'number' || this.currentExIndex < 0 || this.currentExIndex > 3) {
+            return;
+          }
+          const ans = this.evalAnswers || {};
+          const hasProfile = Boolean(ans.profile && (ans.profile.id || ans.profile.nom || ans.profile.prenom));
+          const hasAnswers = Boolean((ans.q1 && ans.q1.trim()) || (ans.q2 && ans.q2.trim()) || (ans.q3 && ans.q3.trim()));
+          if (this.currentExIndex === 0 && !hasProfile && !hasAnswers) {
+            return;
+          }
           const sessionData = {
-            version: 2,
+            version: 3,
+            evalPhase: 'draft',
             currentExIndex: this.currentExIndex,
-            evalAnswers: this.evalAnswers || {},
+            evalAnswers: ans,
             evalScores: this.evalScores || {},
             evalQuestionResults: this.evalQuestionResults || { q1: null, q2: null, q3: null },
             evalScore: this.computeAutoScore(),
-            evalSessionId: this.evalSessionId || (this.evalSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7)),
+            evalSessionId: this.evalSessionId || (this.evalSessionId = this.generateEvalSessionId()),
             lastEvalDocId: this.lastEvalDocId || null,
             updatedAt: new Date().toISOString()
           };
-          localStorage.setItem('ecripro_eval_session_v2', JSON.stringify(sessionData));
+          localStorage.setItem(this.EVAL_ACTIVE_DRAFT_KEY, JSON.stringify(sessionData));
         } catch (e) {
-          console.warn('Failed to save evaluation session to localStorage:', e);
+          console.warn('Failed to save evaluation draft to localStorage:', e);
         }
       },
 
       restoreEvaluationSession() {
         try {
-          const raw = localStorage.getItem('ecripro_eval_session_v2');
+          // Remove legacy keys that previously caused completed results or old student profiles to leak
+          try {
+            localStorage.removeItem('ecripro_eval_session_v2');
+            localStorage.removeItem('ecripro_eval_session');
+            localStorage.removeItem('eval_student_profile');
+          } catch (cleanupErr) {}
+
+          const raw = localStorage.getItem(this.EVAL_ACTIVE_DRAFT_KEY);
           if (!raw) return false;
           const sessionData = JSON.parse(raw);
-          if (sessionData && sessionData.version === 2 && sessionData.evalAnswers) {
-            this.evalAnswers = sessionData.evalAnswers;
-            this.evalScores = sessionData.evalScores || { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null, q1: null, q2: null, q3: null };
-            this.evalQuestionResults = sessionData.evalQuestionResults || { q1: null, q2: null, q3: null };
-            this.evalScore = this.computeAutoScore();
-            this.evalSessionId = sessionData.evalSessionId || ('sess_' + Date.now());
-            this.lastEvalDocId = sessionData.lastEvalDocId || null;
-            if (typeof sessionData.currentExIndex === 'number' && sessionData.currentExIndex >= 0 && sessionData.currentExIndex <= 4) {
-              this.currentExIndex = sessionData.currentExIndex;
-            }
-            console.log('Evaluation v2 session restored successfully:', sessionData);
-            return true;
+          if (
+            !sessionData ||
+            sessionData.version !== 3 ||
+            sessionData.evalPhase !== 'draft' ||
+            typeof sessionData.currentExIndex !== 'number' ||
+            sessionData.currentExIndex < 0 ||
+            sessionData.currentExIndex > 3 ||
+            !sessionData.evalAnswers
+          ) {
+            this.clearActiveEvaluationDraft();
+            return false;
           }
+          const ans = sessionData.evalAnswers;
+          const hasProfile = Boolean(ans.profile && (ans.profile.id || ans.profile.nom || ans.profile.prenom));
+          const hasAnswers = Boolean((ans.q1 && ans.q1.trim()) || (ans.q2 && ans.q2.trim()) || (ans.q3 && ans.q3.trim()));
+          if (!hasProfile && !hasAnswers) {
+            this.clearActiveEvaluationDraft();
+            return false;
+          }
+          this.evalPhase = 'draft';
+          this.evalAnswers = ans;
+          this.evalScores = sessionData.evalScores || { situation: 0, character: 0, place: 0, time: 0, chronology: 0, writing: null, q1: null, q2: null, q3: null };
+          this.evalQuestionResults = sessionData.evalQuestionResults || { q1: null, q2: null, q3: null };
+          this.evalScore = this.computeAutoScore();
+          this.evalSessionId = sessionData.evalSessionId || this.generateEvalSessionId();
+          this.lastEvalDocId = sessionData.lastEvalDocId || null;
+          this.currentExIndex = sessionData.currentExIndex;
+          console.log('[Evaluation] Active unfinished draft restored:', {
+            sessionId: this.evalSessionId,
+            currentExIndex: this.currentExIndex,
+            studentId: ans.profile ? ans.profile.id : null
+          });
+          return true;
         } catch (e) {
-          console.warn('Failed to restore evaluation session:', e);
+          console.warn('Failed to restore evaluation draft:', e);
         }
         return false;
       },
 
-      clearEvaluationSession() {
+      clearActiveEvaluationDraft() {
         try {
+          localStorage.removeItem(this.EVAL_ACTIVE_DRAFT_KEY);
           localStorage.removeItem('ecripro_eval_session_v2');
+          localStorage.removeItem('ecripro_eval_session');
+          localStorage.removeItem('eval_student_profile');
         } catch (e) {}
+      },
+
+      clearEvaluationSession() {
+        this.clearActiveEvaluationDraft();
+      },
+
+      getEvaluationHistory() {
+        try {
+          const raw = localStorage.getItem(this.EVAL_HISTORY_KEY);
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      },
+
+      archiveEvaluationToHistory(payload) {
+        if (!payload || !payload.docId) return;
+        try {
+          const list = this.getEvaluationHistory().filter(item => item && item.docId !== payload.docId);
+          const entry = {
+            docId: payload.docId,
+            sessionId: payload.sessionId || this.evalSessionId,
+            studentId: payload.studentId || 'ANON',
+            studentNom: payload.studentNom || '',
+            studentPrenom: payload.studentPrenom || '',
+            studentClasse: payload.studentClasse || '',
+            writingStatus: payload.writingStatus || 'pending_teacher_grading',
+            totalScore: typeof payload.totalScore === 'number' ? payload.totalScore : null,
+            questionScores: payload.scoresBreakdown ? {
+              q1: payload.scoresBreakdown.q1,
+              q2: payload.scoresBreakdown.q2,
+              q3: payload.scoresBreakdown.q3
+            } : { q1: null, q2: null, q3: null },
+            submittedAt: payload.submittedAt || new Date().toISOString()
+          };
+          list.unshift(entry);
+          localStorage.setItem(this.EVAL_HISTORY_KEY, JSON.stringify(list.slice(0, 30)));
+        } catch (e) {
+          console.warn('Failed to archive evaluation history:', e);
+        }
       },
 
       computeAutoScore() {
@@ -16981,6 +17230,7 @@ showJourney2EndCelebration() {
         const q3Answer = (this.evalAnswers && typeof this.evalAnswers.q3 === 'string') ? this.evalAnswers.q3.trim() : '';
         const combinedText = [q1Answer, q2Answer, q3Answer].filter(Boolean).join('\n\n');
         const currentStatus = statusOverride || 'completed';
+        const isFinalSubmission = (currentStatus === 'completed' || currentStatus === 'submit');
 
         const rubric = window.EVALUATION_RUBRIC_CONFIG;
         const prevQuestions = this.evalQuestionResults || { q1: null, q2: null, q3: null };
@@ -17005,7 +17255,9 @@ showJourney2EndCelebration() {
             mistakes: [],
             feedback: null,
             suggestedCorrection: null,
-            status: currentStatus === 'completed' ? 'pending' : 'in_progress'
+            previousStatus: existing ? existing.status : null,
+            errorDetails: existing && existing.errorDetails ? existing.errorDetails : null,
+            status: isFinalSubmission ? 'pending' : 'in_progress'
           };
         };
 
@@ -17026,10 +17278,10 @@ showJourney2EndCelebration() {
           module: "Module 1",
           journey: "Évaluation — Je construis mon histoire",
           submittedAt: new Date().toISOString(),
-          status: currentStatus,
+          status: isFinalSubmission ? 'grading' : currentStatus,
           autoScore: autoScore,
           maxAutoScore: 0,
-          writingStatus: currentStatus === 'completed' ? "pending_teacher_grading" : "in_progress",
+          writingStatus: isFinalSubmission ? 'grading' : 'in_progress',
           writingScore: null,
           totalScore: null,
           finalScoreOutOf10: null,
@@ -17071,7 +17323,7 @@ showJourney2EndCelebration() {
             totalScore: null,
             maxScore: 10,
             summary: null,
-            status: currentStatus === 'completed' ? "pending" : "in_progress"
+            status: isFinalSubmission ? 'grading' : 'in_progress'
           }
         };
 
@@ -17086,53 +17338,115 @@ showJourney2EndCelebration() {
           }
         }
 
-        // Step 2: Independent per-question evaluation via Gemini AI (ONLY on final submission / retry)
-        if (currentStatus === 'completed' && window.GeminiAIService) {
+        // Helper to build structured failed question entry while preserving attempt count & metadata
+        const makeFailedEntry = (qKey, ans, errObj, reachedGeminiFlag) => {
+          const qCfg = rubric.questions[qKey];
+          const errMsg = (errObj && errObj.message) ? String(errObj.message) : 'Erreur inconnue';
+          const errCode = (errObj && (errObj.code || errObj.name)) ? String(errObj.code || errObj.name) : 'unknown_error';
+          const isFileProtocol = typeof window !== 'undefined' && window.location && window.location.protocol === 'file:';
+          const isAppCheckError = Boolean(errObj && errObj.isAppCheckFatal) || /appCheck|recaptcha|401/i.test(errMsg + ' ' + errCode);
+          const prevEntry = questionsMap[qKey] || {};
+          const prevAttempt = (prevEntry.errorDetails && typeof prevEntry.errorDetails.attempt === 'number')
+            ? prevEntry.errorDetails.attempt
+            : (prevEntry.previousStatus === 'failed' ? 1 : 0);
+
+          return {
+            questionId: qKey,
+            questionNumber: qCfg.number,
+            questionText: qCfg.questionText,
+            answer: ans,
+            score: null,
+            maxScore: qCfg.maxScore,
+            criteria: {},
+            indicators: {},
+            strengths: [],
+            mistakes: [],
+            feedback: null,
+            suggestedCorrection: null,
+            error: errMsg,
+            errorDetails: {
+              message: errMsg,
+              code: errCode,
+              attempt: prevAttempt + 1,
+              reachedGemini: Boolean(reachedGeminiFlag),
+              protocol: (typeof window !== 'undefined' && window.location) ? window.location.protocol : 'unknown',
+              origin: (typeof window !== 'undefined' && window.location) ? window.location.origin : 'unknown',
+              model: window.GeminiAIService ? window.GeminiAIService.model : 'unknown',
+              isFileProtocol,
+              isAppCheckError,
+              timestamp: new Date().toISOString()
+            },
+            status: 'failed',
+            failedAt: new Date().toISOString()
+          };
+        };
+
+        // Step 2: Mandatory App Check token verification BEFORE launching Gemini requests
+        if (isFinalSubmission && window.GeminiAIService) {
           const answerMap = { q1: q1Answer, q2: q2Answer, q3: q3Answer };
           const qKeys = ['q1', 'q2', 'q3'];
+          const pendingKeys = qKeys.filter(k => {
+            const ex = questionsMap[k];
+            return !(ex && ex.status === 'evaluated' && ex.answer === answerMap[k] && typeof ex.score === 'number');
+          });
 
-          for (let i = 0; i < qKeys.length; i++) {
-            const qKey = qKeys[i];
-            const ans = answerMap[qKey];
-            const existing = questionsMap[qKey];
-
-            // Idempotency guard: skip questions already evaluated for the exact same answer
-            if (existing && existing.status === 'evaluated' && existing.answer === ans && typeof existing.score === 'number') {
-              console.log(`[GeminiAI] Skipping already-evaluated ${qKey} (idempotent guard). Score: ${existing.score}/${existing.maxScore}`);
-              continue;
-            }
-
-            if (typeof options.onProgress === 'function') {
-              try { options.onProgress(i + 1, qKeys.length, qKey); } catch (e) {}
-            }
-
+          let preflightOk = true;
+          if (pendingKeys.length > 0 && typeof window.GeminiAIService.ensureAiReady === 'function') {
             try {
-              console.log(`[GeminiAI] Evaluating ${qKey} independently for student:`, studentId);
-              const qEval = await window.GeminiAIService.evaluateQuestion(qKey, ans);
-              questionsMap[qKey] = qEval;
-              this.evalQuestionResults[qKey] = qEval;
-            } catch (qErr) {
-              console.warn(`[GeminiAI] Question ${qKey} evaluation failed (preserved as failed, never scored as 0):`, qErr.message);
-              const qCfg = rubric.questions[qKey];
-              const failedEntry = {
-                questionId: qKey,
-                questionNumber: qCfg.number,
-                questionText: qCfg.questionText,
-                answer: ans,
-                score: null,
-                maxScore: qCfg.maxScore,
-                criteria: {},
-                indicators: {},
-                strengths: [],
-                mistakes: [],
-                feedback: null,
-                suggestedCorrection: null,
-                error: qErr.message,
-                status: 'failed',
-                failedAt: new Date().toISOString()
-              };
-              questionsMap[qKey] = failedEntry;
-              this.evalQuestionResults[qKey] = failedEntry;
+              await window.GeminiAIService.ensureAiReady();
+            } catch (preflightErr) {
+              preflightOk = false;
+              console.error('[GeminiAI] Pre-flight App Check/AI verification failed. Aborting all ungraded Gemini calls:', preflightErr.code || '', preflightErr.message);
+              pendingKeys.forEach(qKey => {
+                const failedEntry = makeFailedEntry(qKey, answerMap[qKey], preflightErr, false);
+                questionsMap[qKey] = failedEntry;
+                this.evalQuestionResults[qKey] = failedEntry;
+              });
+            }
+          }
+
+          if (preflightOk) {
+            for (let i = 0; i < qKeys.length; i++) {
+              const qKey = qKeys[i];
+              const ans = answerMap[qKey];
+              const existing = questionsMap[qKey];
+
+              // Idempotency guard: skip questions already evaluated for the exact same answer
+              if (existing && existing.status === 'evaluated' && existing.answer === ans && typeof existing.score === 'number') {
+                console.log(`[GeminiAI] Skipping already-evaluated ${qKey} (idempotent guard). Score: ${existing.score}/${existing.maxScore}`);
+                continue;
+              }
+
+              if (typeof options.onProgress === 'function') {
+                try { options.onProgress(i + 1, qKeys.length, qKey); } catch (e) {}
+              }
+
+              try {
+                console.log(`[GeminiAI] Evaluating ${qKey} independently for student:`, studentId);
+                const qEval = await window.GeminiAIService.evaluateQuestion(qKey, ans);
+                questionsMap[qKey] = qEval;
+                this.evalQuestionResults[qKey] = qEval;
+              } catch (qErr) {
+                const isFatalAuth = Boolean(qErr && qErr.isAppCheckFatal) || /appCheck|recaptcha|401/i.test(String(qErr?.code || '') + ' ' + String(qErr?.message || ''));
+                const failedEntry = makeFailedEntry(qKey, ans, qErr, !isFatalAuth);
+                console.warn(`[GeminiAI] Question ${qKey} evaluation failed (attempt ${failedEntry.errorDetails.attempt}, reachedGemini=${!isFatalAuth}):`, failedEntry.error);
+                questionsMap[qKey] = failedEntry;
+                this.evalQuestionResults[qKey] = failedEntry;
+
+                // If App Check/authentication failed mid-loop, halt immediately rather than firing hopeless subsequent calls
+                if (isFatalAuth) {
+                  for (let j = i + 1; j < qKeys.length; j++) {
+                    const remKey = qKeys[j];
+                    const remExisting = questionsMap[remKey];
+                    if (!(remExisting && remExisting.status === 'evaluated' && remExisting.answer === answerMap[remKey])) {
+                      const remFail = makeFailedEntry(remKey, answerMap[remKey], qErr, false);
+                      questionsMap[remKey] = remFail;
+                      this.evalQuestionResults[remKey] = remFail;
+                    }
+                  }
+                  break;
+                }
+              }
             }
           }
 
@@ -17149,14 +17463,21 @@ showJourney2EndCelebration() {
           this.evalScores.q2 = payload.scoresBreakdown.q2;
           this.evalScores.q3 = payload.scoresBreakdown.q3;
 
+          const evaluatedCount = qKeys.filter(k => questionsMap[k]?.status === 'evaluated' && typeof questionsMap[k]?.score === 'number').length;
+          const failedCount = qKeys.filter(k => questionsMap[k]?.status === 'failed').length;
+
           let summary = null;
-          try {
-            summary = window.GeminiAIService.buildEvaluationSummary(questionsMap);
-          } catch (sumErr) {
-            console.error('[GeminiAI] Rubric validation error while summarizing:', sumErr.message);
+          if (evaluatedCount === 3) {
+            try {
+              summary = window.GeminiAIService.buildEvaluationSummary(questionsMap);
+            } catch (sumErr) {
+              console.error('[GeminiAI] Rubric validation error while summarizing:', sumErr.message);
+            }
           }
 
+          // Strict consistent status reconciliation across top-level status, writingStatus, and writingEvaluation.status
           if (summary && summary.status === 'evaluated') {
+            payload.status = 'evaluated';
             payload.writingEvaluation.totalScore = summary.totalScore;
             payload.writingEvaluation.summary = summary;
             payload.writingEvaluation.status = 'evaluated';
@@ -17169,11 +17490,12 @@ showJourney2EndCelebration() {
             this.evalScores.writing = summary.totalScore;
             console.log(`[GeminiAI] All 3 questions evaluated independently! Final total: ${summary.totalScore}/10`);
           } else {
-            const hasFailed = qKeys.some(k => questionsMap[k]?.status === 'failed');
+            const resolvedStatus = failedCount > 0 ? (evaluatedCount > 0 ? 'partial_error' : 'grading_failed') : 'pending';
+            payload.status = resolvedStatus;
+            payload.writingStatus = resolvedStatus;
+            payload.writingEvaluation.status = resolvedStatus;
             payload.writingEvaluation.totalScore = null;
             payload.writingEvaluation.summary = null;
-            payload.writingEvaluation.status = hasFailed ? 'partial_error' : 'pending';
-            payload.writingStatus = hasFailed ? 'grading_failed' : 'pending_teacher_grading';
             payload.writingScore = null;
             payload.scoresBreakdown.writing = null;
             payload.totalScore = null;
@@ -17181,10 +17503,17 @@ showJourney2EndCelebration() {
             this.evalScores.writing = null;
           }
 
-          this.lastSavedEvaluation = payload;
-          this.saveEvaluationSession();
+          if (typeof window.GeminiAIService.getDiagnostics === 'function') {
+            payload.aiDiagnostics = window.GeminiAIService.getDiagnostics();
+          }
 
-          // Step 3: Persist updated independent grades + summary to Firestore
+          // Mark session submitted in memory and clear unfinished active draft immediately
+          // (both on complete success and partial/failed grading) so future visits start fresh.
+          this.evalPhase = 'submitted';
+          this.lastSavedEvaluation = payload;
+          this.clearActiveEvaluationDraft();
+
+          // Step 3: Persist updated independent grades + summary + diagnostics to Firestore
           if (window.FirebaseService) {
             try {
               await window.FirebaseService.saveEvaluation(docId, payload);
@@ -17193,20 +17522,15 @@ showJourney2EndCelebration() {
             }
           }
 
-          // Clear in-progress session cleanly once completed & fully evaluated
-          if (payload.writingStatus === 'evaluated') {
-            this.clearEvaluationSession();
-          }
-
-          try {
-            localStorage.setItem('ecripro_eval_completed_' + studentId, JSON.stringify({
-              docId,
-              submittedAt: payload.submittedAt,
-              writingScore: payload.writingScore,
-              writingStatus: payload.writingStatus,
-              totalScore: payload.totalScore
-            }));
-          } catch (e) {}
+          // Record submitted summary in separate browser history index
+          this.archiveEvaluationToHistory(payload);
+        } else if (isFinalSubmission) {
+          payload.status = 'grading_failed';
+          payload.writingStatus = 'grading_failed';
+          payload.writingEvaluation.status = 'grading_failed';
+          this.evalPhase = 'submitted';
+          this.clearActiveEvaluationDraft();
+          this.archiveEvaluationToHistory(payload);
         }
 
         return payload;
@@ -17260,6 +17584,11 @@ showJourney2EndCelebration() {
         if (!container) return;
         container.innerHTML = '';
 
+        if (this.currentExIndex >= EVAL_POPUPS.length - 1 || this.evalPhase === 'submitted') {
+          this.showEvaluationEndCelebration();
+          return;
+        }
+
         if (!this.evalAnswers) {
           this.evalAnswers = { profile: null, q1: '', q2: '', q3: '', text: '' };
         }
@@ -17269,13 +17598,9 @@ showJourney2EndCelebration() {
         if (!this.evalQuestionResults) {
           this.evalQuestionResults = { q1: null, q2: null, q3: null };
         }
+        this.evalPhase = 'draft';
         this.evalScore = this.computeAutoScore();
         this.saveEvaluationSession();
-
-        if (this.currentExIndex >= EVAL_POPUPS.length - 1) {
-          this.showEvaluationEndCelebration();
-          return;
-        }
 
         const activity = EVAL_POPUPS[this.currentExIndex];
         if (!activity) return;
@@ -17459,9 +17784,7 @@ showJourney2EndCelebration() {
             }
 
             this.evalAnswers.profile = collected;
-            try {
-              localStorage.setItem('eval_student_profile', JSON.stringify(collected));
-            } catch(e) {}
+            this.evalPhase = 'draft';
             this.saveEvaluationSession();
 
             this.submitEvaluationToFirestore('started').catch(err => {
@@ -17476,6 +17799,7 @@ showJourney2EndCelebration() {
             const btnWrapper = document.createElement('div');
             btnWrapper.style.cssText = 'position: absolute; left: ' + activity.valBtnPos.left + '%; top: ' + activity.valBtnPos.top + '%; transform: translate(-50%, -50%); z-index: 80;';
             const vbtn = document.createElement('img');
+            vbtn.id = 'eval-profile-valider-btn';
             vbtn.src = 'journe 1/valider.png';
             vbtn.style.cssText = 'width: calc(var(--img-width) * 0.22); height: auto; cursor: pointer; display: block; transition: transform 0.15s ease, filter 0.15s ease;';
             vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
@@ -17493,6 +17817,42 @@ showJourney2EndCelebration() {
           }
 
           wrapper.appendChild(imgContainer);
+
+          // Utility row below registration card (reset prefilled draft or inspect past students)
+          const savedHistory = this.getEvaluationHistory();
+          const hasDraftProfile = Boolean(profileData && (profileData.id || profileData.nom || profileData.prenom));
+          if (hasDraftProfile || savedHistory.length > 0) {
+            const profileBar = document.createElement('div');
+            profileBar.style.cssText = 'display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; z-index: 80;';
+
+            if (hasDraftProfile) {
+              const clearDraftBtn = document.createElement('button');
+              clearDraftBtn.id = 'eval-new-student-profile-btn';
+              clearDraftBtn.type = 'button';
+              clearDraftBtn.textContent = '🔄 Nouvel élève (effacer ce brouillon)';
+              clearDraftBtn.style.cssText = 'padding: 8px 16px; border-radius: 9999px; border: 2px solid #fff; background: rgba(234, 88, 12, 0.92); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+              clearDraftBtn.onclick = () => {
+                playEvalClickSound();
+                this.startNewEvaluationSession({ render: true });
+              };
+              profileBar.appendChild(clearDraftBtn);
+            }
+
+            if (savedHistory.length > 0) {
+              const historyBtn = document.createElement('button');
+              historyBtn.id = 'eval-history-profile-btn';
+              historyBtn.type = 'button';
+              historyBtn.textContent = `📂 Historique (${savedHistory.length})`;
+              historyBtn.style.cssText = 'padding: 8px 16px; border-radius: 9999px; border: 2px solid #fff; background: rgba(30, 58, 138, 0.9); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+              historyBtn.onclick = () => {
+                playEvalClickSound();
+                this.openEvaluationHistoryModal();
+              };
+              profileBar.appendChild(historyBtn);
+            }
+
+            wrapper.appendChild(profileBar);
+          }
 
         } else if (activity.type === 'eval_question') {
           const qKey = activity.questionKey;
@@ -17590,6 +17950,21 @@ showJourney2EndCelebration() {
 
           actionBar.appendChild(wordCountBadge);
 
+          const newStudentBtn = document.createElement('button');
+          newStudentBtn.id = 'eval-new-student-btn';
+          newStudentBtn.type = 'button';
+          newStudentBtn.textContent = '🔄 Nouvel élève';
+          newStudentBtn.title = "Abandonner ce brouillon et commencer une nouvelle évaluation vierge";
+          newStudentBtn.style.cssText = 'padding: 10px 16px; border-radius: 9999px; border: 2px solid #fff; background: rgba(234, 88, 12, 0.9); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.15s ease;';
+          newStudentBtn.onmouseenter = () => { newStudentBtn.style.transform = 'scale(1.05)'; };
+          newStudentBtn.onmouseleave = () => { newStudentBtn.style.transform = 'scale(1)'; };
+          newStudentBtn.onclick = () => {
+            if (this._evalSubmitting) return;
+            playEvalClickSound();
+            this.startNewEvaluationSession({ render: true });
+          };
+          actionBar.appendChild(newStudentBtn);
+
           const vbtn = document.createElement('img');
           vbtn.id = 'eval-valider-btn-' + qKey;
           vbtn.src = 'journe 1/valider.png';
@@ -17608,10 +17983,10 @@ showJourney2EndCelebration() {
               vbtn.style.pointerEvents = 'none';
               vbtn.style.opacity = '0.6';
               vbtn.style.cursor = 'wait';
-              showFeedback("⏳ Enregistrement et correction de la question 1/3...", { persistent: true, isProgress: true });
+              showFeedback("🔐 Enregistrement et vérification Firebase App Check...", { persistent: true, isProgress: true });
 
               try {
-                await this.submitEvaluationToFirestore('completed', {
+                await this.submitEvaluationToFirestore('submit', {
                   onProgress: (step, total) => {
                     showFeedback(`⏳ Correction IA indépendante : question ${step}/${total}...`, { persistent: true, isProgress: true });
                   }
@@ -18004,9 +18379,47 @@ showJourney2EndCelebration() {
             window.evalCurrentAudio.pause();
             window.evalCurrentAudio = null;
           }
+          this.clearActiveEvaluationDraft();
+          this.resetInMemoryEvaluationState();
           this.close();
         };
         controlsRow.appendChild(finishBtn);
+
+        const newEvalBtn = document.createElement('button');
+        newEvalBtn.id = 'eval-new-evaluation-btn';
+        newEvalBtn.type = 'button';
+        newEvalBtn.textContent = '📝 Nouvelle évaluation';
+        newEvalBtn.style.cssText = 'padding: 11px 22px; background: linear-gradient(135deg, #6366f1, #4338ca); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(13px, 1.4vw, 16px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 18px rgba(67, 56, 202, 0.35); cursor: pointer; transition: transform 0.15s ease;';
+        newEvalBtn.onmouseenter = () => { newEvalBtn.style.transform = 'scale(1.05)'; };
+        newEvalBtn.onmouseleave = () => { newEvalBtn.style.transform = 'scale(1)'; };
+        newEvalBtn.onclick = () => {
+          if (this._evalRetrying) return;
+          if (window.evalCurrentAudio) {
+            window.evalCurrentAudio.pause();
+            window.evalCurrentAudio = null;
+          }
+          const detailsModal = document.getElementById('eval-details-modal');
+          if (detailsModal) detailsModal.remove();
+          const historyModal = document.getElementById('eval-history-modal');
+          if (historyModal) historyModal.remove();
+          this.startNewEvaluationSession({ render: true });
+        };
+        controlsRow.insertBefore(newEvalBtn, finishBtn);
+
+        const savedHistory = this.getEvaluationHistory();
+        if (savedHistory.length > 0) {
+          const historyBtn = document.createElement('button');
+          historyBtn.id = 'eval-history-results-btn';
+          historyBtn.type = 'button';
+          historyBtn.textContent = `📂 Historique (${savedHistory.length})`;
+          historyBtn.style.cssText = 'padding: 11px 20px; background: rgba(30, 58, 138, 0.92); color: white; font-family: "Segoe UI", sans-serif; font-weight: 800; font-size: clamp(13px, 1.4vw, 16px); border: 3px solid #fff; border-radius: 30px; box-shadow: 0 6px 18px rgba(30, 58, 138, 0.3); cursor: pointer; transition: transform 0.15s ease;';
+          historyBtn.onmouseenter = () => { historyBtn.style.transform = 'scale(1.05)'; };
+          historyBtn.onmouseleave = () => { historyBtn.style.transform = 'scale(1)'; };
+          historyBtn.onclick = () => {
+            this.openEvaluationHistoryModal();
+          };
+          controlsRow.insertBefore(historyBtn, finishBtn);
+        }
 
         wrapper.appendChild(controlsRow);
         container.appendChild(wrapper);
@@ -18032,7 +18445,9 @@ showJourney2EndCelebration() {
           fetchFailed = true;
         }
 
-        const writingEval = fsDoc && fsDoc.writingEvaluation ? fsDoc.writingEvaluation : null;
+        // Fall back to in-memory submitted payload for display ONLY if Firebase read failed/offline
+        const effectiveDoc = fsDoc || (this.lastSavedEvaluation && this.lastSavedEvaluation.docId === docId ? this.lastSavedEvaluation : null);
+        const writingEval = effectiveDoc && effectiveDoc.writingEvaluation ? effectiveDoc.writingEvaluation : null;
         const qMap = writingEval && writingEval.questions ? writingEval.questions : {};
         const qKeys = ['q1', 'q2', 'q3'];
         const rubric = window.EVALUATION_RUBRIC_CONFIG;
@@ -18053,7 +18468,7 @@ showJourney2EndCelebration() {
         });
 
         const maxSum = Math.round((qStates.reduce((acc, q) => acc + q.maxScore, 0) + Number.EPSILON) * 100) / 100;
-        const allEvaluated = !fetchFailed && qStates.every(q => q.isEvaluated) && Math.abs(maxSum - 10) <= 0.01;
+        const allEvaluated = !fetchFailed && Boolean(fsDoc) && qStates.every(q => q.isEvaluated) && Math.abs(maxSum - 10) <= 0.01;
 
         breakdownCard.innerHTML = '';
         qStates.forEach(q => {
@@ -18095,7 +18510,7 @@ showJourney2EndCelebration() {
             if (typeof playEvalClickSound === 'function') playEvalClickSound();
             this.openEvaluationDetailsModal(fsDoc, overallTotal);
           };
-          controlsRow.insertBefore(detailBtn, finishBtn);
+          controlsRow.insertBefore(detailBtn, newEvalBtn);
 
           // Play celebration audio & fireworks when all questions are evaluated
           try {
@@ -18119,6 +18534,41 @@ showJourney2EndCelebration() {
             : '⏳ Note globale non calculée : correction incomplète';
           breakdownCard.appendChild(warnPill);
 
+          // Surface actionable error diagnostics explaining why grading failed
+          const failedStates = qStates.filter(q => q.status === 'failed' && q.entry && (q.entry.error || q.entry.errorDetails));
+          if (failedStates.length > 0) {
+            const diagBox = document.createElement('div');
+            diagBox.id = 'eval-error-diagnostics';
+            diagBox.style.cssText = 'width: 100%; margin-top: 4px; padding: 8px 12px; border-radius: 12px; background: #fff7ed; border: 1.5px solid #fdba74; color: #7c2d12; font-size: 12px; line-height: 1.45; text-align: left;';
+
+            const isFileAppCheckBlocked = (window.location && window.location.protocol === 'file:') ||
+              failedStates.some(q => q.entry.errorDetails && q.entry.errorDetails.isFileProtocol && q.entry.errorDetails.isAppCheckError);
+
+            if (isFileAppCheckBlocked) {
+              const envHint = document.createElement('div');
+              envHint.style.cssText = 'font-weight: 800; color: #b45309; margin-bottom: 4px;';
+              envHint.textContent = '🌐 Page ouverte en fichier local (file://) : Google reCAPTCHA App Check bloque la requête IA hors serveur web (http://localhost ou https://). Ouvre le site via un serveur web puis clique sur « Réessayer la correction ».';
+              diagBox.appendChild(envHint);
+            }
+
+            const preflightBlocked = failedStates.every(q => q.entry.errorDetails && q.entry.errorDetails.reachedGemini === false);
+            if (preflightBlocked) {
+              const authHint = document.createElement('div');
+              authHint.style.cssText = 'font-weight: 800; color: #991b1b; margin-bottom: 4px;';
+              authHint.textContent = "🔐 Authentification App Check échouée avant l'envoi à Gemini : aucune requête IA n'a été lancée.";
+              diagBox.appendChild(authHint);
+            }
+
+            failedStates.forEach(q => {
+              const line = document.createElement('div');
+              const details = q.entry.errorDetails || {};
+              const attemptTxt = details.attempt ? ` (tentative ${details.attempt})` : '';
+              line.textContent = `• Question ${q.num}${attemptTxt} : ${q.entry.error || details.message || 'Erreur lors de la correction IA'}`;
+              diagBox.appendChild(line);
+            });
+            breakdownCard.appendChild(diagBox);
+          }
+
           const retryBtn = document.createElement('button');
           retryBtn.id = 'eval-retry-grading-btn';
           retryBtn.textContent = '🔄 Réessayer la correction';
@@ -18129,19 +18579,23 @@ showJourney2EndCelebration() {
             retryBtn.disabled = true;
             retryBtn.textContent = '⏳ Correction en cours...';
             try {
-              if (fsDoc) {
-                if (!this.evalAnswers.profile && fsDoc.studentId) {
+              const sourceDoc = effectiveDoc;
+              if (sourceDoc) {
+                this.lastEvalDocId = sourceDoc.docId || docId;
+                this.evalSessionId = sourceDoc.sessionId || this.evalSessionId;
+                if (!this.evalAnswers) this.evalAnswers = { profile: null, q1: '', q2: '', q3: '', text: '' };
+                if (!this.evalAnswers.profile && sourceDoc.studentId) {
                   this.evalAnswers.profile = {
-                    id: fsDoc.studentId,
-                    nom: fsDoc.studentNom || '',
-                    prenom: fsDoc.studentPrenom || '',
-                    classe: fsDoc.studentClasse || ''
+                    id: sourceDoc.studentId,
+                    nom: sourceDoc.studentNom || '',
+                    prenom: sourceDoc.studentPrenom || '',
+                    classe: sourceDoc.studentClasse || ''
                   };
                 }
-                if (fsDoc.answers) {
-                  this.evalAnswers.q1 = fsDoc.answers.q1 || this.evalAnswers.q1 || '';
-                  this.evalAnswers.q2 = fsDoc.answers.q2 || this.evalAnswers.q2 || '';
-                  this.evalAnswers.q3 = fsDoc.answers.q3 || this.evalAnswers.q3 || '';
+                if (sourceDoc.answers) {
+                  this.evalAnswers.q1 = sourceDoc.answers.q1 || this.evalAnswers.q1 || '';
+                  this.evalAnswers.q2 = sourceDoc.answers.q2 || this.evalAnswers.q2 || '';
+                  this.evalAnswers.q3 = sourceDoc.answers.q3 || this.evalAnswers.q3 || '';
                 }
                 this.evalQuestionResults = qMap || this.evalQuestionResults;
               }
@@ -18153,8 +18607,98 @@ showJourney2EndCelebration() {
             }
             this.showEvaluationEndCelebration();
           };
-          controlsRow.insertBefore(retryBtn, finishBtn);
+          controlsRow.insertBefore(retryBtn, newEvalBtn);
         }
+      },
+
+      openEvaluationHistoryModal() {
+        const prev = document.getElementById('eval-history-modal');
+        if (prev) prev.remove();
+
+        const history = this.getEvaluationHistory();
+        const overlay = document.createElement('div');
+        overlay.id = 'eval-history-modal';
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(5px); z-index: 9999999; display: flex; align-items: center; justify-content: center; padding: 18px; box-sizing: border-box;';
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background: #ffffff; border-radius: 22px; max-width: 700px; width: 100%; max-height: 84vh; overflow-y: auto; padding: 22px 26px; box-shadow: 0 20px 50px rgba(0,0,0,0.35); font-family: "Nunito", "Segoe UI", sans-serif; color: #1e293b;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #e2e8f0; padding-bottom:12px; margin-bottom:14px;';
+        const title = document.createElement('h2');
+        title.style.cssText = 'margin:0; font-size:20px; color:#1e3a8a;';
+        title.textContent = `📂 Historique des évaluations (${history.length})`;
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✖';
+        closeBtn.style.cssText = 'width:36px; height:36px; border-radius:50%; border:none; background:#ef4444; color:#fff; font-weight:bold; cursor:pointer; font-size:16px;';
+        closeBtn.onclick = () => overlay.remove();
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        card.appendChild(header);
+
+        if (history.length === 0) {
+          const empty = document.createElement('div');
+          empty.style.cssText = 'padding:20px; text-align:center; color:#64748b; font-weight:700;';
+          empty.textContent = 'Aucune évaluation soumise pour le moment.';
+          card.appendChild(empty);
+        } else {
+          history.forEach(item => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; border:1.5px solid #cbd5e1; border-radius:14px; padding:12px 14px; margin-bottom:10px; background:#f8fafc;';
+
+            const left = document.createElement('div');
+            const nameLine = document.createElement('div');
+            nameLine.style.cssText = 'font-weight:800; font-size:15px; color:#0f172a;';
+            nameLine.textContent = `${item.studentPrenom || ''} ${item.studentNom || ''} (ID: ${item.studentId || 'ANON'}, ${item.studentClasse || 'N/A'})`.trim();
+            const metaLine = document.createElement('div');
+            metaLine.style.cssText = 'font-size:12px; color:#64748b; margin-top:2px;';
+            metaLine.textContent = `${item.submittedAt ? new Date(item.submittedAt).toLocaleString() : ''} • Doc: ${item.docId}`;
+            left.appendChild(nameLine);
+            left.appendChild(metaLine);
+
+            const right = document.createElement('div');
+            right.style.cssText = 'display:flex; align-items:center; gap:8px;';
+            const statusBadge = document.createElement('span');
+            const ok = item.writingStatus === 'evaluated' && typeof item.totalScore === 'number';
+            statusBadge.style.cssText = `padding:5px 10px; border-radius:9999px; font-weight:800; font-size:13px; background:${ok ? '#ecfdf5' : '#fef2f2'}; color:${ok ? '#065f46' : '#991b1b'}; border:1.5px solid ${ok ? '#6ee7b7' : '#fca5a5'};`;
+            statusBadge.textContent = ok ? `✅ ${item.totalScore} / 10` : '⚠️ Incomplète';
+            right.appendChild(statusBadge);
+
+            const viewBtn = document.createElement('button');
+            viewBtn.type = 'button';
+            viewBtn.textContent = 'Ouvrir';
+            viewBtn.style.cssText = 'padding:6px 12px; border-radius:10px; border:none; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer;';
+            viewBtn.onclick = async () => {
+              viewBtn.disabled = true;
+              viewBtn.textContent = '...';
+              try {
+                if (window.FirebaseService && typeof window.FirebaseService.getEvaluation === 'function') {
+                  const res = await window.FirebaseService.getEvaluation(item.docId);
+                  if (res && res.success && res.exists && res.data) {
+                    overlay.remove();
+                    this.lastEvalDocId = item.docId;
+                    this.evalSessionId = res.data.sessionId || item.sessionId;
+                    this.evalPhase = 'submitted';
+                    this.lastSavedEvaluation = res.data;
+                    this.showEvaluationEndCelebration();
+                    return;
+                  }
+                }
+              } catch (e) {}
+              viewBtn.disabled = false;
+              viewBtn.textContent = 'Indisponible';
+            };
+            right.appendChild(viewBtn);
+
+            row.appendChild(left);
+            row.appendChild(right);
+            card.appendChild(row);
+          });
+        }
+
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
       },
 
       openEvaluationDetailsModal(fsDoc, overallTotal) {
