@@ -1502,26 +1502,38 @@
         return { success: false, exists: false, error: "Impossible de lire les résultats depuis Firestore", docId };
       },
 
-      async listEvaluations(pageSize = 100) {
+      async listEvaluations(pageSize = 300) {
         this.init();
         try {
-          const restUrl = "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents/evaluations?pageSize=" + encodeURIComponent(String(pageSize)) + "&key=" + firebaseConfig.apiKey + "&t=" + Date.now();
-          const response = await fetch(restUrl, { method: 'GET', cache: 'no-store' });
-          if (response.ok) {
+          const allDocs = [];
+          let pageToken = '';
+          let pageCount = 0;
+          do {
+            const restUrl = "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId +
+              "/databases/(default)/documents/evaluations?pageSize=" + encodeURIComponent(String(pageSize)) +
+              (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : "") +
+              "&key=" + firebaseConfig.apiKey + "&t=" + Date.now();
+            const response = await fetch(restUrl, { method: 'GET', cache: 'no-store' });
+            if (!response.ok) {
+              const errText = await response.text();
+              throw new Error("REST list HTTP " + response.status + ": " + errText);
+            }
             const body = await response.json();
-            const items = (body.documents || []).map(doc => {
-              const docId = doc.name ? doc.name.split('/').pop() : '';
-              const data = this._fromFirestoreFields(doc.fields || {});
-              if (!data.docId && docId) data.docId = docId;
-              return data;
-            });
-            items.sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
-            return { success: true, items, method: 'rest' };
-          }
-          const errText = await response.text();
-          console.warn("[FirebaseService] REST list HTTP " + response.status + ":", errText);
+            allDocs.push(...(body.documents || []));
+            pageToken = body.nextPageToken || '';
+            pageCount++;
+          } while (pageToken && pageCount < 10);
+
+          const items = allDocs.map(doc => {
+            const docId = doc.name ? doc.name.split('/').pop() : '';
+            const data = this._fromFirestoreFields(doc.fields || {});
+            if (!data.docId && docId) data.docId = docId;
+            return data;
+          });
+          items.sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
+          return { success: true, items, method: 'rest' };
         } catch (restErr) {
-          console.warn("[FirebaseService] REST list network error:", restErr.message);
+          console.warn("[FirebaseService] REST list error:", restErr.message);
         }
 
         if (this.db) {
@@ -3062,15 +3074,15 @@ ${criteriaSchema}
           return haystack.includes(f);
         },
 
-        _removeLocalHistoryDoc(docId) {
+        _clearLocalHistoryStorage() {
           try {
-            const raw = localStorage.getItem('eval_history_v1');
-            if (!raw) return;
-            const list = JSON.parse(raw);
-            if (!Array.isArray(list)) return;
-            const filtered = list.filter(item => item && item.docId !== docId);
-            localStorage.setItem('eval_history_v1', JSON.stringify(filtered));
+            localStorage.removeItem('ecripro_eval_history_v3');
+            localStorage.removeItem('eval_history_v1');
           } catch (e) {}
+        },
+
+        _removeLocalHistoryDoc(docId) {
+          this._clearLocalHistoryStorage();
         },
 
         closeDashboard() {
@@ -3171,19 +3183,18 @@ ${criteriaSchema}
                   <div id="td-stats-bar" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;flex-shrink:0;font-size:12px;min-height:28px;"></div>
 
                   <!-- Table -->
-                  <div style="flex:1;overflow-y:auto;border-radius:14px;overflow:hidden;min-height:0;border:2px solid #e8891c;">
+                  <div id="td-table-wrap" style="flex:1;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;min-height:0;border:2px solid #e8891c;">
                     <!-- Table header -->
-                    <div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;display:grid;grid-template-columns:40px 1fr 80px 130px 80px 80px 70px;gap:0;padding:10px 12px;position:sticky;top:0;z-index:2;">
+                    <div id="td-table-header" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;display:grid;grid-template-columns:44px 1.6fr 100px 95px 95px 72px;gap:0;padding:10px 12px;flex-shrink:0;">
                       <div style="font-size:12px;font-weight:900;">#</div>
                       <div style="font-size:12px;font-weight:900;">Étudiant</div>
                       <div style="font-size:12px;font-weight:900;">Classe</div>
-                      <div style="font-size:12px;font-weight:900;">Date</div>
                       <div style="font-size:12px;font-weight:900;">Score</div>
                       <div style="font-size:12px;font-weight:900;">Détails</div>
                       <div style="font-size:12px;font-weight:900;">Actions</div>
                     </div>
                     <!-- Table body -->
-                    <div id="td-list-body" style="background:#fff8e7;"></div>
+                    <div id="td-list-body" style="background:#fff8e7;flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;"></div>
                   </div>
                 </div>
               </div>
@@ -3201,24 +3212,13 @@ ${criteriaSchema}
 
           classInput.value = state.classFilter;
 
-          const applyFilters = () => {
-            state.classFilter = classInput.value.trim();
-            state.nameFilter = nameInput.value.trim();
-            state.filterText = [state.classFilter, state.nameFilter].filter(Boolean).join(' ');
-            state.pendingDeleteId = null;
-            render();
-          };
-
           const exportToCsv = (rows) => {
-            const header = ['Nom','Prénom','ID','Classe','Date','Q1 (/3)','Q2 (/3)','Q3 (/3)','C1 (/4.5)','C3 (/3)','C6 (/1.5)','Score','Max','Statut'];
+            const header = ['Nom','Prénom','ID','Classe','Q1 (/3)','Q2 (/3)','Q3 (/3)','C1 (/4.5)','C3 (/3)','C6 (/1.5)','Score','Max','Statut'];
             const csvRows = rows.map(s => {
               const doc = s.doc;
-              const we = doc.writingEvaluation || {};
-              const qs = we.questions || {};
               const ct = s.criteriaTotals || {};
               return [
                 doc.studentNom||'', doc.studentPrenom||'', doc.studentId||'', doc.studentClasse||'',
-                doc.submittedAt ? new Date(doc.submittedAt).toLocaleString('fr-FR') : '',
                 s.qData?.q1?.score ?? '', s.qData?.q2?.score ?? '', s.qData?.q3?.score ?? '',
                 typeof ct.C1 === 'number' ? ct.C1 : (ct.C1?.score ?? ''),
                 typeof ct.C3 === 'number' ? ct.C3 : (ct.C3?.score ?? ''),
@@ -3268,7 +3268,7 @@ ${criteriaSchema}
             `;
 
             if (filtered.length === 0) {
-              listBody.innerHTML = `<div style="text-align:center;padding:34px;color:#78350f;font-weight:700;">Aucune évaluation trouvée.<br><small style="font-weight:600;opacity:0.7;">Effacez les filtres pour tout afficher.</small></div>`;
+              listBody.innerHTML = `<div style="text-align:center;padding:34px;color:#78350f;font-weight:700;">Aucune évaluation trouvée dans Firebase.<br><small style="font-weight:600;opacity:0.7;">Effacez les filtres pour tout afficher.</small></div>`;
               return;
             }
 
@@ -3281,14 +3281,14 @@ ${criteriaSchema}
               const initials = getInitials(prenom, nom) || '?';
               const avatarColor = getAvatarColor(name);
               const classe = doc.studentClasse || '—';
-              const dateStr = doc.submittedAt ? new Date(doc.submittedAt).toLocaleString('fr-FR', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
               const isConfirming = state.pendingDeleteId === summary.docId;
               const scoreStyle = summary.isEvaluated ? getScoreBadgeStyle(summary.totalScore, summary.maxScore) : 'background:#fee2e2;color:#b91c1c;border:1.5px solid #fca5a5;';
               const scoreText = summary.isEvaluated ? `${fmtNum(summary.totalScore)}/${fmtNum(summary.maxScore)}` : '—';
 
               const row = document.createElement('div');
+              row.className = 'teacher-eval-row';
               row.dataset.docId = summary.docId;
-              row.style.cssText = `display:grid;grid-template-columns:40px 1fr 80px 130px 80px 80px 70px;gap:0;padding:9px 12px;align-items:center;border-bottom:1px solid #fde68a;background:${idx%2===0?'#fff8e7':'#fffdf0'};transition:background 0.15s;`;
+              row.style.cssText = `display:grid;grid-template-columns:44px 1.6fr 100px 95px 95px 72px;gap:0;padding:9px 12px;align-items:center;border-bottom:1px solid #fde68a;background:${idx%2===0?'#fff8e7':'#fffdf0'};transition:background 0.15s;`;
               row.onmouseenter = () => { row.style.background = '#fef3c7'; };
               row.onmouseleave = () => { row.style.background = idx%2===0?'#fff8e7':'#fffdf0'; };
 
@@ -3299,7 +3299,6 @@ ${criteriaSchema}
                   <span style="font-size:13px;font-weight:800;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(name)}</span>
                 </div>
                 <div style="font-size:12px;font-weight:700;color:#78350f;">${escHtml(classe)}</div>
-                <div style="font-size:11px;font-weight:700;color:#64748b;">📅 ${escHtml(dateStr)}</div>
                 <div>
                   <span style="padding:4px 10px;border-radius:9999px;font-weight:900;font-size:12px;${scoreStyle}">${escHtml(scoreText)}</span>
                 </div>
@@ -3346,7 +3345,7 @@ ${criteriaSchema}
                   }
                 }
                 if (deletedOk) {
-                  this._removeLocalHistoryDoc(summary.docId);
+                  this._clearLocalHistoryStorage();
                   state.rows = state.rows.filter(r => r.docId !== summary.docId);
                 }
                 render();
@@ -3357,28 +3356,25 @@ ${criteriaSchema}
           };
 
           const loadRows = async () => {
+            this._clearLocalHistoryStorage();
             state.loading = true;
             state.loadError = null;
             render();
             const byId = new Map();
             try {
               if (window.FirebaseService && typeof window.FirebaseService.listEvaluations === 'function') {
-                const res = await window.FirebaseService.listEvaluations(120);
+                const res = await window.FirebaseService.listEvaluations(300);
                 const remoteItems = res && Array.isArray(res.items) ? res.items : (res && Array.isArray(res.data) ? res.data : null);
                 if (res && res.success && remoteItems) {
                   remoteItems.forEach(d => { if (d && d.docId) byId.set(d.docId, d); });
                 } else if (res && res.error) {
                   state.loadError = res.error;
                 }
+              } else {
+                state.loadError = 'Service Firebase indisponible.';
               }
             } catch(e) {
               state.loadError = e && e.message ? e.message : String(e);
-            }
-            if (window.ExerciseSystem && typeof window.ExerciseSystem.getEvaluationHistory === 'function') {
-              try {
-                const localList = window.ExerciseSystem.getEvaluationHistory() || [];
-                localList.forEach(item => { if (item && item.docId && !byId.has(item.docId)) byId.set(item.docId, item); });
-              } catch(e) {}
             }
             const docs = Array.from(byId.values()).sort((a,b) => (Date.parse(b.submittedAt||0)||0) - (Date.parse(a.submittedAt||0)||0));
             state.rows = docs.map(d => this._computeDocSummary(d));
@@ -3386,11 +3382,19 @@ ${criteriaSchema}
             render();
           };
 
+          const applyFiltersAndRefresh = async () => {
+            state.classFilter = classInput.value.trim();
+            state.nameFilter = nameInput.value.trim();
+            state.filterText = [state.classFilter, state.nameFilter].filter(Boolean).join(' ');
+            state.pendingDeleteId = null;
+            await loadRows();
+          };
+
           nameInput.addEventListener('input', () => { state.nameFilter = nameInput.value.trim(); state.pendingDeleteId = null; render(); });
           classInput.addEventListener('input', () => { state.classFilter = classInput.value.trim(); state.pendingDeleteId = null; render(); });
-          classInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
-          nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
-          consultBtn.addEventListener('click', () => applyFilters());
+          classInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFiltersAndRefresh(); });
+          nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFiltersAndRefresh(); });
+          consultBtn.addEventListener('click', () => applyFiltersAndRefresh());
 
           exportBtn.addEventListener('click', () => {
             const toExport = state.rows.filter(s => matchesAllFilters(s));
@@ -18041,49 +18045,18 @@ showJourney2EndCelebration() {
 
       getEvaluationHistory() {
         try {
-          const raw = localStorage.getItem(this.EVAL_HISTORY_KEY);
-          const parsed = raw ? JSON.parse(raw) : [];
-          return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-          return [];
-        }
+          localStorage.removeItem(this.EVAL_HISTORY_KEY);
+          localStorage.removeItem('eval_history_v1');
+        } catch (e) {}
+        return [];
       },
 
       archiveEvaluationToHistory(payload) {
-        if (!payload || !payload.docId) return;
+        // Evaluation history is sourced exclusively from Firebase Firestore; keep local cache cleared
         try {
-          const list = this.getEvaluationHistory().filter(item => item && item.docId !== payload.docId);
-          const helper = window.EvaluationRubricHelper;
-          const resolvedMaxScore = typeof payload.maxTotalScore === 'number' && payload.maxTotalScore > 0
-            ? payload.maxTotalScore
-            : (helper ? helper.resolveEvaluationMaxScore(payload) : 9);
-          const resolvedRubricVersion = payload.rubricVersion
-            || (payload.writingEvaluation && payload.writingEvaluation.rubricVersion)
-            || (payload.rubricConfig && payload.rubricConfig.version)
-            || (resolvedMaxScore === 10 ? '4eme_officiel_v1' : '4eme_officiel_v2_9pts');
-          const entry = {
-            docId: payload.docId,
-            sessionId: payload.sessionId || this.evalSessionId,
-            studentId: payload.studentId || 'ANON',
-            studentNom: payload.studentNom || '',
-            studentPrenom: payload.studentPrenom || '',
-            studentClasse: payload.studentClasse || '',
-            writingStatus: payload.writingStatus || 'pending_teacher_grading',
-            rubricVersion: resolvedRubricVersion,
-            maxScore: resolvedMaxScore,
-            totalScore: typeof payload.totalScore === 'number' ? payload.totalScore : null,
-            questionScores: payload.scoresBreakdown ? {
-              q1: payload.scoresBreakdown.q1,
-              q2: payload.scoresBreakdown.q2,
-              q3: payload.scoresBreakdown.q3
-            } : { q1: null, q2: null, q3: null },
-            submittedAt: payload.submittedAt || new Date().toISOString()
-          };
-          list.unshift(entry);
-          localStorage.setItem(this.EVAL_HISTORY_KEY, JSON.stringify(list.slice(0, 30)));
-        } catch (e) {
-          console.warn('Failed to archive evaluation history:', e);
-        }
+          localStorage.removeItem(this.EVAL_HISTORY_KEY);
+          localStorage.removeItem('eval_history_v1');
+        } catch (e) {}
       },
 
       computeAutoScore() {
@@ -18730,38 +18703,26 @@ showJourney2EndCelebration() {
 
           wrapper.appendChild(imgContainer);
 
-          // Utility row below registration card (reset prefilled draft or inspect past students)
-          const savedHistory = this.getEvaluationHistory();
+          // Clear any legacy local history cache and show only reset draft button when needed
+          try {
+            localStorage.removeItem(this.EVAL_HISTORY_KEY);
+            localStorage.removeItem('eval_history_v1');
+          } catch (e) {}
           const hasDraftProfile = Boolean(profileData && (profileData.id || profileData.nom || profileData.prenom));
-          if (hasDraftProfile || savedHistory.length > 0) {
+          if (hasDraftProfile) {
             const profileBar = document.createElement('div');
             profileBar.style.cssText = 'display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; z-index: 80;';
 
-            if (hasDraftProfile) {
-              const clearDraftBtn = document.createElement('button');
-              clearDraftBtn.id = 'eval-new-student-profile-btn';
-              clearDraftBtn.type = 'button';
-              clearDraftBtn.textContent = '🔄 Nouvel élève (effacer ce brouillon)';
-              clearDraftBtn.style.cssText = 'padding: 8px 16px; border-radius: 9999px; border: 2px solid #fff; background: rgba(234, 88, 12, 0.92); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
-              clearDraftBtn.onclick = () => {
-                playEvalClickSound();
-                this.startNewEvaluationSession({ render: true });
-              };
-              profileBar.appendChild(clearDraftBtn);
-            }
-
-            if (savedHistory.length > 0) {
-              const historyBtn = document.createElement('button');
-              historyBtn.id = 'eval-history-profile-btn';
-              historyBtn.type = 'button';
-              historyBtn.textContent = `📂 Historique (${savedHistory.length})`;
-              historyBtn.style.cssText = 'padding: 8px 16px; border-radius: 9999px; border: 2px solid #fff; background: rgba(30, 58, 138, 0.9); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
-              historyBtn.onclick = () => {
-                playEvalClickSound();
-                this.openEvaluationHistoryModal();
-              };
-              profileBar.appendChild(historyBtn);
-            }
+            const clearDraftBtn = document.createElement('button');
+            clearDraftBtn.id = 'eval-new-student-profile-btn';
+            clearDraftBtn.type = 'button';
+            clearDraftBtn.textContent = '🔄 Nouvel élève (effacer ce brouillon)';
+            clearDraftBtn.style.cssText = 'padding: 8px 16px; border-radius: 9999px; border: 2px solid #fff; background: rgba(234, 88, 12, 0.92); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+            clearDraftBtn.onclick = () => {
+              playEvalClickSound();
+              this.startNewEvaluationSession({ render: true });
+            };
+            profileBar.appendChild(clearDraftBtn);
 
             wrapper.appendChild(profileBar);
           }
@@ -19425,11 +19386,10 @@ showJourney2EndCelebration() {
         }
       },
 
-      openEvaluationHistoryModal() {
+      async openEvaluationHistoryModal() {
         const prev = document.getElementById('eval-history-modal');
         if (prev) prev.remove();
 
-        const history = this.getEvaluationHistory();
         const overlay = document.createElement('div');
         overlay.id = 'eval-history-modal';
         overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(5px); z-index: 9999999; display: flex; align-items: center; justify-content: center; padding: 18px; box-sizing: border-box;';
@@ -19441,7 +19401,7 @@ showJourney2EndCelebration() {
         header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #e2e8f0; padding-bottom:12px; margin-bottom:14px;';
         const title = document.createElement('h2');
         title.style.cssText = 'margin:0; font-size:20px; color:#1e3a8a;';
-        title.textContent = `📂 Historique des évaluations (${history.length})`;
+        title.textContent = '📂 Évaluations enregistrées';
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '✖';
         closeBtn.style.cssText = 'width:36px; height:36px; border-radius:50%; border:none; background:#ef4444; color:#fff; font-weight:bold; cursor:pointer; font-size:16px;';
@@ -19450,75 +19410,86 @@ showJourney2EndCelebration() {
         header.appendChild(closeBtn);
         card.appendChild(header);
 
-        if (history.length === 0) {
-          const empty = document.createElement('div');
-          empty.style.cssText = 'padding:20px; text-align:center; color:#64748b; font-weight:700;';
-          empty.textContent = 'Aucune évaluation soumise pour le moment.';
-          card.appendChild(empty);
-        } else {
-          history.forEach(item => {
-            const row = document.createElement('div');
-            row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; border:1.5px solid #cbd5e1; border-radius:14px; padding:12px 14px; margin-bottom:10px; background:#f8fafc;';
-
-            const left = document.createElement('div');
-            const nameLine = document.createElement('div');
-            nameLine.style.cssText = 'font-weight:800; font-size:15px; color:#0f172a;';
-            nameLine.textContent = `${item.studentPrenom || ''} ${item.studentNom || ''} (ID: ${item.studentId || 'ANON'}, ${item.studentClasse || 'N/A'})`.trim();
-            const metaLine = document.createElement('div');
-            metaLine.style.cssText = 'font-size:12px; color:#64748b; margin-top:2px;';
-            metaLine.textContent = `${item.submittedAt ? new Date(item.submittedAt).toLocaleString() : ''} • Doc: ${item.docId}`;
-            left.appendChild(nameLine);
-            left.appendChild(metaLine);
-
-            const right = document.createElement('div');
-            right.style.cssText = 'display:flex; align-items:center; gap:8px;';
-            const statusBadge = document.createElement('span');
-            const ok = item.writingStatus === 'evaluated' && typeof item.totalScore === 'number';
-            const helper = window.EvaluationRubricHelper;
-            const itemMax = (typeof item.maxScore === 'number' && item.maxScore > 0)
-              ? item.maxScore
-              : (item.rubricVersion === '4eme_officiel_v1' || (typeof item.totalScore === 'number' && item.totalScore > 9) || (item.questionScores && typeof item.questionScores.q3 === 'number' && item.questionScores.q3 > 3)
-                ? 10
-                : (helper ? helper.resolveEvaluationMaxScore(item) : 9));
-            statusBadge.style.cssText = `padding:5px 10px; border-radius:9999px; font-weight:800; font-size:13px; background:${ok ? '#ecfdf5' : '#fef2f2'}; color:${ok ? '#065f46' : '#991b1b'}; border:1.5px solid ${ok ? '#6ee7b7' : '#fca5a5'};`;
-            statusBadge.textContent = ok ? `✅ ${item.totalScore} / ${itemMax}` : '⚠️ Incomplète';
-            right.appendChild(statusBadge);
-
-            const viewBtn = document.createElement('button');
-            viewBtn.type = 'button';
-            viewBtn.textContent = 'Ouvrir';
-            viewBtn.style.cssText = 'padding:6px 12px; border-radius:10px; border:none; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer;';
-            viewBtn.onclick = async () => {
-              viewBtn.disabled = true;
-              viewBtn.textContent = '...';
-              try {
-                if (window.FirebaseService && typeof window.FirebaseService.getEvaluation === 'function') {
-                  const res = await window.FirebaseService.getEvaluation(item.docId);
-                  if (res && res.success && res.exists && res.data) {
-                    overlay.remove();
-                    this.lastEvalDocId = item.docId;
-                    this.evalSessionId = res.data.sessionId || item.sessionId;
-                    this.evalPhase = 'submitted';
-                    this.lastSavedEvaluation = res.data;
-                    this.showEvaluationEndCelebration();
-                    return;
-                  }
-                }
-              } catch (e) {}
-              viewBtn.disabled = false;
-              viewBtn.textContent = 'Indisponible';
-            };
-            right.appendChild(viewBtn);
-
-            row.appendChild(left);
-            row.appendChild(right);
-            card.appendChild(row);
-          });
-        }
-
+        const body = document.createElement('div');
+        body.innerHTML = '<div style="padding:20px; text-align:center; color:#64748b; font-weight:700;">⏳ Chargement depuis Firebase...</div>';
+        card.appendChild(body);
         overlay.appendChild(card);
         document.body.appendChild(overlay);
         overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+        let history = [];
+        try {
+          if (window.FirebaseService && typeof window.FirebaseService.listEvaluations === 'function') {
+            const res = await window.FirebaseService.listEvaluations(300);
+            if (res && res.success && Array.isArray(res.items)) {
+              history = res.items;
+            }
+          }
+        } catch (e) {}
+
+        title.textContent = `📂 Évaluations enregistrées (${history.length})`;
+        body.innerHTML = '';
+
+        if (history.length === 0) {
+          const empty = document.createElement('div');
+          empty.style.cssText = 'padding:20px; text-align:center; color:#64748b; font-weight:700;';
+          empty.textContent = 'Aucune évaluation enregistrée dans Firebase.';
+          body.appendChild(empty);
+          return;
+        }
+
+        history.forEach(item => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; border:1.5px solid #cbd5e1; border-radius:14px; padding:12px 14px; margin-bottom:10px; background:#f8fafc;';
+
+          const left = document.createElement('div');
+          const nameLine = document.createElement('div');
+          nameLine.style.cssText = 'font-weight:800; font-size:15px; color:#0f172a;';
+          nameLine.textContent = `${item.studentPrenom || ''} ${item.studentNom || ''} (ID: ${item.studentId || 'ANON'}, ${item.studentClasse || 'N/A'})`.trim();
+          left.appendChild(nameLine);
+
+          const right = document.createElement('div');
+          right.style.cssText = 'display:flex; align-items:center; gap:8px;';
+          const statusBadge = document.createElement('span');
+          const ok = item.writingStatus === 'evaluated' && typeof item.totalScore === 'number';
+          const helper = window.EvaluationRubricHelper;
+          const itemMax = (typeof item.maxTotalScore === 'number' && item.maxTotalScore > 0)
+            ? item.maxTotalScore
+            : (helper ? helper.resolveEvaluationMaxScore(item) : 9);
+          statusBadge.style.cssText = `padding:5px 10px; border-radius:9999px; font-weight:800; font-size:13px; background:${ok ? '#ecfdf5' : '#fef2f2'}; color:${ok ? '#065f46' : '#991b1b'}; border:1.5px solid ${ok ? '#6ee7b7' : '#fca5a5'};`;
+          statusBadge.textContent = ok ? `✅ ${item.totalScore} / ${itemMax}` : '⚠️ Incomplète';
+          right.appendChild(statusBadge);
+
+          const viewBtn = document.createElement('button');
+          viewBtn.type = 'button';
+          viewBtn.textContent = 'Ouvrir';
+          viewBtn.style.cssText = 'padding:6px 12px; border-radius:10px; border:none; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer;';
+          viewBtn.onclick = async () => {
+            viewBtn.disabled = true;
+            viewBtn.textContent = '...';
+            try {
+              if (window.FirebaseService && typeof window.FirebaseService.getEvaluation === 'function') {
+                const res = await window.FirebaseService.getEvaluation(item.docId);
+                if (res && res.success && res.exists && res.data) {
+                  overlay.remove();
+                  this.lastEvalDocId = item.docId;
+                  this.evalSessionId = res.data.sessionId || item.sessionId;
+                  this.evalPhase = 'submitted';
+                  this.lastSavedEvaluation = res.data;
+                  this.showEvaluationEndCelebration();
+                  return;
+                }
+              }
+            } catch (e) {}
+            viewBtn.disabled = false;
+            viewBtn.textContent = 'Indisponible';
+          };
+          right.appendChild(viewBtn);
+
+          row.appendChild(left);
+          row.appendChild(right);
+          body.appendChild(row);
+        });
       },
 
       openEvaluationDetailsModal(fsDoc, overallTotal) {
