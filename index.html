@@ -3084,156 +3084,244 @@ ${criteriaSchema}
           const rawCode = String(initialCode || this.lastEnteredCode || '').trim();
           const state = {
             filterText: wildcardCodes.includes(rawCode.toLowerCase()) ? '' : rawCode,
-            scaleFilter: 'all', // 'all' | 'v2_9' | 'v1_10'
+            classFilter: wildcardCodes.includes(rawCode.toLowerCase()) ? '' : rawCode,
+            nameFilter: '',
             loading: true,
             loadError: null,
             rows: [],
             pendingDeleteId: null
           };
 
+          const escHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+          const fmtNum = (n) => typeof n === 'number' ? (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')) : String(n ?? '—');
+          const avatarColors = ['#7c3aed','#16a34a','#d97706','#dc2626','#0369a1','#c026d3','#059669','#ea580c'];
+          const getAvatarColor = (name) => avatarColors[Math.abs([...name].reduce((a,c)=>a+c.charCodeAt(0),0)) % avatarColors.length];
+          const getInitials = (prenom, nom) => ((prenom||'')[0]||'') + ((nom||'')[0]||'');
+          const getScoreBadgeStyle = (score, maxScore) => {
+            if (typeof score !== 'number' || typeof maxScore !== 'number' || maxScore === 0) return 'background:#f1f5f9;color:#64748b;border:1.5px solid #cbd5e1;';
+            const pct = score / maxScore;
+            if (pct >= 0.666) return 'background:#dcfce7;color:#15803d;border:1.5px solid #86efac;';
+            if (pct >= 0.333) return 'background:#fef3c7;color:#b45309;border:1.5px solid #fcd34d;';
+            return 'background:#fee2e2;color:#b91c1c;border:1.5px solid #fca5a5;';
+          };
+
           const overlay = document.createElement('div');
           overlay.id = 'teacher-dashboard-modal';
-          overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15,23,42,0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 1000001; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: "Nunito", "Segoe UI", sans-serif;';
+          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,40,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:1000001;display:flex;align-items:center;justify-content:center;padding:16px;font-family:"Nunito","Segoe UI",sans-serif;box-sizing:border-box;';
+
           overlay.innerHTML = `
-            <div style="background:#ffffff; border-radius:22px; width:100%; max-width:980px; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.45); border:3px solid #f59e0b;">
-              <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7); padding:14px 20px; border-bottom:2px solid #fde68a; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                  <span style="font-size:26px;">👩‍🏫</span>
-                  <div>
-                    <h2 style="margin:0; font-size:20px; font-weight:900; color:#78350f;">Tableau de bord Enseignant — Évaluations</h2>
-                    <div style="font-size:12px; color:#92400e; font-weight:700;">Barème actif : /9 pts (C1 4.5 • C3 3 • C6 1.5) — Historique /10 préservé</div>
+            <div id="td-main-frame" style="position:relative;width:100%;max-width:1080px;max-height:94vh;background:linear-gradient(160deg,#f5a623 0%,#e8891c 100%);border-radius:28px;padding:6px;box-shadow:0 0 0 4px #c9770d,0 0 0 8px #f5a623,0 24px 60px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden;">
+              <!-- Top bar with title and X -->
+              <div style="position:relative;display:flex;align-items:center;justify-content:center;padding:10px 60px 0 60px;min-height:70px;flex-shrink:0;">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+                  <img src="evalution/botten tet.png" style="width:62px;height:62px;object-fit:contain;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.3));margin-bottom:-8px;position:relative;z-index:2;" alt="">
+                  <div style="background:linear-gradient(135deg,#f5a623,#e8891c);border:3px solid #c9770d;border-radius:16px;padding:8px 36px;box-shadow:inset 0 2px 4px rgba(255,255,255,0.3),0 4px 12px rgba(0,0,0,0.3);">
+                    <span style="font-family:'Nunito',sans-serif;font-size:clamp(18px,3vw,28px);font-weight:900;color:#fff;text-shadow:0 2px 4px rgba(0,0,0,0.4),0 0 1px #000;letter-spacing:0.5px;">Espace Enseignant</span>
                   </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <button type="button" id="td-back-btn" style="background:#ffffff; color:#92400e; border:1.5px solid #f59e0b; border-radius:9999px; padding:6px 12px; font-weight:800; font-size:13px; cursor:pointer;">← Code</button>
-                  <button type="button" id="td-close-all-btn" style="background:#dc2626; color:#ffffff; border:none; border-radius:9999px; width:34px; height:34px; font-weight:900; font-size:16px; cursor:pointer;">✕</button>
+                <button id="td-close-all-btn" type="button" style="position:absolute;right:4px;top:4px;width:44px;height:44px;border-radius:50%;border:3px solid #fff;background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff;font-size:20px;font-weight:900;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;line-height:1;">✕</button>
+              </div>
+
+              <!-- Inner cream container -->
+              <div style="background:#fff8e7;border-radius:20px;margin:8px 6px 6px 6px;flex:1;display:flex;overflow:hidden;min-height:0;border:3px solid #e8891c;">
+                <!-- LEFT SIDEBAR -->
+                <div style="width:210px;min-width:170px;flex-shrink:0;background:#fff8e7;border-right:2px solid #fde68a;display:flex;flex-direction:column;padding:12px 10px;gap:10px;">
+                  <!-- Teacher illustration -->
+                  <div style="flex:1;min-height:120px;max-height:220px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#fef9ec,#fde68a);position:relative;">
+                    <div style="position:absolute;inset:0;background-image:url('evalution/espace.png');background-size:280% auto;background-position:14% 42%;background-repeat:no-repeat;"></div>
+                  </div>
+                  <!-- Nav buttons -->
+                  <button type="button" id="td-nav-results" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;border-radius:12px;padding:11px 10px;font-weight:800;font-size:13px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;box-shadow:0 3px 8px rgba(124,58,237,0.4);">
+                    <span style="font-size:16px;">📊</span> Résultats des évaluations
+                  </button>
+                  <button type="button" id="td-nav-settings" style="background:#fef9ec;color:#78350f;border:2px solid #fde68a;border-radius:12px;padding:11px 10px;font-weight:800;font-size:13px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:16px;">⚙️</span> Paramètres
+                  </button>
+                  <div style="flex:1;"></div>
+                  <button type="button" id="td-logout-btn" style="background:#fff;color:#dc2626;border:2px solid #dc2626;border-radius:12px;padding:9px 10px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:16px;">🚪</span> Déconnexion
+                  </button>
+                </div>
+
+                <!-- RIGHT CONTENT -->
+                <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding:16px 16px 10px 16px;min-width:0;">
+                  <!-- Search row -->
+                  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-bottom:10px;flex-shrink:0;">
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                      <label style="font-size:12px;font-weight:800;color:#78350f;">Nom de la classe :</label>
+                      <div style="display:flex;align-items:center;background:#fff;border:2px solid #fde68a;border-radius:10px;padding:7px 10px;gap:6px;min-width:130px;">
+                        <span style="font-size:14px;">🔑</span>
+                        <input type="text" id="td-class-input" placeholder="ex: 4A-001" style="border:none;outline:none;background:transparent;font-size:13px;font-weight:700;color:#1e293b;width:90px;font-family:inherit;" />
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;background:#fff;border:2px solid #fde68a;border-radius:10px;padding:7px 12px;gap:8px;flex:1;min-width:160px;">
+                      <span style="font-size:16px;">🔍</span>
+                      <input type="text" id="td-name-input" placeholder="Rechercher un étudiant..." style="border:none;outline:none;background:transparent;font-size:13px;font-weight:700;color:#1e293b;width:100%;font-family:inherit;" />
+                    </div>
+                    <button type="button" id="td-consult-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 3px 8px rgba(22,163,74,0.4);flex-shrink:0;">
+                      <span>🔍</span> Consulter
+                    </button>
+                    <div style="flex:1;"></div>
+                    <button type="button" id="td-export-btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 3px 8px rgba(124,58,237,0.4);flex-shrink:0;">
+                      <span>⬇️</span> Exporter
+                    </button>
+                  </div>
+
+                  <!-- Stats bar -->
+                  <div id="td-stats-bar" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;flex-shrink:0;font-size:12px;min-height:28px;"></div>
+
+                  <!-- Table -->
+                  <div style="flex:1;overflow-y:auto;border-radius:14px;overflow:hidden;min-height:0;border:2px solid #e8891c;">
+                    <!-- Table header -->
+                    <div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;display:grid;grid-template-columns:40px 1fr 80px 130px 80px 80px 70px;gap:0;padding:10px 12px;position:sticky;top:0;z-index:2;">
+                      <div style="font-size:12px;font-weight:900;">#</div>
+                      <div style="font-size:12px;font-weight:900;">Étudiant</div>
+                      <div style="font-size:12px;font-weight:900;">Classe</div>
+                      <div style="font-size:12px;font-weight:900;">Date</div>
+                      <div style="font-size:12px;font-weight:900;">Score</div>
+                      <div style="font-size:12px;font-weight:900;">Détails</div>
+                      <div style="font-size:12px;font-weight:900;">Actions</div>
+                    </div>
+                    <!-- Table body -->
+                    <div id="td-list-body" style="background:#fff8e7;"></div>
+                  </div>
                 </div>
               </div>
-              <div style="padding:12px 20px; background:#f8fafc; border-bottom:1.5px solid #e2e8f0; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
-                <input type="text" id="td-filter-input" placeholder="Filtrer par classe, ID, nom ou docId..." style="flex:1; min-width:210px; padding:8px 14px; border-radius:9999px; border:1.5px solid #cbd5e1; font-size:14px; font-weight:700; color:#0f172a; outline:none;" />
-                <button type="button" id="td-show-all-btn" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #7dd3fc; border-radius:9999px; padding:7px 14px; font-weight:800; font-size:13px; cursor:pointer;">Tout afficher</button>
-                <div style="display:flex; gap:4px; background:#e2e8f0; padding:3px; border-radius:9999px;">
-                  <button type="button" class="td-scale-btn" data-scale="all" style="padding:5px 11px; border-radius:9999px; border:none; font-size:12px; font-weight:800; cursor:pointer;">Tous</button>
-                  <button type="button" class="td-scale-btn" data-scale="v2_9" style="padding:5px 11px; border-radius:9999px; border:none; font-size:12px; font-weight:800; cursor:pointer;">Actuel /9</button>
-                  <button type="button" class="td-scale-btn" data-scale="v1_10" style="padding:5px 11px; border-radius:9999px; border:none; font-size:12px; font-weight:800; cursor:pointer;">Ancien /10</button>
-                </div>
-                <button type="button" id="td-refresh-btn" style="background:#f59e0b; color:#ffffff; border:none; border-radius:9999px; padding:7px 14px; font-weight:800; font-size:13px; cursor:pointer;">🔄 Actualiser</button>
-              </div>
-              <div id="td-stats-bar" style="padding:10px 20px; background:#ffffff; border-bottom:1.5px solid #e2e8f0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:13px;"></div>
-              <div id="td-list-body" style="padding:16px 20px; overflow-y:auto; flex:1; background:#f8fafc;"></div>
             </div>
           `;
+
           document.body.appendChild(overlay);
 
-          const filterInput = overlay.querySelector('#td-filter-input');
-          const showAllBtn = overlay.querySelector('#td-show-all-btn');
-          const refreshBtn = overlay.querySelector('#td-refresh-btn');
+          const classInput = overlay.querySelector('#td-class-input');
+          const nameInput = overlay.querySelector('#td-name-input');
           const statsBar = overlay.querySelector('#td-stats-bar');
           const listBody = overlay.querySelector('#td-list-body');
-          const scaleBtns = Array.from(overlay.querySelectorAll('.td-scale-btn'));
+          const consultBtn = overlay.querySelector('#td-consult-btn');
+          const exportBtn = overlay.querySelector('#td-export-btn');
 
-          filterInput.value = state.filterText;
+          classInput.value = state.classFilter;
 
-          const updateScaleButtons = () => {
-            scaleBtns.forEach((btn) => {
-              const active = btn.dataset.scale === state.scaleFilter;
-              btn.style.background = active ? '#1e40af' : 'transparent';
-              btn.style.color = active ? '#ffffff' : '#334155';
+          const applyFilters = () => {
+            state.classFilter = classInput.value.trim();
+            state.nameFilter = nameInput.value.trim();
+            state.filterText = [state.classFilter, state.nameFilter].filter(Boolean).join(' ');
+            state.pendingDeleteId = null;
+            render();
+          };
+
+          const exportToCsv = (rows) => {
+            const header = ['Nom','Prénom','ID','Classe','Date','Q1 (/3)','Q2 (/3)','Q3 (/3)','C1 (/4.5)','C3 (/3)','C6 (/1.5)','Score','Max','Statut'];
+            const csvRows = rows.map(s => {
+              const doc = s.doc;
+              const we = doc.writingEvaluation || {};
+              const qs = we.questions || {};
+              const ct = s.criteriaTotals || {};
+              return [
+                doc.studentNom||'', doc.studentPrenom||'', doc.studentId||'', doc.studentClasse||'',
+                doc.submittedAt ? new Date(doc.submittedAt).toLocaleString('fr-FR') : '',
+                s.qData?.q1?.score ?? '', s.qData?.q2?.score ?? '', s.qData?.q3?.score ?? '',
+                typeof ct.C1 === 'number' ? ct.C1 : (ct.C1?.score ?? ''),
+                typeof ct.C3 === 'number' ? ct.C3 : (ct.C3?.score ?? ''),
+                typeof ct.C6 === 'number' ? ct.C6 : (ct.C6?.score ?? ''),
+                s.totalScore ?? '', s.maxScore ?? '', s.isEvaluated ? 'Corrigée' : 'Incomplète'
+              ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
             });
+            const csv = [header.join(','), ...csvRows].join('\n');
+            const blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'evaluations_espace_enseignant.csv';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+
+          const matchesAllFilters = (summary) => {
+            const doc = summary.doc;
+            const classF = state.classFilter.toLowerCase();
+            const nameF = state.nameFilter.toLowerCase();
+            if (classF) {
+              const classStr = (doc.studentClasse || doc.studentId || '').toLowerCase();
+              if (!classStr.includes(classF)) return false;
+            }
+            if (nameF) {
+              const nameStr = `${doc.studentNom||''} ${doc.studentPrenom||''} ${doc.studentId||''}`.toLowerCase();
+              if (!nameStr.includes(nameF)) return false;
+            }
+            return true;
           };
 
           const render = () => {
-            updateScaleButtons();
             if (state.loading) {
-              statsBar.innerHTML = `<span style="color:#64748b; font-weight:700;">⏳ Chargement des copies depuis Firestore...</span>`;
-              listBody.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b; font-weight:700;">⏳ Récupération des évaluations en cours...</div>`;
+              statsBar.innerHTML = `<span style="color:#78350f;font-weight:700;">⏳ Chargement des évaluations...</span>`;
+              listBody.innerHTML = `<div style="text-align:center;padding:40px;color:#78350f;font-weight:700;">⏳ Récupération des évaluations en cours...</div>`;
               return;
             }
 
-            const filtered = state.rows.filter((summary) => {
-              if (state.scaleFilter === 'v2_9' && summary.isLegacyV1) return false;
-              if (state.scaleFilter === 'v1_10' && !summary.isLegacyV1) return false;
-              return this._matchesFilter(summary.doc, state.filterText);
-            });
-
-            const activeV2Eval = filtered.filter(r => !r.isLegacyV1 && r.isEvaluated);
-            const legacyCount = filtered.filter(r => r.isLegacyV1).length;
-            const avg9 = activeV2Eval.length
-              ? this._fmtNum(activeV2Eval.reduce((a, r) => a + r.totalScore, 0) / activeV2Eval.length)
-              : '—';
-            const critAvg = (code) => {
-              const vals = activeV2Eval.map(r => r.criteriaTotals && r.criteriaTotals[code]).filter(v => typeof v === 'number');
-              return vals.length ? this._fmtNum(vals.reduce((a, b) => a + b, 0) / vals.length) : '—';
-            };
+            const filtered = state.rows.filter(s => matchesAllFilters(s));
+            const evaluatedRows = filtered.filter(r => r.isEvaluated && !r.isLegacyV1);
+            const avg9 = evaluatedRows.length ? fmtNum(evaluatedRows.reduce((a,r)=>a+r.totalScore,0)/evaluatedRows.length) : '—';
 
             statsBar.innerHTML = `
-              <span style="background:#eff6ff; color:#1e40af; padding:4px 10px; border-radius:9999px; font-weight:800;">📊 ${filtered.length} résultat(s)</span>
-              <span style="background:#ecfdf5; color:#065f46; padding:4px 10px; border-radius:9999px; font-weight:800;">✅ Corrigées /9 : ${activeV2Eval.length} (Moy. ${avg9} / 9)</span>
-              <span style="background:#f1f5f9; color:#334155; padding:4px 10px; border-radius:9999px; font-weight:700;">C1 : ${critAvg('C1')}/4.5 • C3 : ${critAvg('C3')}/3 • C6 : ${critAvg('C6')}/1.5</span>
-              ${legacyCount > 0 ? `<span style="background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:9999px; font-weight:800;">📜 Anciennes /10 : ${legacyCount}</span>` : ''}
-              ${state.loadError ? `<span style="background:#fef2f2; color:#991b1b; padding:4px 10px; border-radius:9999px; font-weight:700;">⚠️ ${this._escapeHtml(state.loadError)}</span>` : ''}
+              <span style="background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:9999px;font-weight:800;">📊 ${filtered.length} résultat(s)</span>
+              <span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:9999px;font-weight:800;">✅ Corrigées : ${evaluatedRows.length} (Moy. ${avg9}/9)</span>
+              ${state.loadError ? `<span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:9999px;font-weight:700;">⚠️ ${escHtml(state.loadError)}</span>` : ''}
             `;
 
             if (filtered.length === 0) {
-              listBody.innerHTML = `
-                <div style="text-align:center; padding:34px 16px; background:#ffffff; border:1.5px dashed #cbd5e1; border-radius:16px; color:#475569;">
-                  <div style="font-size:16px; font-weight:800; margin-bottom:6px;">Aucune évaluation ne correspond au filtre « ${this._escapeHtml(state.filterText)} ».</div>
-                  <div style="font-size:13px; margin-bottom:12px;">Clique sur « Tout afficher » pour consulter toutes les copies enregistrées.</div>
-                </div>
-              `;
+              listBody.innerHTML = `<div style="text-align:center;padding:34px;color:#78350f;font-weight:700;">Aucune évaluation trouvée.<br><small style="font-weight:600;opacity:0.7;">Effacez les filtres pour tout afficher.</small></div>`;
               return;
             }
 
             listBody.innerHTML = '';
-            filtered.forEach((summary) => {
+            filtered.forEach((summary, idx) => {
               const doc = summary.doc;
-              const name = `${doc.studentPrenom || ''} ${doc.studentNom || ''}`.trim() || 'Élève anonyme';
-              const dateStr = doc.submittedAt ? new Date(doc.submittedAt).toLocaleString('fr-FR') : 'Date inconnue';
+              const prenom = doc.studentPrenom || '';
+              const nom = doc.studentNom || '';
+              const name = `${prenom} ${nom}`.trim() || 'Élève anonyme';
+              const initials = getInitials(prenom, nom) || '?';
+              const avatarColor = getAvatarColor(name);
+              const classe = doc.studentClasse || '—';
+              const dateStr = doc.submittedAt ? new Date(doc.submittedAt).toLocaleString('fr-FR', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
               const isConfirming = state.pendingDeleteId === summary.docId;
+              const scoreStyle = summary.isEvaluated ? getScoreBadgeStyle(summary.totalScore, summary.maxScore) : 'background:#fee2e2;color:#b91c1c;border:1.5px solid #fca5a5;';
+              const scoreText = summary.isEvaluated ? `${fmtNum(summary.totalScore)}/${fmtNum(summary.maxScore)}` : '—';
 
-              const qPills = ['q1', 'q2', 'q3'].map((qk, idx) => {
-                const q = summary.qData[qk];
-                const txt = typeof q.score === 'number' ? `${this._fmtNum(q.score)}/${this._fmtNum(q.maxScore)}` : `—/${this._fmtNum(q.maxScore)}`;
-                return `<span style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:3px 8px; font-size:12px; font-weight:800; color:#1e293b;">Q${idx + 1} : ${txt}</span>`;
-              }).join(' ');
+              const row = document.createElement('div');
+              row.dataset.docId = summary.docId;
+              row.style.cssText = `display:grid;grid-template-columns:40px 1fr 80px 130px 80px 80px 70px;gap:0;padding:9px 12px;align-items:center;border-bottom:1px solid #fde68a;background:${idx%2===0?'#fff8e7':'#fffdf0'};transition:background 0.15s;`;
+              row.onmouseenter = () => { row.style.background = '#fef3c7'; };
+              row.onmouseleave = () => { row.style.background = idx%2===0?'#fff8e7':'#fffdf0'; };
 
-              let critLine = '';
-              if (!summary.isLegacyV1 && summary.criteriaTotals) {
-                const c = summary.criteriaTotals;
-                critLine = `<div style="font-size:12px; color:#475569; margin-top:4px; font-weight:700;">Critères actifs : C1 ${typeof c.C1 === 'number' ? c.C1 : '—'}/4.5 • C3 ${typeof c.C3 === 'number' ? c.C3 : '—'}/3 • C6 ${typeof c.C6 === 'number' ? c.C6 : '—'}/1.5</div>`;
-              }
-
-              const card = document.createElement('div');
-              card.className = 'teacher-eval-row';
-              card.dataset.docId = summary.docId;
-              card.style.cssText = 'background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:12px 14px; margin-bottom:10px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 2px 6px rgba(15,23,42,0.04);';
-              card.innerHTML = `
-                <div style="flex:1; min-width:260px;">
-                  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
-                    <strong style="font-size:15px; color:#0f172a;">${this._escapeHtml(name)}</strong>
-                    <span style="font-size:12px; color:#475569; font-weight:700;">• ID : ${this._escapeHtml(doc.studentId || '—')} • Classe : ${this._escapeHtml(doc.studentClasse || '—')}</span>
-                    <span style="font-size:11px; padding:2px 8px; border-radius:9999px; font-weight:800; background:${summary.isLegacyV1 ? '#fef3c7' : '#dbeafe'}; color:${summary.isLegacyV1 ? '#92400e' : '#1e40af'};">${summary.isLegacyV1 ? 'Ancien /10' : 'Barème /9'}</span>
-                  </div>
-                  <div style="font-size:12px; color:#64748b; margin-top:3px;">🕒 ${this._escapeHtml(dateStr)}</div>
-                  <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">${qPills}</div>
-                  ${critLine}
+              row.innerHTML = `
+                <div style="font-size:12px;font-weight:800;color:#78350f;">${idx+1}</div>
+                <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+                  <div style="width:34px;height:34px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">${escHtml(initials.toUpperCase())}</div>
+                  <span style="font-size:13px;font-weight:800;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(name)}</span>
                 </div>
-                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
-                  <span style="padding:6px 12px; border-radius:9999px; font-weight:900; font-size:14px; background:${summary.isEvaluated ? '#ecfdf5' : '#fef2f2'}; color:${summary.isEvaluated ? '#065f46' : '#991b1b'}; border:1.5px solid ${summary.isEvaluated ? '#6ee7b7' : '#fca5a5'};">${summary.isEvaluated ? `✅ ${this._fmtNum(summary.totalScore)} / ${this._fmtNum(summary.maxScore)}` : '⚠️ Incomplète'}</span>
-                  <button type="button" class="td-details-btn" style="background:#3b82f6; color:#ffffff; border:none; border-radius:9999px; padding:7px 12px; font-weight:800; font-size:12px; cursor:pointer;">📄 Détails</button>
-                  <button type="button" class="td-delete-btn" style="background:${isConfirming ? '#b91c1c' : '#fee2e2'}; color:${isConfirming ? '#ffffff' : '#b91c1c'}; border:1.5px solid #fca5a5; border-radius:9999px; padding:6px 12px; font-weight:800; font-size:12px; cursor:pointer;">${isConfirming ? '⚠️ Confirmer' : '🗑️ Supprimer'}</button>
+                <div style="font-size:12px;font-weight:700;color:#78350f;">${escHtml(classe)}</div>
+                <div style="font-size:11px;font-weight:700;color:#64748b;">📅 ${escHtml(dateStr)}</div>
+                <div>
+                  <span style="padding:4px 10px;border-radius:9999px;font-weight:900;font-size:12px;${scoreStyle}">${escHtml(scoreText)}</span>
+                </div>
+                <div>
+                  <button type="button" class="td-details-btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-weight:800;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;box-shadow:0 2px 6px rgba(124,58,237,0.3);">
+                    <span>👁️</span> Voir
+                  </button>
+                </div>
+                <div>
+                  <button type="button" class="td-delete-btn" style="background:${isConfirming?'#b91c1c':'#fee2e2'};color:${isConfirming?'#fff':'#b91c1c'};border:1.5px solid #fca5a5;border-radius:8px;padding:5px 8px;font-weight:800;font-size:12px;cursor:pointer;" title="${isConfirming?'Confirmer la suppression':'Supprimer'}">
+                    ${isConfirming?'⚠️':'🗑️'}
+                  </button>
                 </div>
               `;
 
-              card.querySelector('.td-details-btn').addEventListener('click', async () => {
+              row.querySelector('.td-details-btn').addEventListener('click', async () => {
                 let targetDoc = doc;
                 if ((!doc.writingEvaluation || !doc.writingEvaluation.questions) && window.FirebaseService && summary.docId) {
                   try {
                     const fetched = await window.FirebaseService.getEvaluation(summary.docId);
-                    if (fetched && fetched.success && fetched.exists && fetched.data) {
-                      targetDoc = fetched.data;
-                    }
-                  } catch (e) {}
+                    if (fetched && fetched.success && fetched.exists && fetched.data) targetDoc = fetched.data;
+                  } catch(e) {}
                 }
                 if (window.ExerciseSystem && typeof window.ExerciseSystem.openEvaluationDetailsModal === 'function') {
                   window.ExerciseSystem.openEvaluationDetailsModal(targetDoc, summary.totalScore);
@@ -3242,7 +3330,7 @@ ${criteriaSchema}
                 }
               });
 
-              card.querySelector('.td-delete-btn').addEventListener('click', async () => {
+              row.querySelector('.td-delete-btn').addEventListener('click', async () => {
                 if (state.pendingDeleteId !== summary.docId) {
                   state.pendingDeleteId = summary.docId;
                   render();
@@ -3254,7 +3342,7 @@ ${criteriaSchema}
                   const delRes = await window.FirebaseService.deleteEvaluation(summary.docId);
                   if (delRes && delRes.success === false) {
                     deletedOk = false;
-                    state.loadError = delRes.error || 'Suppression Firestore impossible.';
+                    state.loadError = delRes.error || 'Suppression impossible.';
                   }
                 }
                 if (deletedOk) {
@@ -3264,7 +3352,7 @@ ${criteriaSchema}
                 render();
               });
 
-              listBody.appendChild(card);
+              listBody.appendChild(row);
             });
           };
 
@@ -3272,83 +3360,55 @@ ${criteriaSchema}
             state.loading = true;
             state.loadError = null;
             render();
-
             const byId = new Map();
             try {
               if (window.FirebaseService && typeof window.FirebaseService.listEvaluations === 'function') {
                 const res = await window.FirebaseService.listEvaluations(120);
-                const remoteItems = res && Array.isArray(res.items)
-                  ? res.items
-                  : (res && Array.isArray(res.data) ? res.data : null);
+                const remoteItems = res && Array.isArray(res.items) ? res.items : (res && Array.isArray(res.data) ? res.data : null);
                 if (res && res.success && remoteItems) {
-                  remoteItems.forEach((d) => {
-                    if (d && d.docId) byId.set(d.docId, d);
-                  });
+                  remoteItems.forEach(d => { if (d && d.docId) byId.set(d.docId, d); });
                 } else if (res && res.error) {
                   state.loadError = res.error;
                 }
               }
-            } catch (e) {
+            } catch(e) {
               state.loadError = e && e.message ? e.message : String(e);
             }
-
             if (window.ExerciseSystem && typeof window.ExerciseSystem.getEvaluationHistory === 'function') {
               try {
                 const localList = window.ExerciseSystem.getEvaluationHistory() || [];
-                localList.forEach((item) => {
-                  if (item && item.docId && !byId.has(item.docId)) {
-                    byId.set(item.docId, item);
-                  }
-                });
-              } catch (e) {}
+                localList.forEach(item => { if (item && item.docId && !byId.has(item.docId)) byId.set(item.docId, item); });
+              } catch(e) {}
             }
-
-            const docs = Array.from(byId.values()).sort((a, b) => {
-              const ta = Date.parse(a.submittedAt || 0) || 0;
-              const tb = Date.parse(b.submittedAt || 0) || 0;
-              return tb - ta;
-            });
-
+            const docs = Array.from(byId.values()).sort((a,b) => (Date.parse(b.submittedAt||0)||0) - (Date.parse(a.submittedAt||0)||0));
             state.rows = docs.map(d => this._computeDocSummary(d));
             state.loading = false;
-            const statusBanner = document.getElementById('teacher-portal-status');
-            if (statusBanner) {
-              statusBanner.textContent = `✅ ${state.rows.length} évaluation(s) chargée(s).`;
-              statusBanner.style.color = '#166534';
-            }
             render();
           };
 
-          filterInput.addEventListener('input', () => {
-            state.filterText = filterInput.value;
-            state.pendingDeleteId = null;
-            render();
-          });
-          showAllBtn.addEventListener('click', () => {
-            state.filterText = '';
-            filterInput.value = '';
-            state.scaleFilter = 'all';
-            state.pendingDeleteId = null;
-            render();
-          });
-          refreshBtn.addEventListener('click', () => loadRows());
-          scaleBtns.forEach((btn) => {
-            btn.addEventListener('click', () => {
-              state.scaleFilter = btn.dataset.scale;
-              state.pendingDeleteId = null;
-              render();
-            });
+          nameInput.addEventListener('input', () => { state.nameFilter = nameInput.value.trim(); state.pendingDeleteId = null; render(); });
+          classInput.addEventListener('input', () => { state.classFilter = classInput.value.trim(); state.pendingDeleteId = null; render(); });
+          classInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
+          nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
+          consultBtn.addEventListener('click', () => applyFilters());
+
+          exportBtn.addEventListener('click', () => {
+            const toExport = state.rows.filter(s => matchesAllFilters(s));
+            if (toExport.length === 0) { alert('Aucune évaluation à exporter.'); return; }
+            exportToCsv(toExport);
           });
 
-          overlay.querySelector('#td-back-btn').addEventListener('click', () => this.closeDashboard());
           overlay.querySelector('#td-close-all-btn').addEventListener('click', () => {
             this.closeDashboard();
             const portal = document.getElementById('teacher-portal-modal');
             if (portal) portal.remove();
           });
-          overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) this.closeDashboard();
+          overlay.querySelector('#td-logout-btn').addEventListener('click', () => {
+            this.closeDashboard();
+            const portal = document.getElementById('teacher-portal-modal');
+            if (portal) portal.remove();
           });
+          overlay.addEventListener('click', e => { if (e.target === overlay) this.closeDashboard(); });
 
           await loadRows();
         }
