@@ -17911,10 +17911,6 @@ showJourney2EndCelebration() {
           updateWordBadge();
 
           imgContainer.appendChild(textarea);
-          wrapper.appendChild(imgContainer);
-
-          // Focus textarea smoothly
-          setTimeout(() => textarea.focus(), 120);
 
           validateFn = () => {
             const val = textarea.value.trim();
@@ -17928,49 +17924,17 @@ showJourney2EndCelebration() {
             return true;
           };
 
-          // Clean action bar BELOW the card image so the 4th dotted line and mascot are never covered
-          const actionBar = document.createElement('div');
-          actionBar.style.cssText = 'display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; z-index: 80; padding: 2px 10px;';
-
-          if (this.currentExIndex > 0) {
-            const backPill = document.createElement('button');
-            backPill.type = 'button';
-            backPill.textContent = '⬅ Précédent';
-            backPill.style.cssText = 'padding: 10px 18px; border-radius: 9999px; border: 2px solid #fff; background: rgba(51, 65, 85, 0.9); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.15s ease;';
-            backPill.onmouseenter = () => { backPill.style.transform = 'scale(1.05)'; };
-            backPill.onmouseleave = () => { backPill.style.transform = 'scale(1)'; };
-            backPill.onclick = () => {
-              if (this._evalSubmitting) return;
-              playEvalClickSound();
-              this.currentExIndex--;
-              this.loadEvaluationActivity();
-            };
-            actionBar.appendChild(backPill);
-          }
-
-          actionBar.appendChild(wordCountBadge);
-
-          const newStudentBtn = document.createElement('button');
-          newStudentBtn.id = 'eval-new-student-btn';
-          newStudentBtn.type = 'button';
-          newStudentBtn.textContent = '🔄 Nouvel élève';
-          newStudentBtn.title = "Abandonner ce brouillon et commencer une nouvelle évaluation vierge";
-          newStudentBtn.style.cssText = 'padding: 10px 16px; border-radius: 9999px; border: 2px solid #fff; background: rgba(234, 88, 12, 0.9); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.15s ease;';
-          newStudentBtn.onmouseenter = () => { newStudentBtn.style.transform = 'scale(1.05)'; };
-          newStudentBtn.onmouseleave = () => { newStudentBtn.style.transform = 'scale(1)'; };
-          newStudentBtn.onclick = () => {
-            if (this._evalSubmitting) return;
-            playEvalClickSound();
-            this.startNewEvaluationSession({ render: true });
-          };
-          actionBar.appendChild(newStudentBtn);
+          // ── Validate button overlaid ON the image at bottom-centre ──────────
+          // Position: left 41.6%, top 98.2%, width 17%, height 5.5% of image
+          const valBtnWrapper = document.createElement('div');
+          valBtnWrapper.style.cssText = 'position: absolute; left: 41.6%; top: 98.2%; width: 17%; height: 5.5%; z-index: 80; display: flex; align-items: center; justify-content: center;';
 
           const vbtn = document.createElement('img');
           vbtn.id = 'eval-valider-btn-' + qKey;
           vbtn.src = 'journe 1/valider.png';
           vbtn.alt = 'Valider';
-          vbtn.style.cssText = 'height: clamp(46px, 7.2vh, 64px); width: auto; cursor: pointer; display: block; transition: transform 0.15s ease, filter 0.15s ease; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));';
-          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.06)'; vbtn.style.filter = 'brightness(1.08) drop-shadow(0 6px 14px rgba(0,0,0,0.3))'; };
+          vbtn.style.cssText = 'width: 100%; height: 100%; object-fit: contain; cursor: pointer; display: block; transition: transform 0.15s ease, filter 0.15s ease; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));';
+          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.08)'; vbtn.style.filter = 'brightness(1.08) drop-shadow(0 6px 14px rgba(0,0,0,0.3))'; };
           vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'drop-shadow(0 4px 10px rgba(0,0,0,0.25))'; };
 
           vbtn.onclick = async () => {
@@ -18012,7 +17976,77 @@ showJourney2EndCelebration() {
             }
           };
 
-          actionBar.appendChild(vbtn);
+          valBtnWrapper.appendChild(vbtn);
+          imgContainer.appendChild(valBtnWrapper);
+
+          // ── Back button to the LEFT of the image — only on Q2 and Q3 ───────
+          // (index > 1 means we are past Q1; going back from Q1 would reach the
+          //  registration form which the user must not be able to skip back into)
+          if (this.currentExIndex > 1) {
+            const backBtn = document.createElement('button');
+            backBtn.type = 'button';
+            backBtn.setAttribute('aria-label', 'Question précédente');
+            backBtn.title = 'Revenir à la question précédente';
+            // Position: left -8.4%, top 6.4%, width 10.8%, height 10.7% relative to imgContainer
+            backBtn.style.cssText = [
+              'position: absolute',
+              'left: -8.4%',
+              'top: 6.4%',
+              'width: 10.8%',
+              'height: 10.7%',
+              'z-index: 90',
+              'background: rgba(51, 65, 85, 0.88)',
+              'color: #fff',
+              'border: 3px solid rgba(255,255,255,0.85)',
+              'border-radius: 50%',
+              'font-size: clamp(18px, 2.5vw, 32px)',
+              'font-weight: 900',
+              'cursor: pointer',
+              'display: flex',
+              'align-items: center',
+              'justify-content: center',
+              'box-shadow: 0 4px 16px rgba(0,0,0,0.3)',
+              'transition: transform 0.15s ease, background 0.15s ease',
+              'outline: none'
+            ].join('; ') + ';';
+            backBtn.innerHTML = '&#8592;';
+            backBtn.onmouseenter = () => { backBtn.style.transform = 'scale(1.1)'; backBtn.style.background = 'rgba(30, 41, 59, 0.95)'; };
+            backBtn.onmouseleave = () => { backBtn.style.transform = 'scale(1)'; backBtn.style.background = 'rgba(51, 65, 85, 0.88)'; };
+            backBtn.onclick = () => {
+              if (this._evalSubmitting) return;
+              playEvalClickSound();
+              this.currentExIndex--;
+              this.loadEvaluationActivity();
+            };
+            imgContainer.appendChild(backBtn);
+          }
+
+          wrapper.appendChild(imgContainer);
+
+          // Focus textarea smoothly
+          setTimeout(() => textarea.focus(), 120);
+
+          // Action bar below image: word-count badge + "Nouvel élève" only
+          const actionBar = document.createElement('div');
+          actionBar.style.cssText = 'display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; z-index: 80; padding: 2px 10px;';
+
+          actionBar.appendChild(wordCountBadge);
+
+          const newStudentBtn = document.createElement('button');
+          newStudentBtn.id = 'eval-new-student-btn';
+          newStudentBtn.type = 'button';
+          newStudentBtn.textContent = '🔄 Nouvel élève';
+          newStudentBtn.title = "Abandonner ce brouillon et commencer une nouvelle évaluation vierge";
+          newStudentBtn.style.cssText = 'padding: 10px 16px; border-radius: 9999px; border: 2px solid #fff; background: rgba(234, 88, 12, 0.9); color: #fff; font-family: "Nunito", "Segoe UI", sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: transform 0.15s ease;';
+          newStudentBtn.onmouseenter = () => { newStudentBtn.style.transform = 'scale(1.05)'; };
+          newStudentBtn.onmouseleave = () => { newStudentBtn.style.transform = 'scale(1)'; };
+          newStudentBtn.onclick = () => {
+            if (this._evalSubmitting) return;
+            playEvalClickSound();
+            this.startNewEvaluationSession({ render: true });
+          };
+          actionBar.appendChild(newStudentBtn);
+
           wrapper.appendChild(actionBar);
         } else {
           wrapper.appendChild(imgContainer);
