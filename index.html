@@ -2790,6 +2790,9 @@ ${criteriaSchema}
       }
 
       const TeacherPortal = {
+        ACCESS_CODE: '12345678',
+        isAuthenticated: false,
+
         open() {
           const existing = document.getElementById('teacher-portal-modal');
           if (existing) existing.remove();
@@ -2823,11 +2826,11 @@ ${criteriaSchema}
 
           const codeInput = document.createElement('input');
           codeInput.id = 'teacher-code-input';
-          codeInput.type = 'text';
-          codeInput.placeholder = 'Ex. : 4A-001';
+          codeInput.type = 'password';
+          codeInput.placeholder = 'Mot de passe...';
           codeInput.autocomplete = 'off';
           codeInput.spellcheck = false;
-          codeInput.setAttribute('aria-label', 'Code de la classe ou évaluation');
+          codeInput.setAttribute('aria-label', "Mot de passe d'accès enseignant");
           codeInput.style.cssText = [
             'position: absolute',
             'left: 41.4%',
@@ -2885,24 +2888,37 @@ ${criteriaSchema}
             }
           });
 
+          const shakeInput = () => {
+            codeInput.animate([
+              { transform: 'translateX(-4px)' },
+              { transform: 'translateX(4px)' },
+              { transform: 'translateX(-2px)' },
+              { transform: 'translateX(2px)' },
+              { transform: 'translateX(0)' }
+            ], { duration: 220 });
+          };
+
           const handleConsult = () => {
             const code = codeInput.value.trim();
             if (!code) {
-              showStatus("⚠️ Saisis un code pour consulter les évaluations.", true);
-              codeInput.animate([
-                { transform: 'translateX(-4px)' },
-                { transform: 'translateX(4px)' },
-                { transform: 'translateX(-2px)' },
-                { transform: 'translateX(2px)' },
-                { transform: 'translateX(0)' }
-              ], { duration: 220 });
+              showStatus("⚠️ Saisis le mot de passe pour consulter les évaluations.", true);
+              shakeInput();
+              codeInput.focus();
+              return;
+            }
+            if (code !== this.ACCESS_CODE) {
+              this.isAuthenticated = false;
+              showStatus("❌ Mot de passe incorrect. Accès refusé.", true);
+              shakeInput();
+              codeInput.value = '';
               codeInput.focus();
               return;
             }
             codeInput.style.boxShadow = 'none';
-            this.lastEnteredCode = code;
-            showStatus(`🔍 Ouverture des résultats pour « ${code} »...`, false);
-            this.openDashboard(code);
+            this.isAuthenticated = true;
+            this.lastEnteredCode = '';
+            showStatus("✅ Accès autorisé — ouverture de l'Espace Enseignant...", false);
+            this.openDashboard('');
           };
 
           consultBtn.addEventListener('click', (e) => {
@@ -3085,19 +3101,35 @@ ${criteriaSchema}
           this._clearLocalHistoryStorage();
         },
 
-        closeDashboard() {
+        closeDashboard(logout = false) {
           const dash = document.getElementById('teacher-dashboard-modal');
-          if (dash) dash.remove();
+          if (dash) {
+            if (dash._tdRo) {
+              try { dash._tdRo.disconnect(); } catch (e) {}
+            }
+            if (dash._onEscKey) {
+              document.removeEventListener('keydown', dash._onEscKey);
+            }
+            dash.remove();
+          }
+          if (logout) {
+            this.isAuthenticated = false;
+            const portal = document.getElementById('teacher-portal-modal');
+            if (portal) portal.remove();
+          }
         },
 
         async openDashboard(initialCode) {
-          this.closeDashboard();
-          const wildcardCodes = ['all', 'tout', 'tous', 'prof', '*', 'admin'];
-          const rawCode = String(initialCode || this.lastEnteredCode || '').trim();
+          if (!this.isAuthenticated) {
+            this.open();
+            return;
+          }
+          this.closeDashboard(false);
+          const rawCode = String(initialCode || '').trim();
           const state = {
-            filterText: wildcardCodes.includes(rawCode.toLowerCase()) ? '' : rawCode,
-            classFilter: wildcardCodes.includes(rawCode.toLowerCase()) ? '' : rawCode,
+            classFilter: rawCode === this.ACCESS_CODE ? '' : rawCode,
             nameFilter: '',
+            activeTab: 'results',
             loading: true,
             loadError: null,
             rows: [],
@@ -3106,109 +3138,115 @@ ${criteriaSchema}
 
           const escHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
           const fmtNum = (n) => typeof n === 'number' ? (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')) : String(n ?? '—');
-          const avatarColors = ['#7c3aed','#16a34a','#d97706','#dc2626','#0369a1','#c026d3','#059669','#ea580c'];
+          const avatarColors = ['#3b82f6','#ec4899','#10b981','#f59e0b','#8b5cf6','#0ea5e9','#ef4444','#14b8a6'];
           const getAvatarColor = (name) => avatarColors[Math.abs([...name].reduce((a,c)=>a+c.charCodeAt(0),0)) % avatarColors.length];
           const getInitials = (prenom, nom) => ((prenom||'')[0]||'') + ((nom||'')[0]||'');
           const getScoreBadgeStyle = (score, maxScore) => {
-            if (typeof score !== 'number' || typeof maxScore !== 'number' || maxScore === 0) return 'background:#f1f5f9;color:#64748b;border:1.5px solid #cbd5e1;';
+            if (typeof score !== 'number' || typeof maxScore !== 'number' || maxScore === 0) {
+              return 'background:#94a3b8;color:#ffffff;box-shadow:inset 0 -2px 0 rgba(0,0,0,0.16);';
+            }
             const pct = score / maxScore;
-            if (pct >= 0.666) return 'background:#dcfce7;color:#15803d;border:1.5px solid #86efac;';
-            if (pct >= 0.333) return 'background:#fef3c7;color:#b45309;border:1.5px solid #fcd34d;';
-            return 'background:#fee2e2;color:#b91c1c;border:1.5px solid #fca5a5;';
+            if (pct >= 0.666) return 'background:linear-gradient(180deg,#22c55e 0%,#16a34a 100%);color:#ffffff;box-shadow:inset 0 -2px 0 rgba(0,0,0,0.18),0 2px 6px rgba(22,163,74,0.3);';
+            if (pct >= 0.333) return 'background:linear-gradient(180deg,#fbbf24 0%,#d97706 100%);color:#ffffff;box-shadow:inset 0 -2px 0 rgba(0,0,0,0.18),0 2px 6px rgba(217,119,6,0.3);';
+            return 'background:linear-gradient(180deg,#f87171 0%,#dc2626 100%);color:#ffffff;box-shadow:inset 0 -2px 0 rgba(0,0,0,0.18),0 2px 6px rgba(220,38,38,0.3);';
           };
 
           const overlay = document.createElement('div');
           overlay.id = 'teacher-dashboard-modal';
-          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,40,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:1000001;display:flex;align-items:center;justify-content:center;padding:16px;font-family:"Nunito","Segoe UI",sans-serif;box-sizing:border-box;';
+          overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,40,0.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:1000001;display:flex;align-items:center;justify-content:center;padding:12px;font-family:"Nunito","Segoe UI",sans-serif;box-sizing:border-box;';
 
           overlay.innerHTML = `
-            <div id="td-main-frame" style="position:relative;width:100%;max-width:1080px;max-height:94vh;background:linear-gradient(160deg,#f5a623 0%,#e8891c 100%);border-radius:28px;padding:6px;box-shadow:0 0 0 4px #c9770d,0 0 0 8px #f5a623,0 24px 60px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden;">
-              <!-- Top bar with title and X -->
-              <div style="position:relative;display:flex;align-items:center;justify-content:center;padding:10px 60px 0 60px;min-height:70px;flex-shrink:0;">
-                <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
-                  <img src="evalution/botten tet.png" style="width:62px;height:62px;object-fit:contain;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.3));margin-bottom:-8px;position:relative;z-index:2;" alt="">
-                  <div style="background:linear-gradient(135deg,#f5a623,#e8891c);border:3px solid #c9770d;border-radius:16px;padding:8px 36px;box-shadow:inset 0 2px 4px rgba(255,255,255,0.3),0 4px 12px rgba(0,0,0,0.3);">
-                    <span style="font-family:'Nunito',sans-serif;font-size:clamp(18px,3vw,28px);font-weight:900;color:#fff;text-shadow:0 2px 4px rgba(0,0,0,0.4),0 0 1px #000;letter-spacing:0.5px;">Espace Enseignant</span>
-                  </div>
+            <div id="td-stage-box" style="position:relative;width:min(96vw,calc(94vh * 1672 / 941));aspect-ratio:1672 / 941;border-radius:22px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.65);background:#221208;">
+              <img id="td-bg-img" src="evalution/tet dachbored.png" alt="Espace Enseignant" draggable="false" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;user-select:none;pointer-events:none;" />
+
+              <!-- Masked live inputs aligned precisely inside the baked PNG pills -->
+              <input type="text" id="td-class-input" placeholder="Classe (ex: 4A)" autocomplete="off" spellcheck="false" aria-label="Nom de la classe"
+                style="position:absolute;left:28.9%;top:29.0%;width:14.1%;height:4.3%;background:#fef9fd;border:none;outline:none;box-shadow:none;-webkit-appearance:none;appearance:none;border-radius:0 9999px 9999px 0;font-family:'Nunito','Segoe UI',sans-serif;font-weight:800;font-size:calc(var(--td-h, 675px) * 0.0205);color:#3b1b49;padding:0 10px 0 4px;box-sizing:border-box;z-index:25;" />
+
+              <input type="text" id="td-name-input" placeholder="Rechercher un étudiant..." autocomplete="off" spellcheck="false" aria-label="Rechercher un étudiant"
+                style="position:absolute;left:50.8%;top:28.3%;width:26.4%;height:4.5%;background:#fef9fe;border:none;outline:none;box-shadow:none;-webkit-appearance:none;appearance:none;border-radius:0 9999px 9999px 0;font-family:'Nunito','Segoe UI',sans-serif;font-weight:700;font-size:calc(var(--td-h, 675px) * 0.0205);color:#3b1b49;padding:0 12px 0 4px;box-sizing:border-box;z-index:25;" />
+
+              <!-- Hitboxes over baked PNG buttons -->
+              <button type="button" id="td-consult-btn" aria-label="Consulter" title="Consulter les résultats"
+                style="position:absolute;left:79.9%;top:27.3%;width:13.7%;height:6.4%;border-radius:9999px;background:transparent;border:none;outline:none;cursor:pointer;z-index:26;transition:background 0.15s,box-shadow 0.15s;"></button>
+
+              <button type="button" id="td-export-btn" aria-label="Exporter" title="Exporter en CSV"
+                style="position:absolute;left:82.0%;top:39.6%;width:11.9%;height:5.9%;border-radius:9999px;background:transparent;border:none;outline:none;cursor:pointer;z-index:26;transition:background 0.15s,box-shadow 0.15s;"></button>
+
+              <button type="button" id="td-close-all-btn" aria-label="Fermer" title="Fermer l'Espace Enseignant"
+                style="position:absolute;left:89.1%;top:12.3%;width:7.7%;height:12.6%;border-radius:50%;background:transparent;border:none;outline:none;cursor:pointer;z-index:30;transition:background 0.15s;"></button>
+
+              <button type="button" id="td-nav-results" aria-label="Résultats des évaluations" title="Résultats des évaluations"
+                style="position:absolute;left:4.7%;top:51.1%;width:18.2%;height:7.5%;border-radius:14px;background:transparent;border:none;outline:none;cursor:pointer;z-index:26;transition:box-shadow 0.15s,background 0.15s;"></button>
+
+              <button type="button" id="td-nav-settings" aria-label="Paramètres" title="Paramètres du barème et accès"
+                style="position:absolute;left:4.9%;top:60.2%;width:17.7%;height:5.6%;border-radius:14px;background:transparent;border:none;outline:none;cursor:pointer;z-index:26;transition:box-shadow 0.15s,background 0.15s;"></button>
+
+              <button type="button" id="td-logout-btn" aria-label="Déconnexion" title="Déconnexion"
+                style="position:absolute;left:5.9%;top:84.7%;width:15.5%;height:8.2%;border-radius:9999px;background:transparent;border:none;outline:none;cursor:pointer;z-index:26;transition:background 0.15s,box-shadow 0.15s;"></button>
+
+              <!-- Compact summary pills sitting in empty cream strip left of Exporter -->
+              <div id="td-stats-bar"
+                style="position:absolute;left:24.9%;top:39.6%;width:55.5%;height:5.8%;display:flex;align-items:center;gap:calc(var(--td-h, 675px) * 0.012);overflow:hidden;z-index:22;"></div>
+
+              <!-- Main changeable table panel sitting cleanly in the cleared cream area of tet dachbored.png -->
+              <div id="td-table-wrap"
+                style="position:absolute;left:24.8%;top:47.0%;width:69.2%;height:43.8%;background:rgba(255,255,255,0.95);border-radius:calc(var(--td-h, 675px) * 0.022);border:1.5px solid #eadcc8;box-shadow:0 6px 20px rgba(120,53,15,0.09);display:flex;flex-direction:column;overflow:hidden;z-index:24;">
+                <div id="td-table-header"
+                  style="background:linear-gradient(180deg,#ede0ff 0%,#e1cffc 100%);color:#3b1b6b;display:grid;grid-template-columns:7% 35% 14% 15% 16% 13%;align-items:center;padding:0 calc(var(--td-h, 675px) * 0.022);height:14.5%;min-height:30px;flex-shrink:0;border-bottom:1.5px solid #d7c3f7;">
+                  <div style="font-size:calc(var(--td-h, 675px) * 0.019);font-weight:900;text-align:center;">#</div>
+                  <div style="font-size:calc(var(--td-h, 675px) * 0.019);font-weight:900;">Étudiant</div>
+                  <div style="font-size:calc(var(--td-h, 675px) * 0.019);font-weight:900;text-align:center;">Classe</div>
+                  <div style="font-size:calc(var(--td-h, 675px) * 0.019);font-weight:900;text-align:center;">Score</div>
+                  <div style="font-size:calc(var(--td-h, 675px) * 0.019);font-weight:900;text-align:center;">Détails</div>
+                  <div style="font-size:calc(var(--td-h, 675px) * 0.019);font-weight:900;text-align:center;">Actions</div>
                 </div>
-                <button id="td-close-all-btn" type="button" style="position:absolute;right:4px;top:4px;width:44px;height:44px;border-radius:50%;border:3px solid #fff;background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff;font-size:20px;font-weight:900;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;line-height:1;">✕</button>
-              </div>
-
-              <!-- Inner cream container -->
-              <div style="background:#fff8e7;border-radius:20px;margin:8px 6px 6px 6px;flex:1;display:flex;overflow:hidden;min-height:0;border:3px solid #e8891c;">
-                <!-- LEFT SIDEBAR -->
-                <div style="width:210px;min-width:170px;flex-shrink:0;background:#fff8e7;border-right:2px solid #fde68a;display:flex;flex-direction:column;padding:12px 10px;gap:10px;">
-                  <!-- Teacher illustration -->
-                  <div style="flex:1;min-height:120px;max-height:220px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#fef9ec,#fde68a);position:relative;">
-                    <div style="position:absolute;inset:0;background-image:url('evalution/espace.png');background-size:280% auto;background-position:14% 42%;background-repeat:no-repeat;"></div>
-                  </div>
-                  <!-- Nav buttons -->
-                  <button type="button" id="td-nav-results" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;border-radius:12px;padding:11px 10px;font-weight:800;font-size:13px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;box-shadow:0 3px 8px rgba(124,58,237,0.4);">
-                    <span style="font-size:16px;">📊</span> Résultats des évaluations
-                  </button>
-                  <button type="button" id="td-nav-settings" style="background:#fef9ec;color:#78350f;border:2px solid #fde68a;border-radius:12px;padding:11px 10px;font-weight:800;font-size:13px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:16px;">⚙️</span> Paramètres
-                  </button>
-                  <div style="flex:1;"></div>
-                  <button type="button" id="td-logout-btn" style="background:#fff;color:#dc2626;border:2px solid #dc2626;border-radius:12px;padding:9px 10px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:16px;">🚪</span> Déconnexion
-                  </button>
-                </div>
-
-                <!-- RIGHT CONTENT -->
-                <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;padding:16px 16px 10px 16px;min-width:0;">
-                  <!-- Search row -->
-                  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;margin-bottom:10px;flex-shrink:0;">
-                    <div style="display:flex;flex-direction:column;gap:4px;">
-                      <label style="font-size:12px;font-weight:800;color:#78350f;">Nom de la classe :</label>
-                      <div style="display:flex;align-items:center;background:#fff;border:2px solid #fde68a;border-radius:10px;padding:7px 10px;gap:6px;min-width:130px;">
-                        <span style="font-size:14px;">🔑</span>
-                        <input type="text" id="td-class-input" placeholder="ex: 4A-001" style="border:none;outline:none;background:transparent;font-size:13px;font-weight:700;color:#1e293b;width:90px;font-family:inherit;" />
-                      </div>
-                    </div>
-                    <div style="display:flex;align-items:center;background:#fff;border:2px solid #fde68a;border-radius:10px;padding:7px 12px;gap:8px;flex:1;min-width:160px;">
-                      <span style="font-size:16px;">🔍</span>
-                      <input type="text" id="td-name-input" placeholder="Rechercher un étudiant..." style="border:none;outline:none;background:transparent;font-size:13px;font-weight:700;color:#1e293b;width:100%;font-family:inherit;" />
-                    </div>
-                    <button type="button" id="td-consult-btn" style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 3px 8px rgba(22,163,74,0.4);flex-shrink:0;">
-                      <span>🔍</span> Consulter
-                    </button>
-                    <div style="flex:1;"></div>
-                    <button type="button" id="td-export-btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 3px 8px rgba(124,58,237,0.4);flex-shrink:0;">
-                      <span>⬇️</span> Exporter
-                    </button>
-                  </div>
-
-                  <!-- Stats bar -->
-                  <div id="td-stats-bar" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;flex-shrink:0;font-size:12px;min-height:28px;"></div>
-
-                  <!-- Table -->
-                  <div id="td-table-wrap" style="flex:1;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;min-height:0;border:2px solid #e8891c;">
-                    <!-- Table header -->
-                    <div id="td-table-header" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;display:grid;grid-template-columns:44px 1.6fr 100px 95px 95px 72px;gap:0;padding:10px 12px;flex-shrink:0;">
-                      <div style="font-size:12px;font-weight:900;">#</div>
-                      <div style="font-size:12px;font-weight:900;">Étudiant</div>
-                      <div style="font-size:12px;font-weight:900;">Classe</div>
-                      <div style="font-size:12px;font-weight:900;">Score</div>
-                      <div style="font-size:12px;font-weight:900;">Détails</div>
-                      <div style="font-size:12px;font-weight:900;">Actions</div>
-                    </div>
-                    <!-- Table body -->
-                    <div id="td-list-body" style="background:#fff8e7;flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;"></div>
-                  </div>
-                </div>
+                <div id="td-list-body" style="background:#fffdf9;flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;"></div>
               </div>
             </div>
           `;
 
           document.body.appendChild(overlay);
 
+          const stageBox = overlay.querySelector('#td-stage-box');
+          const syncVars = () => {
+            const rect = stageBox.getBoundingClientRect();
+            if (rect.height > 0) {
+              stageBox.style.setProperty('--td-h', rect.height + 'px');
+              stageBox.style.setProperty('--td-w', rect.width + 'px');
+            }
+          };
+          const tdRo = new ResizeObserver(syncVars);
+          tdRo.observe(stageBox);
+          overlay._tdRo = tdRo;
+          requestAnimationFrame(syncVars);
+
+          const addHoverFx = (el, glowColor) => {
+            el.addEventListener('mouseenter', () => {
+              el.style.background = 'rgba(255,255,255,0.14)';
+              el.style.boxShadow = `0 0 14px ${glowColor}`;
+            });
+            el.addEventListener('mouseleave', () => {
+              el.style.background = 'transparent';
+              el.style.boxShadow = 'none';
+            });
+          };
           const classInput = overlay.querySelector('#td-class-input');
           const nameInput = overlay.querySelector('#td-name-input');
           const statsBar = overlay.querySelector('#td-stats-bar');
+          const tableHeader = overlay.querySelector('#td-table-header');
           const listBody = overlay.querySelector('#td-list-body');
           const consultBtn = overlay.querySelector('#td-consult-btn');
           const exportBtn = overlay.querySelector('#td-export-btn');
+          const closeBtn = overlay.querySelector('#td-close-all-btn');
+          const navResultsBtn = overlay.querySelector('#td-nav-results');
+          const navSettingsBtn = overlay.querySelector('#td-nav-settings');
+          const logoutBtn = overlay.querySelector('#td-logout-btn');
+
+          addHoverFx(consultBtn, 'rgba(34,197,94,0.45)');
+          addHoverFx(exportBtn, 'rgba(124,58,237,0.45)');
+          addHoverFx(closeBtn, 'rgba(239,68,68,0.45)');
+          addHoverFx(logoutBtn, 'rgba(220,38,38,0.28)');
 
           classInput.value = state.classFilter;
 
@@ -3251,9 +3289,35 @@ ${criteriaSchema}
           };
 
           const render = () => {
+            navSettingsBtn.style.boxShadow = state.activeTab === 'settings' ? '0 0 0 2.5px #7c3aed' : 'none';
+            navResultsBtn.style.boxShadow = state.activeTab === 'results' ? '0 0 10px rgba(124,58,237,0.35)' : 'none';
+
+            if (state.activeTab === 'settings') {
+              tableHeader.style.display = 'none';
+              statsBar.innerHTML = `<span style="background:#ede9fe;color:#5b21b6;padding:3px 12px;border-radius:9999px;font-weight:800;font-size:calc(var(--td-h, 675px) * 0.017);">⚙️ Paramètres de l'évaluation</span>`;
+              listBody.innerHTML = `
+                <div style="padding:calc(var(--td-h, 675px) * 0.028);display:flex;flex-direction:column;gap:12px;color:#3b1b49;font-size:calc(var(--td-h, 675px) * 0.02);">
+                  <div style="background:#fef9ec;border:1.5px solid #fde68a;border-radius:14px;padding:12px 16px;">
+                    <div style="font-weight:900;margin-bottom:4px;">📐 Barème actif : / 9 points (3 questions × 3 points)</div>
+                    <div style="font-weight:700;color:#78350f;font-size:0.9em;">• C1 (Adéquation) : 4.5 pts (1.5/question) • C3 (Correction) : 3 pts (1.0/question) • C6 (Richesse) : 1.5 pt (0.5/question)</div>
+                  </div>
+                  <div style="background:#f5effe;border:1.5px solid #d5c2f7;border-radius:14px;padding:12px 16px;">
+                    <div style="font-weight:900;margin-bottom:4px;">🔥 Source des données : Firebase Firestore uniquement</div>
+                    <div style="font-weight:700;color:#5b21b6;font-size:0.9em;">Toutes les copies proviennent en direct de Firestore (sans cache local).</div>
+                  </div>
+                  <div style="background:#dcfce7;border:1.5px solid #86efac;border-radius:14px;padding:12px 16px;">
+                    <div style="font-weight:900;margin-bottom:4px;">🔒 Sécurité : Accès protégé par mot de passe</div>
+                    <div style="font-weight:700;color:#15803d;font-size:0.9em;">Déconnectez-vous via « Déconnexion » pour verrouiller à nouveau l'Espace Enseignant.</div>
+                  </div>
+                </div>`;
+              return;
+            }
+
+            tableHeader.style.display = 'grid';
+
             if (state.loading) {
-              statsBar.innerHTML = `<span style="color:#78350f;font-weight:700;">⏳ Chargement des évaluations...</span>`;
-              listBody.innerHTML = `<div style="text-align:center;padding:40px;color:#78350f;font-weight:700;">⏳ Récupération des évaluations en cours...</div>`;
+              statsBar.innerHTML = `<span style="background:#fef3c7;color:#78350f;padding:3px 12px;border-radius:9999px;font-weight:800;font-size:calc(var(--td-h, 675px) * 0.017);">⏳ Chargement depuis Firebase...</span>`;
+              listBody.innerHTML = `<div style="text-align:center;padding:calc(var(--td-h, 675px) * 0.06);color:#78350f;font-weight:800;font-size:calc(var(--td-h, 675px) * 0.021);">⏳ Récupération des évaluations depuis Firebase...</div>`;
               return;
             }
 
@@ -3262,13 +3326,13 @@ ${criteriaSchema}
             const avg9 = evaluatedRows.length ? fmtNum(evaluatedRows.reduce((a,r)=>a+r.totalScore,0)/evaluatedRows.length) : '—';
 
             statsBar.innerHTML = `
-              <span style="background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:9999px;font-weight:800;">📊 ${filtered.length} résultat(s)</span>
-              <span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:9999px;font-weight:800;">✅ Corrigées : ${evaluatedRows.length} (Moy. ${avg9}/9)</span>
-              ${state.loadError ? `<span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:9999px;font-weight:700;">⚠️ ${escHtml(state.loadError)}</span>` : ''}
+              <span style="background:#ede9fe;color:#5b21b6;padding:3px 11px;border-radius:9999px;font-weight:800;font-size:calc(var(--td-h, 675px) * 0.017);white-space:nowrap;">📊 ${filtered.length} résultat(s)</span>
+              <span style="background:#dcfce7;color:#15803d;padding:3px 11px;border-radius:9999px;font-weight:800;font-size:calc(var(--td-h, 675px) * 0.017);white-space:nowrap;">✅ Corrigées : ${evaluatedRows.length} (Moy. ${avg9}/9)</span>
+              ${state.loadError ? `<span style="background:#fee2e2;color:#991b1b;padding:3px 11px;border-radius:9999px;font-weight:700;font-size:calc(var(--td-h, 675px) * 0.017);white-space:nowrap;">⚠️ ${escHtml(state.loadError)}</span>` : ''}
             `;
 
             if (filtered.length === 0) {
-              listBody.innerHTML = `<div style="text-align:center;padding:34px;color:#78350f;font-weight:700;">Aucune évaluation trouvée dans Firebase.<br><small style="font-weight:600;opacity:0.7;">Effacez les filtres pour tout afficher.</small></div>`;
+              listBody.innerHTML = `<div style="text-align:center;padding:calc(var(--td-h, 675px) * 0.06);color:#78350f;font-weight:800;font-size:calc(var(--td-h, 675px) * 0.021);">Aucune évaluation trouvée dans Firebase.<br><small style="font-weight:600;opacity:0.75;">Effacez les filtres et cliquez sur Consulter.</small></div>`;
               return;
             }
 
@@ -3282,34 +3346,39 @@ ${criteriaSchema}
               const avatarColor = getAvatarColor(name);
               const classe = doc.studentClasse || '—';
               const isConfirming = state.pendingDeleteId === summary.docId;
-              const scoreStyle = summary.isEvaluated ? getScoreBadgeStyle(summary.totalScore, summary.maxScore) : 'background:#fee2e2;color:#b91c1c;border:1.5px solid #fca5a5;';
-              const scoreText = summary.isEvaluated ? `${fmtNum(summary.totalScore)}/${fmtNum(summary.maxScore)}` : '—';
+              const scoreStyle = summary.isEvaluated ? getScoreBadgeStyle(summary.totalScore, summary.maxScore) : 'background:#ef4444;color:#ffffff;';
+              const scoreText = summary.isEvaluated ? `${fmtNum(summary.totalScore)} / ${fmtNum(summary.maxScore)}` : '—';
 
               const row = document.createElement('div');
               row.className = 'teacher-eval-row';
               row.dataset.docId = summary.docId;
-              row.style.cssText = `display:grid;grid-template-columns:44px 1.6fr 100px 95px 95px 72px;gap:0;padding:9px 12px;align-items:center;border-bottom:1px solid #fde68a;background:${idx%2===0?'#fff8e7':'#fffdf0'};transition:background 0.15s;`;
-              row.onmouseenter = () => { row.style.background = '#fef3c7'; };
-              row.onmouseleave = () => { row.style.background = idx%2===0?'#fff8e7':'#fffdf0'; };
+              row.style.cssText = `display:grid;grid-template-columns:7% 35% 14% 15% 16% 13%;padding:calc(var(--td-h, 675px) * 0.011) calc(var(--td-h, 675px) * 0.022);align-items:center;border-bottom:1px solid #f2e7d7;background:${idx%2===0?'#ffffff':'#fcf7ee'};transition:background 0.15s;`;
+              row.onmouseenter = () => { row.style.background = '#fef4dc'; };
+              row.onmouseleave = () => { row.style.background = idx%2===0?'#ffffff':'#fcf7ee'; };
+
+              const eyeSvg = `<svg viewBox="0 0 24 24" style="width:calc(var(--td-h, 675px) * 0.021);height:calc(var(--td-h, 675px) * 0.021);fill:#6d28d9;flex-shrink:0;"><path d="M12 5C6.5 5 2 9.5 1 12c1 2.5 5.5 7 11 7s10-4.5 11-7c-1-2.5-5.5-7-11-7zm0 11.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg>`;
+              const trashSvg = `<svg viewBox="0 0 24 24" style="width:calc(var(--td-h, 675px) * 0.022);height:calc(var(--td-h, 675px) * 0.022);fill:${isConfirming?'#ffffff':'#dc2626'};display:block;"><path d="M6 7h12v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7zm3-4h6l1 2h4v2H4V5h4l1-2zm1 6v9h2V9h-2zm4 0v9h2V9h-2z"/></svg>`;
 
               row.innerHTML = `
-                <div style="font-size:12px;font-weight:800;color:#78350f;">${idx+1}</div>
-                <div style="display:flex;align-items:center;gap:8px;min-width:0;">
-                  <div style="width:34px;height:34px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">${escHtml(initials.toUpperCase())}</div>
-                  <span style="font-size:13px;font-weight:800;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(name)}</span>
+                <div style="font-size:calc(var(--td-h, 675px) * 0.020);font-weight:800;color:#3b1b49;text-align:center;">${idx+1}</div>
+                <div style="display:flex;align-items:center;gap:calc(var(--td-h, 675px) * 0.013);min-width:0;">
+                  <div style="width:calc(var(--td-h, 675px) * 0.044);height:calc(var(--td-h, 675px) * 0.044);border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:calc(var(--td-h, 675px) * 0.018);border:2px solid #ffffff;box-shadow:0 2px 5px rgba(0,0,0,0.16);flex-shrink:0;">${escHtml(initials.toUpperCase())}</div>
+                  <span style="font-size:calc(var(--td-h, 675px) * 0.020);font-weight:800;color:#2d1b12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(name)}</span>
                 </div>
-                <div style="font-size:12px;font-weight:700;color:#78350f;">${escHtml(classe)}</div>
-                <div>
-                  <span style="padding:4px 10px;border-radius:9999px;font-weight:900;font-size:12px;${scoreStyle}">${escHtml(scoreText)}</span>
+                <div style="display:flex;justify-content:center;">
+                  <span style="background:#ede6fb;color:#3b1b6b;border-radius:9999px;padding:calc(var(--td-h, 675px) * 0.004) calc(var(--td-h, 675px) * 0.016);font-size:calc(var(--td-h, 675px) * 0.017);font-weight:800;white-space:nowrap;">${escHtml(classe)}</span>
                 </div>
-                <div>
-                  <button type="button" class="td-details-btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-weight:800;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;box-shadow:0 2px 6px rgba(124,58,237,0.3);">
-                    <span>👁️</span> Voir
+                <div style="display:flex;justify-content:center;">
+                  <span style="padding:calc(var(--td-h, 675px) * 0.005) calc(var(--td-h, 675px) * 0.018);border-radius:9999px;font-weight:900;font-size:calc(var(--td-h, 675px) * 0.018);white-space:nowrap;${scoreStyle}">${escHtml(scoreText)}</span>
+                </div>
+                <div style="display:flex;justify-content:center;">
+                  <button type="button" class="td-details-btn" style="background:#f6f0fe;color:#3b1b6b;border:1.5px solid #d5c1f5;border-radius:9999px;padding:calc(var(--td-h, 675px) * 0.004) calc(var(--td-h, 675px) * 0.016);font-weight:800;font-size:calc(var(--td-h, 675px) * 0.018);cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 4px rgba(109,40,217,0.12);">
+                    ${eyeSvg}<span>Voir</span>
                   </button>
                 </div>
-                <div>
-                  <button type="button" class="td-delete-btn" style="background:${isConfirming?'#b91c1c':'#fee2e2'};color:${isConfirming?'#fff':'#b91c1c'};border:1.5px solid #fca5a5;border-radius:8px;padding:5px 8px;font-weight:800;font-size:12px;cursor:pointer;" title="${isConfirming?'Confirmer la suppression':'Supprimer'}">
-                    ${isConfirming?'⚠️':'🗑️'}
+                <div style="display:flex;justify-content:center;">
+                  <button type="button" class="td-delete-btn" style="background:${isConfirming?'#dc2626':'transparent'};border:${isConfirming?'1.5px solid #991b1b':'none'};border-radius:8px;padding:4px 7px;font-weight:800;font-size:calc(var(--td-h, 675px) * 0.017);color:${isConfirming?'#ffffff':'#dc2626'};cursor:pointer;display:inline-flex;align-items:center;gap:3px;" title="${isConfirming?'Confirmer la suppression':'Supprimer'}">
+                    ${isConfirming ? '✓ ?' : trashSvg}
                   </button>
                 </div>
               `;
@@ -3383,18 +3452,20 @@ ${criteriaSchema}
           };
 
           const applyFiltersAndRefresh = async () => {
+            state.activeTab = 'results';
             state.classFilter = classInput.value.trim();
             state.nameFilter = nameInput.value.trim();
-            state.filterText = [state.classFilter, state.nameFilter].filter(Boolean).join(' ');
             state.pendingDeleteId = null;
             await loadRows();
           };
 
-          nameInput.addEventListener('input', () => { state.nameFilter = nameInput.value.trim(); state.pendingDeleteId = null; render(); });
-          classInput.addEventListener('input', () => { state.classFilter = classInput.value.trim(); state.pendingDeleteId = null; render(); });
+          nameInput.addEventListener('input', () => { state.activeTab = 'results'; state.nameFilter = nameInput.value.trim(); state.pendingDeleteId = null; render(); });
+          classInput.addEventListener('input', () => { state.activeTab = 'results'; state.classFilter = classInput.value.trim(); state.pendingDeleteId = null; render(); });
           classInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFiltersAndRefresh(); });
           nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFiltersAndRefresh(); });
           consultBtn.addEventListener('click', () => applyFiltersAndRefresh());
+          navResultsBtn.addEventListener('click', () => { state.activeTab = 'results'; state.pendingDeleteId = null; render(); });
+          navSettingsBtn.addEventListener('click', () => { state.activeTab = 'settings'; state.pendingDeleteId = null; render(); });
 
           exportBtn.addEventListener('click', () => {
             const toExport = state.rows.filter(s => matchesAllFilters(s));
@@ -3402,17 +3473,15 @@ ${criteriaSchema}
             exportToCsv(toExport);
           });
 
-          overlay.querySelector('#td-close-all-btn').addEventListener('click', () => {
-            this.closeDashboard();
-            const portal = document.getElementById('teacher-portal-modal');
-            if (portal) portal.remove();
-          });
-          overlay.querySelector('#td-logout-btn').addEventListener('click', () => {
-            this.closeDashboard();
-            const portal = document.getElementById('teacher-portal-modal');
-            if (portal) portal.remove();
-          });
-          overlay.addEventListener('click', e => { if (e.target === overlay) this.closeDashboard(); });
+          const onEscKey = (e) => {
+            if (e.key === 'Escape') this.closeDashboard(true);
+          };
+          overlay._onEscKey = onEscKey;
+          document.addEventListener('keydown', onEscKey);
+
+          closeBtn.addEventListener('click', () => this.closeDashboard(true));
+          logoutBtn.addEventListener('click', () => this.closeDashboard(true));
+          overlay.addEventListener('click', e => { if (e.target === overlay) this.closeDashboard(true); });
 
           await loadRows();
         }
