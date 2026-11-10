@@ -2671,6 +2671,9 @@ ${criteriaSchema}
             'background: transparent',
             'border: none',
             'outline: none',
+            'box-shadow: none',
+            '-webkit-appearance: none',
+            'appearance: none',
             'border-radius: 9999px',
             'font-family: "Nunito", "Segoe UI", sans-serif',
             'font-weight: 800',
@@ -2680,12 +2683,6 @@ ${criteriaSchema}
             'box-sizing: border-box',
             'z-index: 30'
           ].join('; ') + ';';
-          codeInput.onfocus = () => {
-            codeInput.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.35)';
-          };
-          codeInput.onblur = () => {
-            codeInput.style.boxShadow = 'none';
-          };
           cardBox.appendChild(codeInput);
 
           const statusBanner = document.createElement('div');
@@ -2716,7 +2713,7 @@ ${criteriaSchema}
           };
 
           codeInput.addEventListener('input', () => {
-            codeInput.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.35)';
+            codeInput.style.boxShadow = 'none';
             if (statusBanner.style.display !== 'none') {
               statusBanner.style.display = 'none';
             }
@@ -2726,7 +2723,6 @@ ${criteriaSchema}
             const code = codeInput.value.trim();
             if (!code) {
               showStatus("⚠️ Saisis un code pour consulter les évaluations.", true);
-              codeInput.style.boxShadow = '0 0 0 2.5px rgba(239, 68, 68, 0.65)';
               codeInput.animate([
                 { transform: 'translateX(-4px)' },
                 { transform: 'translateX(4px)' },
