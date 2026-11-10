@@ -1502,6 +1502,77 @@
         return { success: false, exists: false, error: "Impossible de lire les résultats depuis Firestore", docId };
       },
 
+      async listEvaluations(pageSize = 100) {
+        this.init();
+        try {
+          const restUrl = "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents/evaluations?pageSize=" + encodeURIComponent(String(pageSize)) + "&key=" + firebaseConfig.apiKey + "&t=" + Date.now();
+          const response = await fetch(restUrl, { method: 'GET', cache: 'no-store' });
+          if (response.ok) {
+            const body = await response.json();
+            const items = (body.documents || []).map(doc => {
+              const docId = doc.name ? doc.name.split('/').pop() : '';
+              const data = this._fromFirestoreFields(doc.fields || {});
+              if (!data.docId && docId) data.docId = docId;
+              return data;
+            });
+            items.sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
+            return { success: true, items, method: 'rest' };
+          }
+          const errText = await response.text();
+          console.warn("[FirebaseService] REST list HTTP " + response.status + ":", errText);
+        } catch (restErr) {
+          console.warn("[FirebaseService] REST list network error:", restErr.message);
+        }
+
+        if (this.db) {
+          try {
+            const sdkList = this.db.collection('evaluations').limit(pageSize).get({ source: 'server' });
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SDK list timeout')), 4000));
+            const snap = await Promise.race([sdkList, timeout]);
+            const items = [];
+            snap.forEach(d => items.push({ docId: d.id, ...d.data() }));
+            items.sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
+            return { success: true, items, method: 'sdk' };
+          } catch (sdkErr) {
+            console.warn("[FirebaseService] SDK list fallback note:", sdkErr.message);
+          }
+        }
+
+        return { success: false, items: [], error: "Impossible de charger la liste des évaluations." };
+      },
+
+      async deleteEvaluation(docId) {
+        this.init();
+        if (!docId) return { success: false, error: 'Identifiant du document manquant' };
+
+        let restOk = false;
+        try {
+          const restUrl = "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents/evaluations/" + encodeURIComponent(docId) + "?key=" + firebaseConfig.apiKey;
+          const response = await fetch(restUrl, { method: 'DELETE' });
+          if (response.ok || response.status === 404) {
+            restOk = true;
+          } else {
+            const errText = await response.text();
+            console.warn("[FirebaseService] REST delete HTTP " + response.status + ":", errText);
+          }
+        } catch (restErr) {
+          console.warn("[FirebaseService] REST delete error:", restErr.message);
+        }
+
+        if (this.db) {
+          try {
+            const sdkDel = this.db.collection('evaluations').doc(docId).delete();
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SDK delete timeout')), 2500));
+            await Promise.race([sdkDel, timeout]);
+            return { success: true, docId };
+          } catch (sdkErr) {
+            console.warn("[FirebaseService] SDK delete fallback note:", sdkErr.message);
+          }
+        }
+
+        return { success: restOk, docId };
+      },
+
       _toFirestoreValue(val) {
         if (val === null || val === undefined) return { nullValue: null };
         if (typeof val === 'boolean') return { booleanValue: val };
@@ -1569,28 +1640,20 @@
 
     const roundScore = (val) => Math.round((Number(val) + Number.EPSILON) * 100) / 100;
 
-    // Centralized, configurable rubric adhering to official 4ème Français barème totals:
-    // C1 (4.5) + C3 (3.0) + C6 (1.5) + C7 (1.0) = 10.0 pts; C2, C4, C5 preserved as qualitative indicators only.
+    // Centralized, configurable rubric using ONLY 3 active criteria:
+    // C1 (4.5) + C3 (3.0) + C6 (1.5) = 9.0 pts total (3.0 pts per question).
+    // C7 is removed and C2, C4, C5 are excluded from scoring and deductions.
     window.EVALUATION_RUBRIC_CONFIG = {
-      version: "4eme_officiel_v1",
+      version: "4eme_officiel_v2_9pts",
+      legacyVersions: ["4eme_officiel_v1"],
       educationalLevel: "Français 4ème année primaire (élèves âgés de 9 à 10 ans)",
       moduleName: "Module 1 — Évaluation : Je construis mon histoire",
-      overallMaxScore: 10,
+      overallMaxScore: 9,
+      activeCriteriaOrder: ["C1", "C3", "C6"],
       officialCriteriaTotals: {
         C1: { code: "C1", name: "Adéquation avec la situation", max: 4.5 },
         C3: { code: "C3", name: "Correction linguistique", max: 3.0 },
-        C6: { code: "C6", name: "Richesse du vocabulaire", max: 1.5 },
-        C7: {
-          code: "C7",
-          name: "Critère de perfectionnement",
-          max: 1.0,
-          definition: "Originalité des idées / richesse de l'expression et présentation soignée (orthographe, majuscule, ponctuation)"
-        }
-      },
-      qualitativeIndicators: {
-        C2: { code: "C2", name: "Lisibilité et présentation matérielle", hasSeparatePoints: false },
-        C4: { code: "C4", name: "Orthographe", hasSeparatePoints: false },
-        C5: { code: "C5", name: "Cohérence du sens", hasSeparatePoints: false }
+        C6: { code: "C6", name: "Richesse du vocabulaire", max: 1.5 }
       },
       questions: {
         q1: {
@@ -1605,7 +1668,7 @@
           maxScore: 3.0,
           criteria: {
             C1: { name: "Adéquation avec la situation", max: 1.5, description: "La réponse répond exactement à « Où vont les élèves ? » en accord avec l'illustration." },
-            C3: { name: "Correction linguistique", max: 1.0, description: "Phrase compréhensible, ordre des mots correct et conjugaison/accords justes pour la 4ème année." },
+            C3: { name: "Correction linguistique", max: 1.0, description: "Phrase compréhensible, ordre des mots correct et conjugaison/accords essentiels pour la 4ème année." },
             C6: { name: "Richesse du vocabulaire", max: 0.5, description: "Mots justes et pertinents liés au contexte scolaire (école, école primaire, se diriger, aller...)." }
           }
         },
@@ -1634,14 +1697,77 @@
           questionText: "3. Que fait la nouvelle élève ?",
           sceneSummary: "À l'intérieur de la classe, le maître devant le tableau vert accueille d'un geste bienveillant une nouvelle élève souriante debout face aux camarades assis à leurs tables.",
           expectedUnderstanding: "L'élève doit décrire ce que fait la nouvelle élève (elle se présente devant le maître et ses camarades / salue la classe / parle pour faire connaissance). Toute formulation pertinente exprimant cette scène d'accueil et de présentation est acceptée.",
-          maxScore: 4.0,
+          maxScore: 3.0,
           criteria: {
             C1: { name: "Adéquation avec la situation", max: 1.5, description: "La réponse interprète correctement la situation de la nouvelle élève face au maître et aux camarades." },
             C3: { name: "Correction linguistique", max: 1.0, description: "Construction correcte de la phrase (temps, accords, pronoms) adaptée au niveau 4ème." },
-            C6: { name: "Richesse du vocabulaire", max: 0.5, description: "Vocabulaire adapté à l'accueil en classe (se présenter, saluer, camarades, maître, classe...)." },
-            C7: { name: "Critère de perfectionnement", max: 1.0, description: "Originalité des idées / richesse de l'expression et présentation soignée (orthographe, majuscule en début de phrase, ponctuation finale)." }
+            C6: { name: "Richesse du vocabulaire", max: 0.5, description: "Vocabulaire adapté à l'accueil en classe (se présenter, saluer, camarades, maître, classe...)." }
           }
         }
+      }
+    };
+
+    window.EvaluationRubricHelper = {
+      resolveEvaluationMaxScore(record) {
+        const currentDefault = window.EVALUATION_RUBRIC_CONFIG ? window.EVALUATION_RUBRIC_CONFIG.overallMaxScore : 9;
+        if (!record || typeof record !== 'object') return currentDefault;
+
+        const explicitCandidates = [
+          record.maxTotalScore,
+          record.maxScore,
+          record.writingEvaluation && record.writingEvaluation.maxScore,
+          record.writingEvaluation && record.writingEvaluation.summary && record.writingEvaluation.summary.maxScore,
+          record.rubricConfig && record.rubricConfig.overallMaxScore
+        ];
+        for (const c of explicitCandidates) {
+          if (typeof c === 'number' && !Number.isNaN(c) && c > 0) return roundScore(c);
+        }
+
+        const qMap = record.writingEvaluation && record.writingEvaluation.questions;
+        if (qMap && qMap.q1 && qMap.q2 && qMap.q3) {
+          const m1 = Number(qMap.q1.maxScore);
+          const m2 = Number(qMap.q2.maxScore);
+          const m3 = Number(qMap.q3.maxScore);
+          if (m1 > 0 && m2 > 0 && m3 > 0) return roundScore(m1 + m2 + m3);
+        }
+
+        const rv = record.rubricVersion || (record.writingEvaluation && record.writingEvaluation.rubricVersion) || (record.rubricConfig && record.rubricConfig.version);
+        if (rv === '4eme_officiel_v1') return 10;
+        if (typeof rv === 'string' && rv.startsWith('4eme_officiel_v2')) return 9;
+
+        if (record.finalScoreOutOf10 !== undefined && record.finalScoreOutOf9 === undefined) return 10;
+        if (record.finalScoreOutOf9 !== undefined) return 9;
+
+        // Legacy browser history items created before maxScore/rubricVersion were persisted were /10
+        if ('questionScores' in record && record.rubricVersion === undefined && record.maxScore === undefined) {
+          return 10;
+        }
+        return currentDefault;
+      },
+
+      resolveQuestionMaxScore(record, qKey, entry) {
+        if (entry && typeof entry.maxScore === 'number' && !Number.isNaN(entry.maxScore) && entry.maxScore > 0) {
+          return roundScore(entry.maxScore);
+        }
+        const cfgQMax = record && record.rubricConfig && record.rubricConfig.questionMaxScores && record.rubricConfig.questionMaxScores[qKey];
+        if (typeof cfgQMax === 'number' && cfgQMax > 0) return roundScore(cfgQMax);
+
+        const totalMax = this.resolveEvaluationMaxScore(record);
+        if (Math.abs(totalMax - 10) <= 0.01) {
+          return qKey === 'q3' ? 4 : 3;
+        }
+        const activeQ = window.EVALUATION_RUBRIC_CONFIG && window.EVALUATION_RUBRIC_CONFIG.questions[qKey];
+        return activeQ ? activeQ.maxScore : 3;
+      },
+
+      resolveRubricVersion(record) {
+        if (!record || typeof record !== 'object') {
+          return window.EVALUATION_RUBRIC_CONFIG ? window.EVALUATION_RUBRIC_CONFIG.version : '4eme_officiel_v2_9pts';
+        }
+        return record.rubricVersion ||
+          (record.writingEvaluation && record.writingEvaluation.rubricVersion) ||
+          (record.rubricConfig && record.rubricConfig.version) ||
+          (this.resolveEvaluationMaxScore(record) === 10 ? '4eme_officiel_v1' : '4eme_officiel_v2_9pts');
       }
     };
 
@@ -1649,6 +1775,11 @@
       if (!config || !config.questions) {
         throw new Error("Configuration du barème introuvable.");
       }
+      const allowedCriteria = ["C1", "C3", "C6"];
+      if (config.qualitativeIndicators && Object.keys(config.qualitativeIndicators).length > 0) {
+        throw new Error("Les indicateurs C2, C4, C5 ne doivent plus faire partie de la configuration active.");
+      }
+
       const qKeys = ["q1", "q2", "q3"];
       let totalMax = 0;
       const criterionSums = {};
@@ -1658,8 +1789,17 @@
         if (!q || typeof q.maxScore !== "number" || q.maxScore <= 0) {
           throw new Error("Configuration invalide pour la question " + qKey);
         }
+        const critEntries = Object.entries(q.criteria || {});
+        for (const cCode of allowedCriteria) {
+          if (!q.criteria || !q.criteria[cCode]) {
+            throw new Error(`Critère obligatoire ${cCode} manquant pour ${qKey}.`);
+          }
+        }
         let qCritSum = 0;
-        for (const [cCode, cDef] of Object.entries(q.criteria || {})) {
+        for (const [cCode, cDef] of critEntries) {
+          if (!allowedCriteria.includes(cCode)) {
+            throw new Error(`Critère non autorisé ${cCode} détecté dans ${qKey}.`);
+          }
           qCritSum = roundScore(qCritSum + cDef.max);
           criterionSums[cCode] = roundScore((criterionSums[cCode] || 0) + cDef.max);
         }
@@ -1673,7 +1813,14 @@
         throw new Error(`La somme des maximums des 3 questions (${totalMax}) doit être exactement égale à ${config.overallMaxScore}.`);
       }
 
-      for (const [cCode, totalDef] of Object.entries(config.officialCriteriaTotals || {})) {
+      const totalEntries = Object.entries(config.officialCriteriaTotals || {});
+      if (totalEntries.length !== allowedCriteria.length) {
+        throw new Error("officialCriteriaTotals doit contenir uniquement C1, C3 et C6.");
+      }
+      for (const [cCode, totalDef] of totalEntries) {
+        if (!allowedCriteria.includes(cCode)) {
+          throw new Error(`Critère non autorisé ${cCode} dans officialCriteriaTotals.`);
+        }
         const actual = criterionSums[cCode] || 0;
         if (Math.abs(actual - totalDef.max) > 0.01) {
           throw new Error(`Le total configuré pour ${cCode} (${actual}) ne correspond pas au barème officiel (${totalDef.max}).`);
@@ -1895,29 +2042,22 @@ ${studentAnswer}
 """
 
 BARÈME OFFICIEL APPLICABLE À CETTE QUESTION (TOTAL MAXIMUM : ${qConfig.maxScore} POINTS) :
-Évalue chaque critère individuellement et rigoureusement (utilise des demi-points ou quarts de point si nécessaire, sans jamais dépasser le maximum de chaque critère) :
+Évalue UNIQUEMENT les trois critères C1, C3 et C6 individuellement et rigoureusement (utilise des demi-points ou quarts de point si nécessaire, sans jamais dépasser le maximum de chaque critère ni un total de ${qConfig.maxScore} points) :
 ${criteriaLines}
 
-INDICATEURS QUALITATIFS À PRÉSERVER SANS POINTS SÉPARÉS :
-N'invente JAMAIS de note chiffrée séparée pour C2, C4 ou C5. Indique uniquement leur observation pédagogique sous "indicators" ("maîtrisé", "en_cours", ou "à_renforcer") :
-- C2 — Lisibilité et présentation matérielle
-- C4 — Orthographe d'usage et grammaticale
-- C5 — Cohérence du sens
+CRITÈRES EXCLUS (NE PAS ÉVALUER NI PÉNALISER) :
+- N'utilise PAS C7 (le critère de perfectionnement est supprimé).
+- N'attribue aucun point et ne retire aucun point pour C2, C4 ou C5. N'ajoute aucun bloc "indicators".
 
 RÈGLE STRICTE SUR LE CHARABIA OU TEXTE VIDE DE SENS :
-Si la réponse est un charabia aléatoire (ex. "zdzadz", "qsdfg") ou totalement hors-sujet, attribue 0 point à TOUS les critères.
+Si la réponse est vide, un charabia aléatoire (ex. "zdzadz", "qsdfg") ou totalement hors-sujet, attribue 0 point à C1, C3 et C6 (total = 0 / ${qConfig.maxScore}).
 
 FORMAT DE RÉPONSE JSON STRICTEMENT OBLIGATOIRE :
-Retourne UNIQUEMENT un objet JSON valide (sans texte ni balises markdown) avec cette structure exacte :
+Retourne UNIQUEMENT un objet JSON valide (sans texte ni balises markdown) contenant UNIQUEMENT C1, C3 et C6 dans "criteria" :
 {
   "questionId": "${qConfig.id}",
   "criteria": {
 ${criteriaSchema}
-  },
-  "indicators": {
-    "C2": { "name": "Lisibilité et présentation matérielle", "level": "maîtrisé", "observation": "" },
-    "C4": { "name": "Orthographe", "level": "maîtrisé", "observation": "" },
-    "C5": { "name": "Cohérence du sens", "level": "maîtrisé", "observation": "" }
   },
   "strengths": [],
   "mistakes": [
@@ -1943,39 +2083,30 @@ ${criteriaSchema}
         throw new Error(`Format JSON incomplet retourné par Gemini pour ${qKey}.`);
       }
 
+      const isBlankAnswer = !String(studentAnswer || "").trim();
       const normalizedCriteria = {};
       let sum = 0;
 
       for (const [cCode, cCfg] of Object.entries(qConfig.criteria)) {
         const rawCrit = parsed.criteria[cCode];
-        if (!rawCrit || typeof rawCrit.score !== "number" || Number.isNaN(rawCrit.score)) {
+        if (!isBlankAnswer && (!rawCrit || typeof rawCrit.score !== "number" || Number.isNaN(rawCrit.score))) {
           throw new Error(`Score manquant ou invalide pour le critère ${cCode} sur ${qKey}.`);
         }
-        const clampedScore = roundScore(Math.max(0, Math.min(cCfg.max, rawCrit.score)));
+        const rawScore = isBlankAnswer ? 0 : rawCrit.score;
+        const clampedScore = roundScore(Math.max(0, Math.min(cCfg.max, rawScore)));
         normalizedCriteria[cCode] = {
           code: cCode,
           name: cCfg.name,
           score: clampedScore,
           max: cCfg.max,
-          justification: typeof rawCrit.justification === "string" ? rawCrit.justification.trim() : ""
+          justification: isBlankAnswer
+            ? "Aucune réponse fournie."
+            : (rawCrit && typeof rawCrit.justification === "string" ? rawCrit.justification.trim() : "")
         };
         sum = roundScore(sum + clampedScore);
       }
 
-      const validatedScore = roundScore(Math.max(0, Math.min(qConfig.maxScore, sum)));
-
-      const normalizedIndicators = {};
-      const indDefs = window.EVALUATION_RUBRIC_CONFIG.qualitativeIndicators;
-      for (const [iCode, iDef] of Object.entries(indDefs)) {
-        const rawInd = (parsed.indicators && parsed.indicators[iCode]) || {};
-        normalizedIndicators[iCode] = {
-          code: iCode,
-          name: iDef.name,
-          hasSeparatePoints: false,
-          level: typeof rawInd.level === "string" ? rawInd.level : "en_cours",
-          observation: typeof rawInd.observation === "string" ? rawInd.observation.trim() : ""
-        };
-      }
+      const validatedScore = isBlankAnswer ? 0 : roundScore(Math.max(0, Math.min(qConfig.maxScore, sum)));
 
       const mistakes = Array.isArray(parsed.mistakes)
         ? parsed.mistakes.filter(m => m && (m.original || m.correction || m.explanation)).map(m => ({
@@ -1991,15 +2122,17 @@ ${criteriaSchema}
         questionId: qKey,
         questionNumber: qConfig.number,
         questionText: qConfig.questionText,
-        answer: studentAnswer,
+        answer: String(studentAnswer || ""),
         score: validatedScore,
         maxScore: qConfig.maxScore,
+        rubricVersion: window.EVALUATION_RUBRIC_CONFIG.version,
         criteria: normalizedCriteria,
-        indicators: normalizedIndicators,
         strengths,
         mistakes,
         suggestedCorrection: typeof parsed.suggestedCorrection === "string" ? parsed.suggestedCorrection.trim() : "",
-        feedback: typeof parsed.feedback === "string" && parsed.feedback.trim() ? parsed.feedback.trim() : "Bonne participation !",
+        feedback: isBlankAnswer
+          ? "Aucune réponse n'a été écrite pour cette question."
+          : (typeof parsed.feedback === "string" && parsed.feedback.trim() ? parsed.feedback.trim() : "Bonne participation !"),
         status: "evaluated",
         evaluatedAt: new Date().toISOString(),
         model: modelName,
@@ -2012,6 +2145,20 @@ ${criteriaSchema}
 
       validateRubric() {
         return validateRubricConfig(window.EVALUATION_RUBRIC_CONFIG);
+      },
+
+      buildQuestionPrompt(qKey, studentAnswer) {
+        this.validateRubric();
+        const qConfig = window.EVALUATION_RUBRIC_CONFIG.questions[qKey];
+        if (!qConfig) throw new Error("Question inconnue dans le barème : " + qKey);
+        return buildQuestionPrompt(qConfig, studentAnswer, window.EVALUATION_RUBRIC_CONFIG);
+      },
+
+      normalizeQuestionResponse(rawText, qKey, studentAnswer, usedImageContext = true) {
+        this.validateRubric();
+        const qConfig = window.EVALUATION_RUBRIC_CONFIG.questions[qKey];
+        if (!qConfig) throw new Error("Question inconnue dans le barème : " + qKey);
+        return normalizeQuestionEvaluation(rawText, qKey, qConfig, studentAnswer, usedImageContext, this.model);
       },
 
       getDiagnostics() {
@@ -2043,7 +2190,7 @@ ${criteriaSchema}
         if (lastAiDiagnostics) {
           lastAiDiagnostics.reachedGemini = true;
         }
-        console.log(`[GeminiAIService] Requesting independent evaluation for ${qKey} (image attached: ${Boolean(imagePart)}, reachedGemini: true)...`);
+        console.log(`[GeminiAIService] Requesting independent evaluation for ${qKey} (image attached: ${Boolean(imagePart)}, max: ${qConfig.maxScore}, reachedGemini: true)...`);
 
         const generateWithTimeout = async () => {
           const generatePromise = model.generateContent(contentPayload);
@@ -2086,6 +2233,7 @@ ${criteriaSchema}
         this.validateRubric();
         const rubric = window.EVALUATION_RUBRIC_CONFIG;
         const qKeys = ["q1", "q2", "q3"];
+        const allowedCodes = rubric.activeCriteriaOrder || ["C1", "C3", "C6"];
 
         for (const k of qKeys) {
           const ev = questionsMap && questionsMap[k];
@@ -2095,6 +2243,11 @@ ${criteriaSchema}
           const maxAllowed = rubric.questions[k].maxScore;
           if (ev.score < 0 || ev.score > maxAllowed) {
             throw new Error(`Score invalide détecté pour ${k} : ${ev.score}/${maxAllowed}`);
+          }
+          for (const cCode of Object.keys(ev.criteria || {})) {
+            if (!allowedCodes.includes(cCode)) {
+              throw new Error(`Critère non autorisé ${cCode} détecté dans les résultats de ${k}.`);
+            }
           }
         }
 
@@ -2115,18 +2268,19 @@ ${criteriaSchema}
           for (const k of qKeys) {
             const qCrit = questionsMap[k].criteria && questionsMap[k].criteria[cCode];
             if (qCrit && typeof qCrit.score === "number") {
-              earned = roundScore(earned + qCrit.score);
+              earned = roundScore(earned + Math.max(0, Math.min(rubric.questions[k].criteria[cCode].max, qCrit.score)));
             }
           }
           criteriaTotals[cCode] = {
             code: cCode,
             name: cDef.name,
-            score: Math.min(cDef.max, earned),
+            score: roundScore(Math.min(cDef.max, earned)),
             max: cDef.max
           };
         }
 
         return {
+          rubricVersion: rubric.version,
           totalScore,
           maxScore: rubric.overallMaxScore,
           questionScores: {
@@ -2735,7 +2889,8 @@ ${criteriaSchema}
             }
             codeInput.style.boxShadow = 'none';
             this.lastEnteredCode = code;
-            showStatus(`🔑 Code « ${code} » prêt — consultation en cours de préparation.`, false);
+            showStatus(`🔍 Ouverture des résultats pour « ${code} »...`, false);
+            this.openDashboard(code);
           };
 
           consultBtn.addEventListener('click', (e) => {
@@ -2793,6 +2948,411 @@ ${criteriaSchema}
           });
         }
       };
+
+      Object.assign(TeacherPortal, {
+        _escapeHtml(str) {
+          return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        },
+
+        _fmtNum(val) {
+          if (typeof val !== 'number' || Number.isNaN(val)) return '—';
+          const rounded = Math.round((val + Number.EPSILON) * 100) / 100;
+          return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+        },
+
+        _computeDocSummary(rawDoc) {
+          const helper = window.EvaluationRubricHelper;
+          const doc = rawDoc || {};
+          const maxScore = helper
+            ? helper.resolveEvaluationMaxScore(doc)
+            : (doc.maxTotalScore === 10 ? 10 : 9);
+          const rubricVer = helper
+            ? helper.resolveRubricVersion(doc)
+            : (maxScore === 10 ? '4eme_officiel_v1' : '4eme_officiel_v2_9pts');
+          const isLegacyV1 = rubricVer === '4eme_officiel_v1' || maxScore === 10;
+
+          const we = doc.writingEvaluation || {};
+          const qs = we.questions || {};
+          const qData = {};
+          let allQEvaluated = true;
+          let sumQ = 0;
+
+          ['q1', 'q2', 'q3'].forEach((qk) => {
+            const entry = qs[qk] || {};
+            const cfgMax = helper
+              ? helper.resolveQuestionMaxScore(doc, qk, entry)
+              : (isLegacyV1 && qk === 'q3' ? 4 : 3);
+            const qMax = (typeof entry.maxScore === 'number' && entry.maxScore > 0) ? entry.maxScore : cfgMax;
+            const fallbackQScore = doc.questionScores && typeof doc.questionScores[qk] === 'number'
+              ? doc.questionScores[qk] : null;
+            const qScore = typeof entry.score === 'number' && !Number.isNaN(entry.score) ? entry.score : fallbackQScore;
+            const qOk = (entry.status === 'evaluated' || doc.writingStatus === 'evaluated') && typeof qScore === 'number';
+            if (qOk) {
+              sumQ += Math.max(0, Math.min(qMax, qScore));
+            } else {
+              allQEvaluated = false;
+            }
+            qData[qk] = { score: qScore, maxScore: qMax, evaluated: qOk };
+          });
+
+          const totalScore = allQEvaluated
+            ? Math.max(0, Math.min(maxScore, Math.round((sumQ + Number.EPSILON) * 100) / 100))
+            : (typeof doc.totalScore === 'number' ? Math.max(0, Math.min(maxScore, doc.totalScore)) : null);
+          const isEvaluated = (doc.writingStatus === 'evaluated' || doc.status === 'evaluated' || allQEvaluated)
+            && typeof totalScore === 'number';
+
+          const critTotals = {};
+          const critCodes = isLegacyV1 ? ['C1', 'C3', 'C6', 'C7'] : ['C1', 'C3', 'C6'];
+          let hasCrit = false;
+          ['q1', 'q2', 'q3'].forEach((qk) => {
+            const crits = (qs[qk] && qs[qk].criteria) || {};
+            critCodes.forEach((cc) => {
+              if (crits[cc] && typeof crits[cc].score === 'number' && !Number.isNaN(crits[cc].score)) {
+                critTotals[cc] = (critTotals[cc] || 0) + crits[cc].score;
+                hasCrit = true;
+              }
+            });
+          });
+          if (hasCrit) {
+            critCodes.forEach((cc) => {
+              if (typeof critTotals[cc] === 'number') {
+                critTotals[cc] = Math.round((critTotals[cc] + Number.EPSILON) * 100) / 100;
+              }
+            });
+          } else if (!isLegacyV1 && doc.criteriaTotals && typeof doc.criteriaTotals === 'object') {
+            ['C1', 'C3', 'C6'].forEach((cc) => {
+              const cv = doc.criteriaTotals[cc];
+              const numVal = typeof cv === 'number' ? cv : (cv && typeof cv.score === 'number' ? cv.score : null);
+              if (typeof numVal === 'number' && !Number.isNaN(numVal)) {
+                critTotals[cc] = Math.round((numVal + Number.EPSILON) * 100) / 100;
+                hasCrit = true;
+              }
+            });
+          }
+
+          return {
+            doc,
+            docId: doc.docId || '',
+            maxScore,
+            rubricVersion: rubricVer,
+            isLegacyV1,
+            qData,
+            totalScore,
+            isEvaluated,
+            criteriaTotals: hasCrit ? critTotals : null
+          };
+        },
+
+        _matchesFilter(doc, rawFilter) {
+          const f = String(rawFilter || '').trim().toLowerCase();
+          if (!f || ['all', 'tout', 'tous', 'prof', '*', 'admin'].includes(f)) return true;
+          const haystack = [
+            doc.studentClasse,
+            doc.studentId,
+            doc.studentNom,
+            doc.studentPrenom,
+            doc.docId,
+            doc.sessionId
+          ].filter(Boolean).join(' ').toLowerCase();
+          return haystack.includes(f);
+        },
+
+        _removeLocalHistoryDoc(docId) {
+          try {
+            const raw = localStorage.getItem('eval_history_v1');
+            if (!raw) return;
+            const list = JSON.parse(raw);
+            if (!Array.isArray(list)) return;
+            const filtered = list.filter(item => item && item.docId !== docId);
+            localStorage.setItem('eval_history_v1', JSON.stringify(filtered));
+          } catch (e) {}
+        },
+
+        closeDashboard() {
+          const dash = document.getElementById('teacher-dashboard-modal');
+          if (dash) dash.remove();
+        },
+
+        async openDashboard(initialCode) {
+          this.closeDashboard();
+          const wildcardCodes = ['all', 'tout', 'tous', 'prof', '*', 'admin'];
+          const rawCode = String(initialCode || this.lastEnteredCode || '').trim();
+          const state = {
+            filterText: wildcardCodes.includes(rawCode.toLowerCase()) ? '' : rawCode,
+            scaleFilter: 'all', // 'all' | 'v2_9' | 'v1_10'
+            loading: true,
+            loadError: null,
+            rows: [],
+            pendingDeleteId: null
+          };
+
+          const overlay = document.createElement('div');
+          overlay.id = 'teacher-dashboard-modal';
+          overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(15,23,42,0.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 1000001; display: flex; align-items: center; justify-content: center; padding: 16px; font-family: "Nunito", "Segoe UI", sans-serif;';
+          overlay.innerHTML = `
+            <div style="background:#ffffff; border-radius:22px; width:100%; max-width:980px; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.45); border:3px solid #f59e0b;">
+              <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7); padding:14px 20px; border-bottom:2px solid #fde68a; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:26px;">👩‍🏫</span>
+                  <div>
+                    <h2 style="margin:0; font-size:20px; font-weight:900; color:#78350f;">Tableau de bord Enseignant — Évaluations</h2>
+                    <div style="font-size:12px; color:#92400e; font-weight:700;">Barème actif : /9 pts (C1 4.5 • C3 3 • C6 1.5) — Historique /10 préservé</div>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <button type="button" id="td-back-btn" style="background:#ffffff; color:#92400e; border:1.5px solid #f59e0b; border-radius:9999px; padding:6px 12px; font-weight:800; font-size:13px; cursor:pointer;">← Code</button>
+                  <button type="button" id="td-close-all-btn" style="background:#dc2626; color:#ffffff; border:none; border-radius:9999px; width:34px; height:34px; font-weight:900; font-size:16px; cursor:pointer;">✕</button>
+                </div>
+              </div>
+              <div style="padding:12px 20px; background:#f8fafc; border-bottom:1.5px solid #e2e8f0; display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+                <input type="text" id="td-filter-input" placeholder="Filtrer par classe, ID, nom ou docId..." style="flex:1; min-width:210px; padding:8px 14px; border-radius:9999px; border:1.5px solid #cbd5e1; font-size:14px; font-weight:700; color:#0f172a; outline:none;" />
+                <button type="button" id="td-show-all-btn" style="background:#e0f2fe; color:#0369a1; border:1.5px solid #7dd3fc; border-radius:9999px; padding:7px 14px; font-weight:800; font-size:13px; cursor:pointer;">Tout afficher</button>
+                <div style="display:flex; gap:4px; background:#e2e8f0; padding:3px; border-radius:9999px;">
+                  <button type="button" class="td-scale-btn" data-scale="all" style="padding:5px 11px; border-radius:9999px; border:none; font-size:12px; font-weight:800; cursor:pointer;">Tous</button>
+                  <button type="button" class="td-scale-btn" data-scale="v2_9" style="padding:5px 11px; border-radius:9999px; border:none; font-size:12px; font-weight:800; cursor:pointer;">Actuel /9</button>
+                  <button type="button" class="td-scale-btn" data-scale="v1_10" style="padding:5px 11px; border-radius:9999px; border:none; font-size:12px; font-weight:800; cursor:pointer;">Ancien /10</button>
+                </div>
+                <button type="button" id="td-refresh-btn" style="background:#f59e0b; color:#ffffff; border:none; border-radius:9999px; padding:7px 14px; font-weight:800; font-size:13px; cursor:pointer;">🔄 Actualiser</button>
+              </div>
+              <div id="td-stats-bar" style="padding:10px 20px; background:#ffffff; border-bottom:1.5px solid #e2e8f0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:13px;"></div>
+              <div id="td-list-body" style="padding:16px 20px; overflow-y:auto; flex:1; background:#f8fafc;"></div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+
+          const filterInput = overlay.querySelector('#td-filter-input');
+          const showAllBtn = overlay.querySelector('#td-show-all-btn');
+          const refreshBtn = overlay.querySelector('#td-refresh-btn');
+          const statsBar = overlay.querySelector('#td-stats-bar');
+          const listBody = overlay.querySelector('#td-list-body');
+          const scaleBtns = Array.from(overlay.querySelectorAll('.td-scale-btn'));
+
+          filterInput.value = state.filterText;
+
+          const updateScaleButtons = () => {
+            scaleBtns.forEach((btn) => {
+              const active = btn.dataset.scale === state.scaleFilter;
+              btn.style.background = active ? '#1e40af' : 'transparent';
+              btn.style.color = active ? '#ffffff' : '#334155';
+            });
+          };
+
+          const render = () => {
+            updateScaleButtons();
+            if (state.loading) {
+              statsBar.innerHTML = `<span style="color:#64748b; font-weight:700;">⏳ Chargement des copies depuis Firestore...</span>`;
+              listBody.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b; font-weight:700;">⏳ Récupération des évaluations en cours...</div>`;
+              return;
+            }
+
+            const filtered = state.rows.filter((summary) => {
+              if (state.scaleFilter === 'v2_9' && summary.isLegacyV1) return false;
+              if (state.scaleFilter === 'v1_10' && !summary.isLegacyV1) return false;
+              return this._matchesFilter(summary.doc, state.filterText);
+            });
+
+            const activeV2Eval = filtered.filter(r => !r.isLegacyV1 && r.isEvaluated);
+            const legacyCount = filtered.filter(r => r.isLegacyV1).length;
+            const avg9 = activeV2Eval.length
+              ? this._fmtNum(activeV2Eval.reduce((a, r) => a + r.totalScore, 0) / activeV2Eval.length)
+              : '—';
+            const critAvg = (code) => {
+              const vals = activeV2Eval.map(r => r.criteriaTotals && r.criteriaTotals[code]).filter(v => typeof v === 'number');
+              return vals.length ? this._fmtNum(vals.reduce((a, b) => a + b, 0) / vals.length) : '—';
+            };
+
+            statsBar.innerHTML = `
+              <span style="background:#eff6ff; color:#1e40af; padding:4px 10px; border-radius:9999px; font-weight:800;">📊 ${filtered.length} résultat(s)</span>
+              <span style="background:#ecfdf5; color:#065f46; padding:4px 10px; border-radius:9999px; font-weight:800;">✅ Corrigées /9 : ${activeV2Eval.length} (Moy. ${avg9} / 9)</span>
+              <span style="background:#f1f5f9; color:#334155; padding:4px 10px; border-radius:9999px; font-weight:700;">C1 : ${critAvg('C1')}/4.5 • C3 : ${critAvg('C3')}/3 • C6 : ${critAvg('C6')}/1.5</span>
+              ${legacyCount > 0 ? `<span style="background:#fef3c7; color:#92400e; padding:4px 10px; border-radius:9999px; font-weight:800;">📜 Anciennes /10 : ${legacyCount}</span>` : ''}
+              ${state.loadError ? `<span style="background:#fef2f2; color:#991b1b; padding:4px 10px; border-radius:9999px; font-weight:700;">⚠️ ${this._escapeHtml(state.loadError)}</span>` : ''}
+            `;
+
+            if (filtered.length === 0) {
+              listBody.innerHTML = `
+                <div style="text-align:center; padding:34px 16px; background:#ffffff; border:1.5px dashed #cbd5e1; border-radius:16px; color:#475569;">
+                  <div style="font-size:16px; font-weight:800; margin-bottom:6px;">Aucune évaluation ne correspond au filtre « ${this._escapeHtml(state.filterText)} ».</div>
+                  <div style="font-size:13px; margin-bottom:12px;">Clique sur « Tout afficher » pour consulter toutes les copies enregistrées.</div>
+                </div>
+              `;
+              return;
+            }
+
+            listBody.innerHTML = '';
+            filtered.forEach((summary) => {
+              const doc = summary.doc;
+              const name = `${doc.studentPrenom || ''} ${doc.studentNom || ''}`.trim() || 'Élève anonyme';
+              const dateStr = doc.submittedAt ? new Date(doc.submittedAt).toLocaleString('fr-FR') : 'Date inconnue';
+              const isConfirming = state.pendingDeleteId === summary.docId;
+
+              const qPills = ['q1', 'q2', 'q3'].map((qk, idx) => {
+                const q = summary.qData[qk];
+                const txt = typeof q.score === 'number' ? `${this._fmtNum(q.score)}/${this._fmtNum(q.maxScore)}` : `—/${this._fmtNum(q.maxScore)}`;
+                return `<span style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:3px 8px; font-size:12px; font-weight:800; color:#1e293b;">Q${idx + 1} : ${txt}</span>`;
+              }).join(' ');
+
+              let critLine = '';
+              if (!summary.isLegacyV1 && summary.criteriaTotals) {
+                const c = summary.criteriaTotals;
+                critLine = `<div style="font-size:12px; color:#475569; margin-top:4px; font-weight:700;">Critères actifs : C1 ${typeof c.C1 === 'number' ? c.C1 : '—'}/4.5 • C3 ${typeof c.C3 === 'number' ? c.C3 : '—'}/3 • C6 ${typeof c.C6 === 'number' ? c.C6 : '—'}/1.5</div>`;
+              }
+
+              const card = document.createElement('div');
+              card.className = 'teacher-eval-row';
+              card.dataset.docId = summary.docId;
+              card.style.cssText = 'background:#ffffff; border:1.5px solid #e2e8f0; border-radius:14px; padding:12px 14px; margin-bottom:10px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 2px 6px rgba(15,23,42,0.04);';
+              card.innerHTML = `
+                <div style="flex:1; min-width:260px;">
+                  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
+                    <strong style="font-size:15px; color:#0f172a;">${this._escapeHtml(name)}</strong>
+                    <span style="font-size:12px; color:#475569; font-weight:700;">• ID : ${this._escapeHtml(doc.studentId || '—')} • Classe : ${this._escapeHtml(doc.studentClasse || '—')}</span>
+                    <span style="font-size:11px; padding:2px 8px; border-radius:9999px; font-weight:800; background:${summary.isLegacyV1 ? '#fef3c7' : '#dbeafe'}; color:${summary.isLegacyV1 ? '#92400e' : '#1e40af'};">${summary.isLegacyV1 ? 'Ancien /10' : 'Barème /9'}</span>
+                  </div>
+                  <div style="font-size:12px; color:#64748b; margin-top:3px;">🕒 ${this._escapeHtml(dateStr)}</div>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">${qPills}</div>
+                  ${critLine}
+                </div>
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                  <span style="padding:6px 12px; border-radius:9999px; font-weight:900; font-size:14px; background:${summary.isEvaluated ? '#ecfdf5' : '#fef2f2'}; color:${summary.isEvaluated ? '#065f46' : '#991b1b'}; border:1.5px solid ${summary.isEvaluated ? '#6ee7b7' : '#fca5a5'};">${summary.isEvaluated ? `✅ ${this._fmtNum(summary.totalScore)} / ${this._fmtNum(summary.maxScore)}` : '⚠️ Incomplète'}</span>
+                  <button type="button" class="td-details-btn" style="background:#3b82f6; color:#ffffff; border:none; border-radius:9999px; padding:7px 12px; font-weight:800; font-size:12px; cursor:pointer;">📄 Détails</button>
+                  <button type="button" class="td-delete-btn" style="background:${isConfirming ? '#b91c1c' : '#fee2e2'}; color:${isConfirming ? '#ffffff' : '#b91c1c'}; border:1.5px solid #fca5a5; border-radius:9999px; padding:6px 12px; font-weight:800; font-size:12px; cursor:pointer;">${isConfirming ? '⚠️ Confirmer' : '🗑️ Supprimer'}</button>
+                </div>
+              `;
+
+              card.querySelector('.td-details-btn').addEventListener('click', async () => {
+                let targetDoc = doc;
+                if ((!doc.writingEvaluation || !doc.writingEvaluation.questions) && window.FirebaseService && summary.docId) {
+                  try {
+                    const fetched = await window.FirebaseService.getEvaluation(summary.docId);
+                    if (fetched && fetched.success && fetched.exists && fetched.data) {
+                      targetDoc = fetched.data;
+                    }
+                  } catch (e) {}
+                }
+                if (window.ExerciseSystem && typeof window.ExerciseSystem.openEvaluationDetailsModal === 'function') {
+                  window.ExerciseSystem.openEvaluationDetailsModal(targetDoc, summary.totalScore);
+                  const detailsOverlay = document.getElementById('eval-details-modal');
+                  if (detailsOverlay) detailsOverlay.style.zIndex = '1000005';
+                }
+              });
+
+              card.querySelector('.td-delete-btn').addEventListener('click', async () => {
+                if (state.pendingDeleteId !== summary.docId) {
+                  state.pendingDeleteId = summary.docId;
+                  render();
+                  return;
+                }
+                state.pendingDeleteId = null;
+                let deletedOk = true;
+                if (window.FirebaseService && typeof window.FirebaseService.deleteEvaluation === 'function' && summary.docId) {
+                  const delRes = await window.FirebaseService.deleteEvaluation(summary.docId);
+                  if (delRes && delRes.success === false) {
+                    deletedOk = false;
+                    state.loadError = delRes.error || 'Suppression Firestore impossible.';
+                  }
+                }
+                if (deletedOk) {
+                  this._removeLocalHistoryDoc(summary.docId);
+                  state.rows = state.rows.filter(r => r.docId !== summary.docId);
+                }
+                render();
+              });
+
+              listBody.appendChild(card);
+            });
+          };
+
+          const loadRows = async () => {
+            state.loading = true;
+            state.loadError = null;
+            render();
+
+            const byId = new Map();
+            try {
+              if (window.FirebaseService && typeof window.FirebaseService.listEvaluations === 'function') {
+                const res = await window.FirebaseService.listEvaluations(120);
+                const remoteItems = res && Array.isArray(res.items)
+                  ? res.items
+                  : (res && Array.isArray(res.data) ? res.data : null);
+                if (res && res.success && remoteItems) {
+                  remoteItems.forEach((d) => {
+                    if (d && d.docId) byId.set(d.docId, d);
+                  });
+                } else if (res && res.error) {
+                  state.loadError = res.error;
+                }
+              }
+            } catch (e) {
+              state.loadError = e && e.message ? e.message : String(e);
+            }
+
+            if (window.ExerciseSystem && typeof window.ExerciseSystem.getEvaluationHistory === 'function') {
+              try {
+                const localList = window.ExerciseSystem.getEvaluationHistory() || [];
+                localList.forEach((item) => {
+                  if (item && item.docId && !byId.has(item.docId)) {
+                    byId.set(item.docId, item);
+                  }
+                });
+              } catch (e) {}
+            }
+
+            const docs = Array.from(byId.values()).sort((a, b) => {
+              const ta = Date.parse(a.submittedAt || 0) || 0;
+              const tb = Date.parse(b.submittedAt || 0) || 0;
+              return tb - ta;
+            });
+
+            state.rows = docs.map(d => this._computeDocSummary(d));
+            state.loading = false;
+            const statusBanner = document.getElementById('teacher-portal-status');
+            if (statusBanner) {
+              statusBanner.textContent = `✅ ${state.rows.length} évaluation(s) chargée(s).`;
+              statusBanner.style.color = '#166534';
+            }
+            render();
+          };
+
+          filterInput.addEventListener('input', () => {
+            state.filterText = filterInput.value;
+            state.pendingDeleteId = null;
+            render();
+          });
+          showAllBtn.addEventListener('click', () => {
+            state.filterText = '';
+            filterInput.value = '';
+            state.scaleFilter = 'all';
+            state.pendingDeleteId = null;
+            render();
+          });
+          refreshBtn.addEventListener('click', () => loadRows());
+          scaleBtns.forEach((btn) => {
+            btn.addEventListener('click', () => {
+              state.scaleFilter = btn.dataset.scale;
+              state.pendingDeleteId = null;
+              render();
+            });
+          });
+
+          overlay.querySelector('#td-back-btn').addEventListener('click', () => this.closeDashboard());
+          overlay.querySelector('#td-close-all-btn').addEventListener('click', () => {
+            this.closeDashboard();
+            const portal = document.getElementById('teacher-portal-modal');
+            if (portal) portal.remove();
+          });
+          overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) this.closeDashboard();
+          });
+
+          await loadRows();
+        }
+      });
 
       window.TeacherPortal = TeacherPortal;
 
@@ -17454,6 +18014,14 @@ showJourney2EndCelebration() {
         if (!payload || !payload.docId) return;
         try {
           const list = this.getEvaluationHistory().filter(item => item && item.docId !== payload.docId);
+          const helper = window.EvaluationRubricHelper;
+          const resolvedMaxScore = typeof payload.maxTotalScore === 'number' && payload.maxTotalScore > 0
+            ? payload.maxTotalScore
+            : (helper ? helper.resolveEvaluationMaxScore(payload) : 9);
+          const resolvedRubricVersion = payload.rubricVersion
+            || (payload.writingEvaluation && payload.writingEvaluation.rubricVersion)
+            || (payload.rubricConfig && payload.rubricConfig.version)
+            || (resolvedMaxScore === 10 ? '4eme_officiel_v1' : '4eme_officiel_v2_9pts');
           const entry = {
             docId: payload.docId,
             sessionId: payload.sessionId || this.evalSessionId,
@@ -17462,6 +18030,8 @@ showJourney2EndCelebration() {
             studentPrenom: payload.studentPrenom || '',
             studentClasse: payload.studentClasse || '',
             writingStatus: payload.writingStatus || 'pending_teacher_grading',
+            rubricVersion: resolvedRubricVersion,
+            maxScore: resolvedMaxScore,
             totalScore: typeof payload.totalScore === 'number' ? payload.totalScore : null,
             questionScores: payload.scoresBreakdown ? {
               q1: payload.scoresBreakdown.q1,
@@ -17545,7 +18115,6 @@ showJourney2EndCelebration() {
             score: null,
             maxScore: qCfg ? qCfg.maxScore : 0,
             criteria: existing && existing.criteria ? existing.criteria : {},
-            indicators: existing && existing.indicators ? existing.indicators : {},
             strengths: [],
             mistakes: [],
             feedback: null,
@@ -17569,7 +18138,8 @@ showJourney2EndCelebration() {
           studentClasse: studentClasse,
           sessionId: this.evalSessionId,
           docId: docId,
-          evaluationVersion: "v2_3questions",
+          evaluationVersion: "v3_3questions_9pts",
+          rubricVersion: rubric ? rubric.version : "4eme_officiel_v2_9pts",
           module: "Module 1",
           journey: "Évaluation — Je construis mon histoire",
           submittedAt: new Date().toISOString(),
@@ -17579,11 +18149,13 @@ showJourney2EndCelebration() {
           writingStatus: isFinalSubmission ? 'grading' : 'in_progress',
           writingScore: null,
           totalScore: null,
-          finalScoreOutOf10: null,
-          maxTotalScore: 10,
+          finalScoreOutOf9: null,
+          maxTotalScore: rubric ? rubric.overallMaxScore : 9,
           rubricConfig: rubric ? {
             version: rubric.version,
             overallMaxScore: rubric.overallMaxScore,
+            criteriaOrder: rubric.criteriaOrder ? [...rubric.criteriaOrder] : ['C1', 'C3', 'C6'],
+            criteriaMaxTotals: rubric.criteriaMaxTotals ? { ...rubric.criteriaMaxTotals } : { C1: 4.5, C3: 3.0, C6: 1.5 },
             questionMaxScores: {
               q1: rubric.questions.q1.maxScore,
               q2: rubric.questions.q2.maxScore,
@@ -17610,13 +18182,14 @@ showJourney2EndCelebration() {
             writing: null
           },
           writingEvaluation: {
-            rubricVersion: rubric ? rubric.version : "4eme_officiel_v1",
+            rubricVersion: rubric ? rubric.version : "4eme_officiel_v2_9pts",
             questions: questionsMap,
             question1Evaluation: questionsMap.q1,
             question2Evaluation: questionsMap.q2,
             question3Evaluation: questionsMap.q3,
             totalScore: null,
-            maxScore: 10,
+            maxScore: rubric ? rubric.overallMaxScore : 9,
+            criteriaTotals: { C1: null, C3: null, C6: null },
             summary: null,
             status: isFinalSubmission ? 'grading' : 'in_progress'
           }
@@ -17653,7 +18226,6 @@ showJourney2EndCelebration() {
             score: null,
             maxScore: qCfg.maxScore,
             criteria: {},
-            indicators: {},
             strengths: [],
             mistakes: [],
             feedback: null,
@@ -17780,21 +18352,27 @@ showJourney2EndCelebration() {
             payload.writingScore = summary.totalScore;
             payload.scoresBreakdown.writing = summary.totalScore;
             payload.totalScore = summary.totalScore;
-            payload.finalScoreOutOf10 = summary.totalScore;
+            payload.finalScoreOutOf9 = summary.totalScore;
+            payload.maxTotalScore = summary.maxScore || summary.maxTotalScore || (rubric ? rubric.overallMaxScore : 9);
+            payload.writingEvaluation.maxScore = payload.maxTotalScore;
+            payload.writingEvaluation.criteriaTotals = summary.criteriaTotals || null;
+            payload.criteriaTotals = summary.criteriaTotals || null;
             payload.aiEvaluation = summary;
             this.evalScores.writing = summary.totalScore;
-            console.log(`[GeminiAI] All 3 questions evaluated independently! Final total: ${summary.totalScore}/10`);
+            console.log(`[GeminiAI] All 3 questions evaluated independently! Final total: ${summary.totalScore}/${payload.maxTotalScore}`);
           } else {
             const resolvedStatus = failedCount > 0 ? (evaluatedCount > 0 ? 'partial_error' : 'grading_failed') : 'pending';
             payload.status = resolvedStatus;
             payload.writingStatus = resolvedStatus;
             payload.writingEvaluation.status = resolvedStatus;
             payload.writingEvaluation.totalScore = null;
+            payload.writingEvaluation.criteriaTotals = { C1: null, C3: null, C6: null };
             payload.writingEvaluation.summary = null;
             payload.writingScore = null;
             payload.scoresBreakdown.writing = null;
             payload.totalScore = null;
-            payload.finalScoreOutOf10 = null;
+            payload.finalScoreOutOf9 = null;
+            payload.criteriaTotals = null;
             this.evalScores.writing = null;
           }
 
@@ -18666,12 +19244,18 @@ showJourney2EndCelebration() {
         ro.observe(cardImg);
         cardImg.addEventListener('load', syncCardSizeVars);
 
-        // Score displayed inside the designated box on pop up end.png (positioned neatly above baked-in underline)
+        // Score displayed left of '/' and max score displayed right of '/' inside the purple dashed pill on pop up end.png
         const scoreBox = document.createElement('div');
         scoreBox.id = 'eval-final-score-box';
-        scoreBox.style.cssText = 'position: absolute; left: 43.2%; top: 58.6%; width: 10.6%; height: 10.0%; display: flex; align-items: center; justify-content: center; z-index: 50; pointer-events: none; user-select: none; font-family: "Segoe UI", "Nunito", Arial, sans-serif; font-weight: 900; font-size: clamp(26px, calc(var(--img-height, 550px) * 0.105), 72px); color: #3b1b49; line-height: 1;';
+        scoreBox.style.cssText = 'position: absolute; left: 40.0%; top: 59.5%; width: 14.8%; height: 14.0%; display: flex; align-items: center; justify-content: flex-end; z-index: 50; pointer-events: none; user-select: none; font-family: "Segoe UI", "Nunito", Arial, sans-serif; font-weight: 900; font-size: clamp(24px, calc(var(--img-height, 550px) * 0.12), 74px); color: #3b1b49; line-height: 1;';
         scoreBox.textContent = '...';
         cardBox.appendChild(scoreBox);
+
+        const maxBox = document.createElement('div');
+        maxBox.id = 'eval-final-max-box';
+        maxBox.style.cssText = 'position: absolute; left: 59.3%; top: 59.5%; width: 11.2%; height: 14.0%; display: flex; align-items: center; justify-content: flex-start; z-index: 50; pointer-events: none; user-select: none; font-family: "Segoe UI", "Nunito", Arial, sans-serif; font-weight: 900; font-size: clamp(24px, calc(var(--img-height, 550px) * 0.12), 74px); color: #3b1b49; line-height: 1;';
+        maxBox.textContent = '9';
+        cardBox.appendChild(maxBox);
 
         let clicked = false;
         const doFinish = (e) => {
@@ -18747,10 +19331,19 @@ showJourney2EndCelebration() {
         const qMap = writingEval && writingEval.questions ? writingEval.questions : {};
         const qKeys = ['q1', 'q2', 'q3'];
         const rubric = window.EVALUATION_RUBRIC_CONFIG;
+        const helper = window.EvaluationRubricHelper;
+        const expectedMax = helper ? helper.resolveEvaluationMaxScore(effectiveDoc) : (rubric ? rubric.overallMaxScore : 9);
+
+        maxBox.style.fontSize = String(fmtScore(expectedMax)).length >= 2
+          ? 'clamp(22px, calc(var(--img-height, 550px) * 0.105), 64px)'
+          : 'clamp(24px, calc(var(--img-height, 550px) * 0.12), 74px)';
+        maxBox.textContent = fmtScore(expectedMax);
 
         const qStates = qKeys.map((k) => {
           const entry = qMap[k] || {};
-          const cfgMax = rubric && rubric.questions[k] ? rubric.questions[k].maxScore : 0;
+          const cfgMax = helper
+            ? helper.resolveQuestionMaxScore(effectiveDoc, k, entry)
+            : (rubric && rubric.questions[k] ? rubric.questions[k].maxScore : 3);
           const maxScore = (typeof entry.maxScore === 'number' && entry.maxScore > 0) ? entry.maxScore : cfgMax;
           const isEvaluated = entry.status === 'evaluated' && typeof entry.score === 'number' && !Number.isNaN(entry.score) && entry.score >= 0 && entry.score <= maxScore;
           return {
@@ -18761,19 +19354,20 @@ showJourney2EndCelebration() {
         });
 
         const maxSum = Math.round((qStates.reduce((acc, q) => acc + q.maxScore, 0) + Number.EPSILON) * 100) / 100;
-        const allEvaluated = !fetchFailed && Boolean(fsDoc) && qStates.every(q => q.isEvaluated) && Math.abs(maxSum - 10) <= 0.01;
+        const allEvaluated = !fetchFailed && Boolean(fsDoc) && qStates.every(q => q.isEvaluated) && Math.abs(maxSum - expectedMax) <= 0.01;
 
         if (allEvaluated) {
-          // Compute overall total strictly as sum of the 3 saved Firebase question scores
-          const overallTotal = Math.round((qStates.reduce((acc, q) => acc + q.score, 0) + Number.EPSILON) * 100) / 100;
+          // Compute overall total strictly as sum of the 3 saved Firebase question scores (capped at expectedMax)
+          const rawTotal = Math.round((qStates.reduce((acc, q) => acc + q.score, 0) + Number.EPSILON) * 100) / 100;
+          const overallTotal = Math.max(0, Math.min(expectedMax, rawTotal));
           const totalDisplay = fmtScore(overallTotal);
 
           scoreBox.style.fontSize = totalDisplay.length >= 3
-            ? 'clamp(20px, calc(var(--img-height, 550px) * 0.078), 50px)'
-            : 'clamp(28px, calc(var(--img-height, 550px) * 0.105), 72px)';
+            ? 'clamp(20px, calc(var(--img-height, 550px) * 0.092), 54px)'
+            : 'clamp(26px, calc(var(--img-height, 550px) * 0.12), 74px)';
           scoreBox.textContent = totalDisplay;
 
-          // Trigger fireworks and celebration audio only when overall score is 6/10 or above
+          // Trigger fireworks and celebration audio when overall score is 6 or above
           if (overallTotal >= 6) {
             fireworks.start();
             try {
@@ -18841,8 +19435,14 @@ showJourney2EndCelebration() {
             right.style.cssText = 'display:flex; align-items:center; gap:8px;';
             const statusBadge = document.createElement('span');
             const ok = item.writingStatus === 'evaluated' && typeof item.totalScore === 'number';
+            const helper = window.EvaluationRubricHelper;
+            const itemMax = (typeof item.maxScore === 'number' && item.maxScore > 0)
+              ? item.maxScore
+              : (item.rubricVersion === '4eme_officiel_v1' || (typeof item.totalScore === 'number' && item.totalScore > 9) || (item.questionScores && typeof item.questionScores.q3 === 'number' && item.questionScores.q3 > 3)
+                ? 10
+                : (helper ? helper.resolveEvaluationMaxScore(item) : 9));
             statusBadge.style.cssText = `padding:5px 10px; border-radius:9999px; font-weight:800; font-size:13px; background:${ok ? '#ecfdf5' : '#fef2f2'}; color:${ok ? '#065f46' : '#991b1b'}; border:1.5px solid ${ok ? '#6ee7b7' : '#fca5a5'};`;
-            statusBadge.textContent = ok ? `✅ ${item.totalScore} / 10` : '⚠️ Incomplète';
+            statusBadge.textContent = ok ? `✅ ${item.totalScore} / ${itemMax}` : '⚠️ Incomplète';
             right.appendChild(statusBadge);
 
             const viewBtn = document.createElement('button');
@@ -18900,21 +19500,29 @@ showJourney2EndCelebration() {
         const headerHtml = `
           <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #e2e8f0; padding-bottom:12px; margin-bottom:16px;">
             <div>
-              <h2 style="margin:0; font-size:20px; color:#1e3a8a;">📋 Correction détaillée — Total : ${escapeHtml(overallTotal)} / 10</h2>
+              <h2 style="margin:0; font-size:20px; color:#1e3a8a;">📋 Correction détaillée — Total : ${escapeHtml(overallTotal)} / ${escapeHtml(window.EvaluationRubricHelper ? window.EvaluationRubricHelper.resolveEvaluationMaxScore(fsDoc) : (fsDoc && fsDoc.maxTotalScore === 10 ? 10 : 9))}${(window.EvaluationRubricHelper ? window.EvaluationRubricHelper.resolveEvaluationMaxScore(fsDoc) === 10 : (fsDoc && fsDoc.maxTotalScore === 10)) ? ' <span style="font-size:12px; background:#fef3c7; color:#92400e; padding:3px 8px; border-radius:9999px; margin-left:6px; vertical-align:middle;">Ancien barème /10</span>' : ''}</h2>
               <div style="font-size:13px; color:#64748b; margin-top:4px;">Élève : ${escapeHtml(fsDoc.studentPrenom || '')} ${escapeHtml(fsDoc.studentNom || '')} (${escapeHtml(fsDoc.studentClasse || '')})</div>
             </div>
             <button id="eval-details-close" style="width:36px; height:36px; border-radius:50%; border:none; background:#ef4444; color:#fff; font-weight:bold; cursor:pointer; font-size:16px;">✖</button>
           </div>`;
 
+        const rubricHelper = window.EvaluationRubricHelper;
+        const resolvedMaxTotal = rubricHelper ? rubricHelper.resolveEvaluationMaxScore(fsDoc) : 9;
+        const resolvedRubricVer = rubricHelper ? rubricHelper.resolveRubricVersion(fsDoc) : '4eme_officiel_v2_9pts';
+        const isLegacyV1 = resolvedRubricVer === '4eme_officiel_v1' || resolvedMaxTotal === 10;
         const cardsHtml = ['q1', 'q2', 'q3'].map((k, idx) => {
           const q = questions[k] || {};
-          const critOrder = ['C1', 'C3', 'C6', 'C7'];
-          const orderedCrits = Object.values(q.criteria || {}).sort((a, b) => critOrder.indexOf(a.code) - critOrder.indexOf(b.code));
+          const critOrder = isLegacyV1 ? ['C1', 'C3', 'C6', 'C7'] : ['C1', 'C3', 'C6'];
+          const orderedCrits = Object.values(q.criteria || {})
+            .filter(c => c && c.code && critOrder.includes(c.code))
+            .sort((a, b) => critOrder.indexOf(a.code) - critOrder.indexOf(b.code));
           const critHtml = orderedCrits.map(c =>
             `<div style="font-size:13px; margin:4px 0;">• <strong>${escapeHtml(c.code)} — ${escapeHtml(c.name)} :</strong> <span style="color:#1d4ed8; font-weight:800;">${escapeHtml(c.score)} / ${escapeHtml(c.max)}</span>${c.justification ? ` — ${escapeHtml(c.justification)}` : ''}</div>`
           ).join('');
           const indOrder = ['C2', 'C4', 'C5'];
-          const orderedInds = Object.values(q.indicators || {}).sort((a, b) => indOrder.indexOf(a.code) - indOrder.indexOf(b.code));
+          const orderedInds = isLegacyV1
+            ? Object.values(q.indicators || {}).sort((a, b) => indOrder.indexOf(a.code) - indOrder.indexOf(b.code))
+            : [];
           const indHtml = orderedInds.map(ind =>
             `<span style="display:inline-block; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:3px 8px; font-size:12px; margin:2px 4px 2px 0;"><strong>${escapeHtml(ind.code)} (${escapeHtml(ind.name)}) :</strong> ${escapeHtml(ind.level)}${ind.observation ? ` — ${escapeHtml(ind.observation)}` : ''}</span>`
           ).join('');
