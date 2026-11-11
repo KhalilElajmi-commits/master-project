@@ -7959,115 +7959,489 @@ ${criteriaSchema}
         MapSystem.advanceAfterCompletion(window.currentSelectedLevel || 6);
       },
 
+      /**
+       * Render an interactive crossword puzzle overlay with directional typing,
+       * clickable definitions, cell error feedback, and clue number preservation.
+       */
+      renderCrosswordActivity(activity, imgContainer, { prefix, createFeedback, onNext, onSuccess }) {
+        const normalizeLetter = (ch) => (ch || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toUpperCase()
+          .replace(/[^A-Z]/g, '')
+          .slice(-1);
+
+        let isAnswerCorrect = false;
+        let activeWord = null;
+        let activeKey = null;
+        const cellMap = new Map(); // "r,c" -> { cell, box, input, badge }
+        const clueEls = new Map(); // word.id -> dom element
+
+        if (activity.blockedCell) {
+          const mask = document.createElement('div');
+          mask.style.position = 'absolute';
+          mask.style.left = activity.blockedCell.l + '%';
+          mask.style.top = activity.blockedCell.t + '%';
+          mask.style.width = activity.blockedCell.w + '%';
+          mask.style.height = activity.blockedCell.h + '%';
+          mask.style.background = 'linear-gradient(135deg, rgba(226, 178, 252, 0.94), rgba(212, 152, 248, 0.94))';
+          mask.style.borderRadius = '2px';
+          mask.style.pointerEvents = 'none';
+          mask.style.zIndex = '18';
+          imgContainer.appendChild(mask);
+        }
+
+        const wordsForCell = (r, c) => (activity.words || []).filter(w =>
+          w.cells.some(([wr, wc]) => wr === r && wc === c)
+        );
+
+        const styleCellsAndClues = () => {
+          const activeSet = new Set(activeWord ? activeWord.cells.map(([wr, wc]) => `${wr},${wc}`) : []);
+          cellMap.forEach(({ cell, box, input, badge }, key) => {
+            const hasVal = !!input.value;
+            const isFocused = key === activeKey;
+            const inActiveWord = activeSet.has(key);
+
+            if (badge) {
+              badge.style.opacity = (hasVal || isFocused) ? '1' : '0';
+            }
+
+            if (isAnswerCorrect) {
+              box.style.backgroundColor = 'rgba(220, 252, 231, 0.94)';
+              box.style.boxShadow = 'inset 0 0 0 2px #16a34a';
+              input.style.color = '#15803d';
+            } else if (box.dataset.error === '1') {
+              box.style.backgroundColor = 'rgba(254, 226, 226, 0.94)';
+              box.style.boxShadow = 'inset 0 0 0 2.5px #dc2626';
+              input.style.color = '#b91c1c';
+            } else if (isFocused) {
+              box.style.backgroundColor = cell.n ? 'rgba(255, 255, 255, 0.95)' : 'rgba(254, 249, 195, 0.85)';
+              box.style.boxShadow = 'inset 0 0 0 2.5px #0284c7, 0 0 8px rgba(2, 132, 199, 0.45)';
+              input.style.color = '#1e1b4b';
+            } else if (inActiveWord) {
+              box.style.backgroundColor = hasVal || cell.n ? 'rgba(239, 246, 255, 0.92)' : 'rgba(186, 230, 253, 0.42)';
+              box.style.boxShadow = 'inset 0 0 0 1.5px #38bdf8';
+              input.style.color = '#1e1b4b';
+            } else {
+              box.style.backgroundColor = hasVal ? 'rgba(255, 255, 255, 0.93)' : (cell.drawBox ? '#ffffff' : 'transparent');
+              box.style.boxShadow = 'none';
+              input.style.color = '#1e1b4b';
+            }
+          });
+
+          clueEls.forEach((el, wordId) => {
+            const isSel = activeWord && activeWord.id === wordId;
+            el.style.backgroundColor = isSel ? 'rgba(56, 189, 248, 0.22)' : 'transparent';
+            el.style.boxShadow = isSel ? 'inset 0 0 0 1.5px rgba(2, 132, 199, 0.55)' : 'none';
+          });
+        };
+
+        const focusCell = (r, c, preferWord = null) => {
+          const entry = cellMap.get(`${r},${c}`);
+          if (!entry) return;
+          activeKey = `${r},${c}`;
+          if (preferWord) {
+            activeWord = preferWord;
+          } else {
+            const matching = wordsForCell(r, c);
+            if (matching.length > 0 && (!activeWord || !matching.some(w => w.id === activeWord.id))) {
+              activeWord = matching[0];
+            }
+          }
+          styleCellsAndClues();
+          entry.input.focus();
+        };
+
+        const stepWithinActiveWord = (r, c, delta) => {
+          if (!activeWord) return false;
+          const idx = activeWord.cells.findIndex(([wr, wc]) => wr === r && wc === c);
+          const nextIdx = idx + delta;
+          if (nextIdx >= 0 && nextIdx < activeWord.cells.length) {
+            const [nr, nc] = activeWord.cells[nextIdx];
+            focusCell(nr, nc, activeWord);
+            return true;
+          }
+          return false;
+        };
+
+        const findNeighborInDirection = (r, c, dr, dc) => {
+          for (let dist = 1; dist <= 12; dist++) {
+            const nr = r + dr * dist;
+            const nc = c + dc * dist;
+            if (cellMap.has(`${nr},${nc}`)) return [nr, nc];
+          }
+          return null;
+        };
+
+        const triggerValidate = () => {
+          const btn = document.getElementById(`${prefix}-cw-validate`);
+          if (btn) btn.click();
+        };
+
+        activity.cells.forEach(cell => {
+          const key = `${cell.r},${cell.c}`;
+          const box = document.createElement('div');
+          box.style.position = 'absolute';
+          box.style.left = cell.l + '%';
+          box.style.top = cell.t + '%';
+          box.style.width = cell.w + '%';
+          box.style.height = cell.h + '%';
+          box.style.boxSizing = 'border-box';
+          box.style.borderRadius = cell.drawBox ? '0 0 5px 5px' : '2px';
+          if (cell.drawBox) {
+            box.style.border = '2.5px solid #16163a';
+            box.style.backgroundColor = '#ffffff';
+          }
+          box.style.zIndex = '22';
+          box.style.transition = 'background-color 0.15s ease, box-shadow 0.15s ease';
+
+          let badge = null;
+          if (cell.n) {
+            badge = document.createElement('span');
+            badge.textContent = cell.n;
+            badge.style.position = 'absolute';
+            badge.style.top = '2px';
+            badge.style.left = '3px';
+            badge.style.fontFamily = "'Nunito', 'Quicksand', sans-serif";
+            badge.style.fontSize = 'calc(var(--img-width) * 0.0072)';
+            badge.style.fontWeight = '900';
+            badge.style.lineHeight = '1';
+            badge.style.color = '#1d4ed8';
+            badge.style.pointerEvents = 'none';
+            badge.style.zIndex = '2';
+            badge.style.opacity = '0';
+            box.appendChild(badge);
+          }
+
+          const input = document.createElement('input');
+          input.id = `${prefix}-cw-${cell.r}-${cell.c}`;
+          input.type = 'text';
+          input.autocomplete = 'off';
+          input.spellcheck = false;
+          input.maxLength = 2;
+          input.setAttribute('aria-label', `Case ligne ${cell.r + 1}, colonne ${cell.c + 1}${cell.n ? ', mot ' + cell.n : ''}`);
+          input.style.position = 'relative';
+          input.style.width = '100%';
+          input.style.height = '100%';
+          input.style.border = 'none';
+          input.style.outline = 'none';
+          input.style.background = 'transparent';
+          input.style.textAlign = 'center';
+          input.style.textTransform = 'uppercase';
+          input.style.fontFamily = "'Nunito', 'Quicksand', sans-serif";
+          input.style.fontWeight = '900';
+          input.style.fontSize = 'calc(var(--img-width) * 0.017)';
+          input.style.lineHeight = '1';
+          input.style.padding = cell.n ? '20% 0 0 0' : '0';
+          input.style.margin = '0';
+          input.style.cursor = 'pointer';
+          input.style.caretColor = 'transparent';
+          input.style.zIndex = '1';
+
+          input.onmousedown = (e) => {
+            if (isAnswerCorrect) return;
+            e.preventDefault();
+            const matching = wordsForCell(cell.r, cell.c);
+            if (activeKey === key && matching.length > 1) {
+              const currIdx = matching.findIndex(w => activeWord && w.id === activeWord.id);
+              activeWord = matching[(currIdx + 1) % matching.length];
+            } else if (matching.length > 0 && (!activeWord || !matching.some(w => w.id === activeWord.id))) {
+              activeWord = matching[0];
+            }
+            activeKey = key;
+            styleCellsAndClues();
+            input.focus();
+          };
+
+          input.onfocus = () => {
+            if (activeKey !== key) {
+              activeKey = key;
+              const matching = wordsForCell(cell.r, cell.c);
+              if (matching.length > 0 && (!activeWord || !matching.some(w => w.id === activeWord.id))) {
+                activeWord = matching[0];
+              }
+              styleCellsAndClues();
+            }
+          };
+
+          input.onkeydown = (e) => {
+            if (isAnswerCorrect) return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            if (e.key === 'Backspace') {
+              e.preventDefault();
+              box.dataset.error = '';
+              if (input.value) {
+                input.value = '';
+                styleCellsAndClues();
+              } else if (stepWithinActiveWord(cell.r, cell.c, -1)) {
+                const prev = cellMap.get(activeKey);
+                if (prev) {
+                  prev.box.dataset.error = '';
+                  prev.input.value = '';
+                  styleCellsAndClues();
+                }
+              }
+              return;
+            }
+
+            if (e.key === 'Delete') {
+              e.preventDefault();
+              box.dataset.error = '';
+              input.value = '';
+              styleCellsAndClues();
+              return;
+            }
+
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              const deltaMap = { ArrowRight: [0, 1], ArrowLeft: [0, -1], ArrowDown: [1, 0], ArrowUp: [-1, 0] };
+              const [dr, dc] = deltaMap[e.key];
+              const target = findNeighborInDirection(cell.r, cell.c, dr, dc);
+              if (target) {
+                const preferDir = dr !== 0 ? 'down' : 'across';
+                const prefer = wordsForCell(target[0], target[1]).find(w => w.dir === preferDir) || null;
+                focusCell(target[0], target[1], prefer);
+              }
+              return;
+            }
+
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              triggerValidate();
+              return;
+            }
+
+            if (e.key.length === 1 && /^[a-zA-Z\u00C0-\u00FF]$/.test(e.key)) {
+              e.preventDefault();
+              const rawUpper = e.key.toLocaleUpperCase('fr-FR');
+              if (!normalizeLetter(rawUpper)) return;
+              box.dataset.error = '';
+              input.value = rawUpper;
+              styleCellsAndClues();
+              stepWithinActiveWord(cell.r, cell.c, 1);
+            }
+          };
+
+          input.oninput = () => {
+            if (isAnswerCorrect) return;
+            const raw = input.value.trim();
+            const lastChar = raw ? Array.from(raw).pop().toLocaleUpperCase('fr-FR') : '';
+            input.value = normalizeLetter(lastChar) ? lastChar : '';
+            box.dataset.error = '';
+            styleCellsAndClues();
+            if (input.value) stepWithinActiveWord(cell.r, cell.c, 1);
+          };
+
+          box.appendChild(input);
+          imgContainer.appendChild(box);
+          cellMap.set(key, { cell, box, input, badge });
+        });
+
+        // Clickable definition rows on the right panel
+        (activity.words || []).forEach(word => {
+          if (!word.clueBox) return;
+          const clueEl = document.createElement('div');
+          clueEl.id = `${prefix}-clue-${word.id}`;
+          clueEl.style.position = 'absolute';
+          clueEl.style.left = word.clueBox.l + '%';
+          clueEl.style.top = word.clueBox.t + '%';
+          clueEl.style.width = word.clueBox.w + '%';
+          clueEl.style.height = word.clueBox.h + '%';
+          clueEl.style.borderRadius = '8px';
+          clueEl.style.cursor = 'pointer';
+          clueEl.style.zIndex = '20';
+          clueEl.style.transition = 'background-color 0.15s ease, box-shadow 0.15s ease';
+          clueEl.title = `Compléter le mot ${word.num} (${word.dir === 'across' ? 'Horizontal' : 'Vertical'})`;
+          clueEl.onmouseenter = () => {
+            if (!activeWord || activeWord.id !== word.id) clueEl.style.backgroundColor = 'rgba(56, 189, 248, 0.12)';
+          };
+          clueEl.onmouseleave = () => {
+            if (!activeWord || activeWord.id !== word.id) clueEl.style.backgroundColor = 'transparent';
+          };
+          clueEl.onclick = () => {
+            if (isAnswerCorrect) return;
+            const firstEmpty = word.cells.find(([wr, wc]) => {
+              const entry = cellMap.get(`${wr},${wc}`);
+              return entry && !entry.input.value;
+            }) || word.cells[0];
+            focusCell(firstEmpty[0], firstEmpty[1], word);
+          };
+          imgContainer.appendChild(clueEl);
+          clueEls.set(word.id, clueEl);
+        });
+
+        // Validate button
+        const btnWrapper = document.createElement('div');
+        btnWrapper.style.position = 'absolute';
+        btnWrapper.style.left = activity.valBtnPos.left + '%';
+        btnWrapper.style.top = activity.valBtnPos.top + '%';
+        btnWrapper.style.transform = 'translate(-50%, -50%)';
+        btnWrapper.style.zIndex = '30';
+
+        const vbtn = document.createElement('img');
+        vbtn.id = `${prefix}-cw-validate`;
+        vbtn.src = 'journe 1/valider.png';
+        vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width)
+          ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')')
+          : 'calc(var(--img-width) * 0.175)';
+        vbtn.style.height = 'auto';
+        vbtn.style.cursor = 'pointer';
+        vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+        vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
+        vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'brightness(1)'; };
+
+        vbtn.onclick = () => {
+          if (isAnswerCorrect) {
+            onNext();
+            return;
+          }
+
+          const fbTop = activity.valBtnPos.top > 85 ? (activity.valBtnPos.top - 6.5) : (activity.valBtnPos.top + 7.5);
+          const fb = createFeedback(fbTop);
+
+          let missingCount = 0;
+          let wrongCount = 0;
+          cellMap.forEach(({ cell, box, input }) => {
+            const typed = normalizeLetter(input.value);
+            if (!typed) {
+              missingCount++;
+              box.dataset.error = '';
+            } else if (typed !== cell.a) {
+              wrongCount++;
+              box.dataset.error = '1';
+            } else {
+              box.dataset.error = '';
+            }
+          });
+          styleCellsAndClues();
+
+          if (missingCount > 0) {
+            fb.textContent = 'Complète toutes les cases de la grille avant de valider !';
+            fb.style.color = '#ea580c';
+            if (window.j1GentleShake) window.j1GentleShake(fb);
+            return;
+          }
+
+          if (wrongCount > 0) {
+            fb.textContent = "Certaines lettres ne sont pas correctes (en rouge). Vérifie l'orthographe !";
+            fb.style.color = '#dc2626';
+            if (window.j1GentleShake) window.j1GentleShake(fb);
+            return;
+          }
+
+          isAnswerCorrect = true;
+          cellMap.forEach(({ input }) => { input.readOnly = true; });
+          activeKey = null;
+          activeWord = null;
+          styleCellsAndClues();
+          if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+            window.SoundSystem.playSuccess();
+          }
+          vbtn.src = 'journe 1/continuer.png';
+          vbtn.animate([
+            { transform: 'scale(0.85)' },
+            { transform: 'scale(1.2)' },
+            { transform: 'scale(1)' }
+          ], { duration: 320 });
+          onSuccess(vbtn, fb, 'Bravo ! Tu as parfaitement complété tous les mots croisés !');
+        };
+
+        btnWrapper.appendChild(vbtn);
+        imgContainer.appendChild(btnWrapper);
+
+        styleCellsAndClues();
+      },
+
       loadJourney7Activity() {
         this.runActivityCleanups();
         const JOURNEY_7_POPUPS = [
           {
             src: 'journe 7/1.png',
-            type: 'j7-multiselect',
-            groups: [
-              {
-                id: 'qui',
-                name: 'QUI ?',
-                single: false,
-                options: [
-                  { id: 1, label: 'des enfants', left: 47.43, top: 38.6, width: 14.0, height: 3.5, correct: true },
-                  { id: 2, label: 'une élève', left: 47.43, top: 42.6, width: 14.0, height: 3.5, correct: true },
-                  { id: 3, label: 'un professeur', left: 47.43, top: 46.5, width: 14.0, height: 3.5, correct: true }
-                ]
-              },
-              {
-                id: 'ou',
-                name: 'OÙ ?',
-                single: true,
-                options: [
-                  { id: 4, label: 'au marché', left: 68.62, top: 38.6, width: 13.5, height: 3.5, correct: false },
-                  { id: 5, label: 'à la plage', left: 68.62, top: 42.6, width: 13.5, height: 3.5, correct: false },
-                  { id: 6, label: 'à l\'école', left: 68.62, top: 46.5, width: 13.5, height: 3.5, correct: true }
-                ]
-              },
-              {
-                id: 'quand',
-                name: 'QUAND ?',
-                single: true,
-                options: [
-                  { id: 7, label: 'la nuit', left: 47.43, top: 62.2, width: 16.5, height: 3.5, correct: false },
-                  { id: 8, label: 'le matin', left: 47.43, top: 66.0, width: 16.5, height: 3.5, correct: true },
-                  { id: 9, label: 'pendant les vacances', left: 47.43, top: 69.8, width: 16.5, height: 3.5, correct: false }
-                ]
-              },
-              {
-                id: 'quoi',
-                name: 'QUE FONT-ILS ?',
-                single: true,
-                options: [
-                  { id: 10, label: 'Ils dorment', left: 68.8, top: 62.5, width: 17.5, height: 3.5, correct: false },
-                  { id: 11, label: 'Ils jouent au football', left: 68.8, top: 66.7, width: 17.5, height: 3.5, correct: false },
-                  { id: 12, label: 'Ils entrent en classe', left: 68.8, top: 70.8, width: 17.5, height: 3.5, correct: true }
-                ]
-              }
+            type: 'j7-crossword',
+            blockedCell: { l: 36.1, t: 63.18, w: 2.04, h: 3.78 },
+            cells: [
+              { r: 0, c: 8, a: 'G', l: 47.28, t: 25.97, w: 3.39, h: 4.58, n: '1' },
+              { r: 1, c: 3, a: 'A', l: 32.2, t: 30.05, w: 3.51, h: 4.88, n: '2' },
+              { r: 1, c: 8, a: 'O', l: 47.35, t: 31.04, w: 3.32, h: 4.08 },
+              { r: 2, c: 0, a: 'G', l: 21.41, t: 35.42, w: 3.26, h: 4.58, n: '3' },
+              { r: 2, c: 1, a: 'E', l: 24.98, t: 35.42, w: 3.32, h: 4.58 },
+              { r: 2, c: 2, a: 'N', l: 28.63, t: 35.42, w: 3.26, h: 4.58 },
+              { r: 2, c: 3, a: 'T', l: 32.2, t: 35.42, w: 3.51, h: 4.58 },
+              { r: 2, c: 4, a: 'I', l: 36.1, t: 35.42, w: 3.19, h: 4.58 },
+              { r: 2, c: 5, a: 'L', l: 39.62, t: 35.42, w: 3.19, h: 4.58 },
+              { r: 2, c: 8, a: 'M', l: 47.35, t: 35.62, w: 3.32, h: 4.38 },
+              { r: 2, c: 11, a: 'C', l: 57.38, t: 35.52, w: 3.51, h: 4.68, n: '4' },
+              { r: 3, c: 3, a: 'T', l: 32.2, t: 40.5, w: 3.51, h: 4.28 },
+              { r: 3, c: 8, a: 'M', l: 47.35, t: 40.5, w: 3.32, h: 4.18 },
+              { r: 3, c: 11, a: 'A', l: 57.38, t: 40.7, w: 3.51, h: 4.08 },
+              { r: 4, c: 0, a: 'S', l: 21.41, t: 45.17, w: 3.26, h: 4.28, n: '5' },
+              { r: 4, c: 1, a: 'A', l: 25.05, t: 45.17, w: 3.26, h: 4.28 },
+              { r: 4, c: 2, a: 'G', l: 28.63, t: 45.17, w: 3.26, h: 4.28 },
+              { r: 4, c: 3, a: 'E', l: 32.27, t: 45.17, w: 3.45, h: 4.28 },
+              { r: 4, c: 5, a: 'J', l: 38.47, t: 45.17, w: 3.13, h: 4.28, n: '6' },
+              { r: 4, c: 6, a: 'O', l: 41.92, t: 45.17, w: 2.62, h: 4.28 },
+              { r: 4, c: 7, a: 'U', l: 44.86, t: 45.17, w: 2.17, h: 4.28 },
+              { r: 4, c: 8, a: 'E', l: 47.35, t: 45.17, w: 3.39, h: 4.28 },
+              { r: 4, c: 9, a: 'R', l: 51.05, t: 45.17, w: 3.32, h: 4.28 },
+              { r: 4, c: 11, a: 'R', l: 57.38, t: 45.27, w: 3.51, h: 4.18 },
+              { r: 5, c: 3, a: 'N', l: 32.27, t: 50.05, w: 3.51, h: 3.98 },
+              { r: 5, c: 5, a: 'O', l: 38.4, t: 49.95, w: 3.19, h: 3.98 },
+              { r: 5, c: 11, a: 'T', l: 57.44, t: 49.95, w: 3.45, h: 3.98 },
+              { r: 6, c: 3, a: 'T', l: 32.27, t: 54.53, w: 3.51, h: 3.48 },
+              { r: 6, c: 5, a: 'Y', l: 38.47, t: 54.43, w: 3.13, h: 3.58 },
+              { r: 6, c: 8, a: 'C', l: 47.41, t: 54.23, w: 3.39, h: 3.88, n: '7' },
+              { r: 6, c: 11, a: 'A', l: 57.44, t: 54.53, w: 3.45, h: 3.58 },
+              { r: 7, c: 0, a: 'E', l: 21.53, t: 58.51, w: 3.19, h: 4.18, n: '8' },
+              { r: 7, c: 1, a: 'C', l: 25.11, t: 58.51, w: 3.26, h: 4.18, n: '9' },
+              { r: 7, c: 2, a: 'R', l: 28.69, t: 58.51, w: 3.26, h: 4.18 },
+              { r: 7, c: 3, a: 'I', l: 32.27, t: 58.51, w: 3.51, h: 4.18 },
+              { r: 7, c: 4, a: 'R', l: 36.1, t: 58.51, w: 2.04, h: 4.18 },
+              { r: 7, c: 5, a: 'E', l: 38.47, t: 58.51, w: 3.13, h: 4.18 },
+              { r: 7, c: 8, a: 'A', l: 47.41, t: 58.61, w: 3.39, h: 4.08 },
+              { r: 7, c: 11, a: 'B', l: 57.44, t: 58.61, w: 3.45, h: 4.08 },
+              { r: 8, c: 1, a: 'L', l: 25.11, t: 63.18, w: 3.26, h: 3.98 },
+              { r: 8, c: 3, a: 'F', l: 32.27, t: 63.18, w: 3.51, h: 3.98 },
+              { r: 8, c: 5, a: 'U', l: 38.47, t: 63.18, w: 3.13, h: 3.78 },
+              { r: 8, c: 8, a: 'H', l: 47.41, t: 63.18, w: 3.39, h: 3.78 },
+              { r: 8, c: 11, a: 'L', l: 57.44, t: 63.18, w: 3.45, h: 3.78 },
+              { r: 9, c: 1, a: 'A', l: 25.11, t: 67.76, w: 3.26, h: 4.08 },
+              { r: 9, c: 4, a: 'E', l: 35.14, t: 67.56, w: 3, h: 4.08, n: '10' },
+              { r: 9, c: 5, a: 'X', l: 38.47, t: 67.56, w: 3.13, h: 4.08 },
+              { r: 9, c: 6, a: 'P', l: 41.98, t: 67.46, w: 2.56, h: 4.18 },
+              { r: 9, c: 7, a: 'L', l: 44.86, t: 67.46, w: 2.3, h: 4.18 },
+              { r: 9, c: 8, a: 'I', l: 47.48, t: 67.46, w: 3.32, h: 4.28 },
+              { r: 9, c: 9, a: 'Q', l: 51.12, t: 67.46, w: 3, h: 4.28 },
+              { r: 9, c: 10, a: 'U', l: 54.44, t: 67.46, w: 2.68, h: 4.28 },
+              { r: 9, c: 11, a: 'E', l: 57.44, t: 67.46, w: 3.45, h: 4.28 },
+              { r: 9, c: 12, a: 'R', l: 61.21, t: 67.56, w: 3, h: 4.18 },
+              { r: 10, c: 1, a: 'S', l: 25.18, t: 72.34, w: 3.19, h: 4.08 },
+              { r: 10, c: 8, a: 'E', l: 47.48, t: 72.24, w: 3.32, h: 3.68 },
+              { r: 11, c: 1, a: 'S', l: 25.18, t: 76.92, w: 3.19, h: 4.28 },
+              { r: 11, c: 6, a: 'L', l: 40.26, t: 76.52, w: 3.13, h: 4.38, n: '11' },
+              { r: 11, c: 7, a: 'I', l: 43.77, t: 76.52, w: 3.39, h: 4.38 },
+              { r: 11, c: 8, a: 'R', l: 47.48, t: 76.52, w: 3.39, h: 4.38 },
+              { r: 11, c: 9, a: 'E', l: 51.18, t: 76.52, w: 3.45, h: 4.38 },
+              { r: 12, c: 1, a: 'E', l: 25.0, t: 81.2, w: 3.55, h: 3.9, drawBox: true }
             ],
-            valBtnPos: { left: 50.9, top: 101.3, width: 17.4 }
-          },
-          {
-            src: 'journe 7/2.png',
-            type: 'j7-build-sentences',
-            sentences: [
-              {
-                id: 1,
-                target: ['La nouvelle élève', 'arrive', 'à l\'école.'],
-                words: [
-                  { id: '1_1', text: 'arrive', left: 8.5, top: 50.7, width: 14.2, height: 7.4, bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899' },
-                  { id: '1_2', text: 'à l\'école.', left: 25.4, top: 50.5, width: 13.6, height: 6.9, bg: 'rgba(34, 197, 94, 0.2)', border: '#22c55e' },
-                  { id: '1_3', text: 'La nouvelle élève', left: 42.1, top: 50.8, width: 22.6, height: 6.4, bg: 'rgba(59, 130, 246, 0.2)', border: '#3b82f6' }
-                ],
-                displayBox: { left: 7.5, top: 46.0, width: 56.0, height: 4.0 }
-              },
-              {
-                id: 2,
-                target: ['Le directeur', 'accompagne', 'Caroline', 'en classe.'],
-                words: [
-                  { id: '2_1', text: 'Caroline', left: 8.6, top: 61.6, width: 13.7, height: 6.9, bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899' },
-                  { id: '2_2', text: 'Le directeur', left: 25.4, top: 62.1, width: 12.6, height: 7.0, bg: 'rgba(59, 130, 246, 0.2)', border: '#3b82f6' },
-                  { id: '2_3', text: 'en classe.', left: 40.6, top: 62.1, width: 10.5, height: 7.1, bg: 'rgba(14, 165, 233, 0.2)', border: '#0ea5e9' },
-                  { id: '2_4', text: 'accompagne', left: 53.4, top: 62.1, width: 12.0, height: 6.8, bg: 'rgba(168, 85, 247, 0.2)', border: '#a855f7' }
-                ],
-                displayBox: { left: 7.5, top: 57.5, width: 58.0, height: 3.5 }
-              },
-              {
-                id: 3,
-                target: ['Caroline', 'est', 'contente.'],
-                words: [
-                  { id: '3_1', text: 'contente.', left: 8.6, top: 74.3, width: 14.2, height: 7.4, bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899' },
-                  { id: '3_2', text: 'Caroline', left: 24.7, top: 74.5, width: 10.7, height: 6.9, bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899' },
-                  { id: '3_3', text: 'est', left: 38.0, top: 74.7, width: 12.5, height: 6.8, bg: 'rgba(234, 179, 8, 0.2)', border: '#eab308' }
-                ],
-                displayBox: { left: 7.5, top: 69.2, width: 56.0, height: 3.5 }
-              }
+            words: [
+              { id: '3h', num: '3', dir: 'across', clueBox: { l: 68.2, t: 17.8, w: 28.8, h: 4.8 }, cells: [[2,0],[2,1],[2,2],[2,3],[2,4],[2,5]] },
+              { id: '5h', num: '5', dir: 'across', clueBox: { l: 68.2, t: 22.8, w: 28.8, h: 4.8 }, cells: [[4,0],[4,1],[4,2],[4,3]] },
+              { id: '6h', num: '6', dir: 'across', clueBox: { l: 68.2, t: 27.6, w: 28.8, h: 4.8 }, cells: [[4,5],[4,6],[4,7],[4,8],[4,9]] },
+              { id: '8h', num: '8', dir: 'across', clueBox: { l: 68.2, t: 32.4, w: 28.8, h: 4.8 }, cells: [[7,0],[7,1],[7,2],[7,3],[7,4],[7,5]] },
+              { id: '10h', num: '10', dir: 'across', clueBox: { l: 68.2, t: 37.2, w: 28.8, h: 4.8 }, cells: [[9,4],[9,5],[9,6],[9,7],[9,8],[9,9],[9,10],[9,11],[9,12]] },
+              { id: '11h', num: '11', dir: 'across', clueBox: { l: 68.2, t: 42.0, w: 28.8, h: 5.0 }, cells: [[11,6],[11,7],[11,8],[11,9]] },
+              { id: '1v', num: '1', dir: 'down', clueBox: { l: 68.2, t: 52.8, w: 28.8, h: 3.1 }, cells: [[0,8],[1,8],[2,8],[3,8],[4,8]] },
+              { id: '2v', num: '2', dir: 'down', clueBox: { l: 68.2, t: 55.8, w: 28.8, h: 3.1 }, cells: [[1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3]] },
+              { id: '4v', num: '4', dir: 'down', clueBox: { l: 68.2, t: 58.9, w: 28.8, h: 4.0 }, cells: [[2,11],[3,11],[4,11],[5,11],[6,11],[7,11],[8,11],[9,11]] },
+              { id: '6v', num: '6', dir: 'down', clueBox: { l: 68.2, t: 63.0, w: 28.8, h: 2.9 }, cells: [[4,5],[5,5],[6,5],[7,5],[8,5],[9,5]] },
+              { id: '7v', num: '7', dir: 'down', clueBox: { l: 68.2, t: 65.9, w: 28.8, h: 2.9 }, cells: [[6,8],[7,8],[8,8],[9,8],[10,8],[11,8]] },
+              { id: '9v', num: '9', dir: 'down', clueBox: { l: 68.2, t: 68.8, w: 28.8, h: 4.8 }, cells: [[7,1],[8,1],[9,1],[10,1],[11,1],[12,1]] }
             ],
-            valBtnPos: { left: 50.1, top: 103.05, width: 16.0 },
+            valBtnPos: { left: 50.0, top: 101.8, width: 17.5 },
             navPos: {
-              back: { top: '3.0%', left: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' },
-              home: { top: '3.0%', right: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' }
-            }
-          },
-          {
-            src: 'journe 7/3.png',
-            type: 'j7-line-match',
-            topCircles: [
-              { id: 1, label: 'Classe', left: 14.1, top: 49.1, width: 2.7, height: 3.4, matchWith: 6 },
-              { id: 5, label: 'École', left: 35.6, top: 49.1, width: 2.9, height: 3.7, matchWith: 2 },
-              { id: 8, label: 'Amies', left: 56.6, top: 48.6, width: 2.5, height: 3.6, matchWith: 7 }
-            ],
-            bottomCircles: [
-              { id: 2, label: 'Début', left: 14.3, top: 62.3, width: 2.5, height: 3.9, matchWith: 5 },
-              { id: 6, label: 'Ensuite', left: 35.7, top: 61.9, width: 2.9, height: 3.3, matchWith: 1 },
-              { id: 7, label: 'Fin', left: 56.6, top: 62.1, width: 2.6, height: 3.8, matchWith: 8 }
-            ],
-            valBtnPos: { left: 50.45, top: 96.6, width: 16.7 },
-            navPos: {
-              back: { top: '3.0%', left: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' },
-              home: { top: '3.0%', right: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' }
+              back: { top: '0.5%', left: '-3.8%', width: 'clamp(56px, 6.4vw, 80px)', height: 'clamp(56px, 6.4vw, 80px)' },
+              home: { top: '0.5%', right: '-3.8%', width: 'clamp(56px, 6.4vw, 80px)', height: 'clamp(56px, 6.4vw, 80px)' }
             }
           },
           {
@@ -8127,18 +8501,32 @@ ${criteriaSchema}
         });
         ro.observe(bgImg);
 
-        const handledShared = this.renderSharedStoryActivity(activity, imgContainer, {
-          prefix: 'j7',
-          createFeedback: (topPos) => this.createOverlayFeedback(imgContainer, 'j7-feedback', topPos),
-          onNext: () => this.handleJourney7Next(),
-          onSuccess: (vbtn, fb, successMessage) => {
-            fb.textContent = successMessage;
-            fb.style.color = '#16a34a';
-          }
-        });
+        let handled = false;
+        if (activity.type === 'j7-crossword') {
+          this.renderCrosswordActivity(activity, imgContainer, {
+            prefix: 'j7',
+            createFeedback: (topPos) => this.createOverlayFeedback(imgContainer, 'j7-feedback', topPos),
+            onNext: () => this.handleJourney7Next(),
+            onSuccess: (vbtn, fb, successMessage) => {
+              fb.textContent = successMessage;
+              fb.style.color = '#16a34a';
+            }
+          });
+          handled = true;
+        } else {
+          handled = this.renderSharedStoryActivity(activity, imgContainer, {
+            prefix: 'j7',
+            createFeedback: (topPos) => this.createOverlayFeedback(imgContainer, 'j7-feedback', topPos),
+            onNext: () => this.handleJourney7Next(),
+            onSuccess: (vbtn, fb, successMessage) => {
+              fb.textContent = successMessage;
+              fb.style.color = '#16a34a';
+            }
+          });
+        }
 
         // --- INFO / POPUP PAGES (First & End popup) ---
-        if (!handledShared && activity.type === 'info') {
+        if (!handled && activity.type === 'info') {
           const btnWrapper = document.createElement('div');
           btnWrapper.style.position = 'absolute';
           btnWrapper.style.left = (activity.valBtnPos ? activity.valBtnPos.left : 50) + '%';
