@@ -5745,7 +5745,613 @@ ${criteriaSchema}
         this.loadJourney5Activity();
       },
 
+      registerActivityCleanup(fn) {
+        if (!this._activeActivityCleanups) this._activeActivityCleanups = [];
+        if (typeof fn === 'function') this._activeActivityCleanups.push(fn);
+      },
+
+      runActivityCleanups() {
+        if (!this._activeActivityCleanups || this._activeActivityCleanups.length === 0) return;
+        const cleanups = this._activeActivityCleanups.splice(0);
+        cleanups.forEach(fn => {
+          try { fn(); } catch (e) {}
+        });
+      },
+
+      createOverlayFeedback(imgContainer, elementId, topPos) {
+        let fb = document.getElementById(elementId);
+        if (!fb) {
+          fb = document.createElement('div');
+          fb.id = elementId;
+          fb.style.position = 'absolute';
+          fb.style.left = '50%';
+          fb.style.transform = 'translate(-50%, -50%)';
+          fb.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
+          fb.style.fontSize = 'calc(var(--img-width) * 0.020)';
+          fb.style.fontWeight = 'bold';
+          fb.style.zIndex = '35';
+          fb.style.pointerEvents = 'none';
+          fb.style.backgroundColor = 'rgba(255, 252, 240, 0.94)';
+          fb.style.padding = '4px 14px';
+          fb.style.borderRadius = '9999px';
+          fb.style.boxShadow = '0 4px 12px rgba(0,0,0,0.22)';
+          fb.style.textAlign = 'center';
+          fb.style.whiteSpace = 'nowrap';
+          imgContainer.appendChild(fb);
+        }
+        fb.style.display = 'block';
+        fb.style.top = topPos + '%';
+        return fb;
+      },
+
+      /**
+       * Render story construction exercises ('j7-multiselect', 'j7-build-sentences',
+       * 'j7-line-match') shared between Journey 6 and Journey 7.
+       */
+      renderSharedStoryActivity(activity, imgContainer, { prefix, createFeedback, onNext, onSuccess }) {
+        const mountValidateButton = (onClick) => {
+          const btnWrapper = document.createElement('div');
+          btnWrapper.style.position = 'absolute';
+          btnWrapper.style.left = activity.valBtnPos.left + '%';
+          btnWrapper.style.top = activity.valBtnPos.top + '%';
+          btnWrapper.style.transform = 'translate(-50%, -50%)';
+          btnWrapper.style.zIndex = '30';
+
+          const vbtn = document.createElement('img');
+          vbtn.src = 'journe 1/valider.png';
+          vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width)
+            ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')')
+            : 'calc(var(--img-width) * 0.18)';
+          vbtn.style.height = 'auto';
+          vbtn.style.cursor = 'pointer';
+          vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
+          vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'brightness(1)'; };
+          vbtn.onclick = () => onClick(vbtn);
+
+          btnWrapper.appendChild(vbtn);
+          imgContainer.appendChild(btnWrapper);
+          return vbtn;
+        };
+
+        const feedbackTop = () => (
+          activity.valBtnPos.top > 85
+            ? (activity.valBtnPos.top - 6.5)
+            : (activity.valBtnPos.top + 7.5)
+        );
+
+        if (activity.type === 'j7-multiselect') {
+          const selected = new Map();
+          activity.groups.forEach(g => selected.set(g.id, new Set()));
+          let isAnswerCorrect = false;
+
+          activity.groups.forEach(group => {
+            group.options.forEach(opt => {
+              const btn = document.createElement('div');
+              btn.id = `${prefix}-opt-${opt.id}`;
+              btn.style.position = 'absolute';
+              btn.style.left = opt.left + '%';
+              btn.style.top = opt.top + '%';
+              btn.style.width = opt.width + '%';
+              btn.style.height = opt.height + '%';
+              btn.style.cursor = 'pointer';
+              btn.style.border = '2.5px solid transparent';
+              btn.style.borderRadius = '10px';
+              btn.style.backgroundColor = 'transparent';
+              btn.style.transition = 'all 0.18s ease';
+              btn.style.zIndex = '20';
+              btn.title = opt.label;
+
+              btn.onmouseenter = () => { if (!selected.get(group.id).has(opt.id)) btn.style.backgroundColor = 'rgba(59, 130, 246, 0.12)'; };
+              btn.onmouseleave = () => { if (!selected.get(group.id).has(opt.id)) btn.style.backgroundColor = 'transparent'; };
+
+              btn.onclick = () => {
+                if (isAnswerCorrect) return;
+                const groupSet = selected.get(group.id);
+                if (group.single) {
+                  group.options.forEach(other => {
+                    groupSet.delete(other.id);
+                    const el = document.getElementById(`${prefix}-opt-${other.id}`);
+                    if (el) {
+                      el.style.border = '2.5px solid transparent';
+                      el.style.backgroundColor = 'transparent';
+                    }
+                  });
+                  groupSet.add(opt.id);
+                  btn.style.border = '2.5px solid #0284c7';
+                  btn.style.backgroundColor = 'rgba(2, 132, 199, 0.28)';
+                } else {
+                  if (groupSet.has(opt.id)) {
+                    groupSet.delete(opt.id);
+                    btn.style.border = '2.5px solid transparent';
+                    btn.style.backgroundColor = 'transparent';
+                  } else {
+                    groupSet.add(opt.id);
+                    btn.style.border = '2.5px solid #0284c7';
+                    btn.style.backgroundColor = 'rgba(2, 132, 199, 0.28)';
+                  }
+                }
+
+                btn.animate([
+                  { transform: 'scale(0.96)' },
+                  { transform: 'scale(1.04)' },
+                  { transform: 'scale(1)' }
+                ], { duration: 180 });
+              };
+
+              imgContainer.appendChild(btn);
+            });
+          });
+
+          mountValidateButton((vbtn) => {
+            if (isAnswerCorrect) {
+              onNext();
+              return;
+            }
+
+            const fb = createFeedback(feedbackTop());
+            const allAnswered = activity.groups.every(g => selected.get(g.id).size > 0);
+            if (!allAnswered) {
+              fb.textContent = 'Réponds à toutes les questions avant de valider !';
+              fb.style.color = '#ea580c';
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+              return;
+            }
+
+            let allCorrect = true;
+            activity.groups.forEach(g => {
+              if (g.id === 'qui') {
+                const groupSel = selected.get(g.id);
+                if (groupSel.size === 0) {
+                  allCorrect = false;
+                } else {
+                  groupSel.forEach(selId => {
+                    const opt = g.options.find(o => o.id === selId);
+                    if (!opt || !opt.correct) allCorrect = false;
+                  });
+                }
+              } else {
+                g.options.forEach(opt => {
+                  const isSel = selected.get(g.id).has(opt.id);
+                  if (opt.correct !== isSel) allCorrect = false;
+                });
+              }
+            });
+
+            if (allCorrect) {
+              isAnswerCorrect = true;
+              vbtn.src = 'journe 1/continuer.png';
+              vbtn.animate([
+                { transform: 'scale(0.85)' },
+                { transform: 'scale(1.2)' },
+                { transform: 'scale(1)' }
+              ], { duration: 320 });
+              onSuccess(vbtn, fb, "Bravo ! Tu as parfaitement retrouvé les 4 éléments de l'histoire !");
+            } else {
+              fb.textContent = "Certaines réponses sont incorrectes. Regarde bien l'image de l'école !";
+              fb.style.color = '#dc2626';
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
+          });
+          return true;
+        }
+
+        if (activity.type === 'j7-build-sentences') {
+          const sentenceStates = activity.sentences.map(s => ({
+            id: s.id,
+            picked: [],
+            isDone: false
+          }));
+          let isAnswerCorrect = false;
+
+          activity.sentences.forEach(s => {
+            const disp = document.createElement('div');
+            disp.style.position = 'absolute';
+            disp.style.left = s.displayBox.left + '%';
+            disp.style.top = s.displayBox.top + '%';
+            disp.style.width = s.displayBox.width + '%';
+            disp.style.height = s.displayBox.height + '%';
+            disp.style.display = 'flex';
+            disp.style.alignItems = 'center';
+            disp.style.gap = '8px';
+            disp.style.zIndex = '25';
+            disp.style.fontFamily = "'Nunito', 'Quicksand', sans-serif";
+            disp.style.fontSize = 'calc(var(--img-width) * 0.016)';
+            disp.style.fontWeight = 'bold';
+            disp.style.color = '#1e293b';
+            disp.style.pointerEvents = 'none';
+            imgContainer.appendChild(disp);
+
+            s.words.forEach(w => {
+              const btn = document.createElement('div');
+              btn.id = `${prefix}-w-${w.id}`;
+              btn.style.position = 'absolute';
+              btn.style.left = w.left + '%';
+              btn.style.top = w.top + '%';
+              btn.style.width = w.width + '%';
+              btn.style.height = w.height + '%';
+              btn.style.cursor = 'pointer';
+              btn.style.border = '3px solid transparent';
+              btn.style.borderRadius = '16px';
+              btn.style.transition = 'all 0.18s ease';
+              btn.style.zIndex = '20';
+
+              btn.onmouseenter = () => { btn.style.transform = 'scale(1.03)'; };
+              btn.onmouseleave = () => { btn.style.transform = 'scale(1)'; };
+
+              btn.onclick = () => {
+                if (isAnswerCorrect) return;
+                const state = sentenceStates.find(st => st.id === s.id);
+                if (state.picked.includes(w.id)) {
+                  state.picked = state.picked.filter(id => id !== w.id);
+                  btn.style.border = '3px solid transparent';
+                  btn.style.backgroundColor = 'transparent';
+                } else {
+                  state.picked.push(w.id);
+                  btn.style.border = '3px solid ' + w.border;
+                  btn.style.backgroundColor = w.bg;
+                  btn.animate([
+                    { transform: 'scale(0.92)' },
+                    { transform: 'scale(1.06)' },
+                    { transform: 'scale(1)' }
+                  ], { duration: 180 });
+                }
+
+                const wordsOrdered = state.picked.map(pid => s.words.find(word => word.id === pid).text);
+                disp.innerHTML = wordsOrdered.map((txt, idx) => `
+                  <span style="background: rgba(255,255,255,0.92); padding: 3px 10px; border-radius: 9999px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); border: 1.5px solid #0284c7; color: #0369a1;">
+                    <span style="color: #64748b; font-size: 0.85em; margin-right: 4px;">${idx + 1}.</span>${txt}
+                  </span>
+                `).join('');
+              };
+
+              imgContainer.appendChild(btn);
+            });
+          });
+
+          mountValidateButton((vbtn) => {
+            if (isAnswerCorrect) {
+              onNext();
+              return;
+            }
+
+            const fb = createFeedback(feedbackTop());
+            let allComplete = true;
+            let allCorrect = true;
+
+            activity.sentences.forEach(s => {
+              const state = sentenceStates.find(st => st.id === s.id);
+              if (state.picked.length < s.words.length) allComplete = false;
+              const currentSentence = state.picked.map(pid => s.words.find(word => word.id === pid).text).join(' ');
+              if (currentSentence !== s.target.join(' ')) allCorrect = false;
+            });
+
+            if (!allComplete) {
+              fb.textContent = 'Complète toutes les phrases avant de valider !';
+              fb.style.color = '#ea580c';
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+              return;
+            }
+
+            if (allCorrect) {
+              isAnswerCorrect = true;
+              vbtn.src = 'journe 1/continuer.png';
+              vbtn.animate([
+                { transform: 'scale(0.85)' },
+                { transform: 'scale(1.2)' },
+                { transform: 'scale(1)' }
+              ], { duration: 320 });
+              onSuccess(vbtn, fb, 'Bravo ! Toutes tes phrases sont parfaitement construites !');
+            } else {
+              fb.textContent = "L'ordre des mots n'est pas correct. Suis les aides progressives à droite !";
+              fb.style.color = '#dc2626';
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
+          });
+          return true;
+        }
+
+        if (activity.type === 'j7-line-match') {
+          let activeDrag = null;
+          let selectedCircle = null;
+          const userMatches = {};
+          let isAnswerCorrect = false;
+
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', '0 0 100 100');
+          svg.setAttribute('preserveAspectRatio', 'none');
+          svg.style.position = 'absolute';
+          svg.style.left = '0';
+          svg.style.top = '0';
+          svg.style.width = '100%';
+          svg.style.height = '100%';
+          svg.style.pointerEvents = 'none';
+          svg.style.zIndex = '24';
+          imgContainer.appendChild(svg);
+
+          const getCircleCenter = (c) => ({
+            x: c.left + c.width / 2,
+            y: c.top + c.height / 2
+          });
+
+          const lineColors = [
+            { stroke: '#0284c7', glow: '#38bdf8' },
+            { stroke: '#ec4899', glow: '#f472b6' },
+            { stroke: '#10b981', glow: '#34d399' }
+          ];
+
+          const redrawSVG = () => {
+            svg.innerHTML = `
+              <defs>
+                <filter id="${prefix}-glow" filterUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+                  <feDropShadow dx="0" dy="1.5" stdDeviation="1.8" flood-color="#0284c7" flood-opacity="0.6"/>
+                </filter>
+                <filter id="${prefix}-glow-drag" filterUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+                  <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#f59e0b" flood-opacity="0.75"/>
+                </filter>
+              </defs>
+            `;
+
+            let pairIdx = 0;
+            Object.entries(userMatches).forEach(([topIdStr, botId]) => {
+              const topObj = activity.topCircles.find(c => c.id === Number(topIdStr));
+              const botObj = activity.bottomCircles.find(c => c.id === botId);
+              if (!topObj || !botObj) return;
+
+              const p1 = getCircleCenter(topObj);
+              const p2 = getCircleCenter(botObj);
+              const color = lineColors[pairIdx % lineColors.length];
+              pairIdx++;
+
+              const dy = (p2.y - p1.y) * 0.5;
+              const pathD = `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + dy}, ${p2.x} ${p2.y - dy}, ${p2.x} ${p2.y}`;
+
+              const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+              path.setAttribute('d', pathD);
+              path.setAttribute('fill', 'none');
+              path.setAttribute('stroke', color.stroke);
+              path.setAttribute('stroke-width', '2.4');
+              path.setAttribute('stroke-linecap', 'round');
+              path.setAttribute('filter', `url(#${prefix}-glow)`);
+              svg.appendChild(path);
+
+              [p1, p2].forEach(p => {
+                const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                dot.setAttribute('cx', p.x);
+                dot.setAttribute('cy', p.y);
+                dot.setAttribute('r', '1.6');
+                dot.setAttribute('fill', color.stroke);
+                dot.setAttribute('stroke', '#ffffff');
+                dot.setAttribute('stroke-width', '0.5');
+                svg.appendChild(dot);
+              });
+            });
+
+            if (activeDrag) {
+              const p1 = getCircleCenter(activeDrag.startCircle);
+              const p2 = { x: activeDrag.currentX, y: activeDrag.currentY };
+              const dy = (p2.y - p1.y) * 0.5;
+              const pathD = `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + dy}, ${p2.x} ${p2.y - dy}, ${p2.x} ${p2.y}`;
+
+              const dragPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+              dragPath.setAttribute('d', pathD);
+              dragPath.setAttribute('fill', 'none');
+              dragPath.setAttribute('stroke', '#f59e0b');
+              dragPath.setAttribute('stroke-width', '2.6');
+              dragPath.setAttribute('stroke-dasharray', '3.5, 2');
+              dragPath.setAttribute('stroke-linecap', 'round');
+              dragPath.setAttribute('filter', `url(#${prefix}-glow-drag)`);
+              svg.appendChild(dragPath);
+
+              const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+              dot.setAttribute('cx', p2.x);
+              dot.setAttribute('cy', p2.y);
+              dot.setAttribute('r', '1.6');
+              dot.setAttribute('fill', '#f59e0b');
+              dot.setAttribute('stroke', '#ffffff');
+              dot.setAttribute('stroke-width', '0.5');
+              svg.appendChild(dot);
+            }
+          };
+
+          const styleCircleGroup = (circles, circleType, domPrefix) => {
+            circles.forEach(c => {
+              const el = document.getElementById(`${prefix}-${domPrefix}-${c.id}`);
+              if (!el) return;
+              const isMatched = circleType === 'top'
+                ? userMatches[c.id] !== undefined
+                : Object.values(userMatches).includes(c.id);
+              const isSelected = selectedCircle && selectedCircle.type === circleType && selectedCircle.id === c.id;
+              const isDragging = activeDrag && activeDrag.startType === circleType && activeDrag.startCircle.id === c.id;
+
+              if (isSelected || isDragging) {
+                el.style.border = '4px solid #0284c7';
+                el.style.backgroundColor = 'rgba(2, 132, 199, 0.45)';
+                el.style.boxShadow = '0 0 14px rgba(2, 132, 199, 0.85)';
+                el.style.transform = 'scale(1.22)';
+              } else if (isMatched) {
+                el.style.border = '3px solid #16a34a';
+                el.style.backgroundColor = 'rgba(22, 163, 74, 0.35)';
+                el.style.boxShadow = '0 0 8px rgba(22, 163, 74, 0.5)';
+                el.style.transform = 'scale(1)';
+              } else {
+                el.style.border = '2.5px solid rgba(2, 132, 199, 0.5)';
+                el.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+                el.style.boxShadow = 'none';
+                el.style.transform = 'scale(1)';
+              }
+            });
+          };
+
+          const updateCirclesUI = () => {
+            styleCircleGroup(activity.topCircles, 'top', 'tcirc');
+            styleCircleGroup(activity.bottomCircles, 'bottom', 'bcirc');
+            redrawSVG();
+          };
+
+          const connectCircles = (topId, botId) => {
+            delete userMatches[topId];
+            Object.keys(userMatches).forEach(k => {
+              if (userMatches[k] === botId) delete userMatches[k];
+            });
+            userMatches[topId] = botId;
+            selectedCircle = null;
+            activeDrag = null;
+            updateCirclesUI();
+          };
+
+          const onGlobalPointerMove = (e) => {
+            if (!activeDrag) return;
+            const rect = imgContainer.getBoundingClientRect();
+            const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+            const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+            activeDrag.currentX = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+            activeDrag.currentY = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
+            redrawSVG();
+          };
+
+          const onGlobalPointerUp = (e) => {
+            if (!activeDrag) return;
+            const rect = imgContainer.getBoundingClientRect();
+            const clientX = e.clientX !== undefined ? e.clientX : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : 0);
+            const clientY = e.clientY !== undefined ? e.clientY : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : 0);
+            const dropX = ((clientX - rect.left) / rect.width) * 100;
+            const dropY = ((clientY - rect.top) / rect.height) * 100;
+
+            const targets = (activeDrag.startType === 'top') ? activity.bottomCircles : activity.topCircles;
+            const hit = targets.find(c => {
+              const dx = Math.abs((c.left + c.width / 2) - dropX);
+              const dy = Math.abs((c.top + c.height / 2) - dropY);
+              return dx < (c.width * 2.2) && dy < (c.height * 2.2);
+            });
+
+            if (hit) {
+              if (activeDrag.startType === 'top') {
+                connectCircles(activeDrag.startCircle.id, hit.id);
+              } else {
+                connectCircles(hit.id, activeDrag.startCircle.id);
+              }
+            } else {
+              activeDrag = null;
+              updateCirclesUI();
+            }
+          };
+
+          const cleanupPointerListeners = () => {
+            window.removeEventListener('mousemove', onGlobalPointerMove);
+            window.removeEventListener('mouseup', onGlobalPointerUp);
+            window.removeEventListener('touchmove', onGlobalPointerMove);
+            window.removeEventListener('touchend', onGlobalPointerUp);
+          };
+
+          window.addEventListener('mousemove', onGlobalPointerMove);
+          window.addEventListener('mouseup', onGlobalPointerUp);
+          window.addEventListener('touchmove', onGlobalPointerMove, { passive: true });
+          window.addEventListener('touchend', onGlobalPointerUp);
+          this.registerActivityCleanup(cleanupPointerListeners);
+
+          const createCircleEndpoint = (c, circleType, domPrefix) => {
+            const circle = document.createElement('div');
+            circle.id = `${prefix}-${domPrefix}-${c.id}`;
+            circle.style.position = 'absolute';
+            circle.style.left = c.left + '%';
+            circle.style.top = c.top + '%';
+            circle.style.width = c.width + '%';
+            circle.style.height = c.height + '%';
+            circle.style.borderRadius = '50%';
+            circle.style.cursor = 'pointer';
+            circle.style.zIndex = '28';
+            circle.style.boxSizing = 'border-box';
+            circle.style.transition = 'transform 0.15s ease, background 0.15s ease';
+            circle.title = c.label + ' (Glisse ou clique pour relier)';
+
+            const handleStart = (clientX, clientY) => {
+              if (isAnswerCorrect) return;
+              if (circleType === 'top') {
+                if (selectedCircle && selectedCircle.type === 'bottom') {
+                  connectCircles(c.id, selectedCircle.id);
+                  return;
+                }
+                if (userMatches[c.id] !== undefined && !selectedCircle) {
+                  delete userMatches[c.id];
+                  updateCirclesUI();
+                  return;
+                }
+              } else {
+                if (selectedCircle && selectedCircle.type === 'top') {
+                  connectCircles(selectedCircle.id, c.id);
+                  return;
+                }
+                const matchedTopKey = Object.keys(userMatches).find(k => userMatches[k] === c.id);
+                if (matchedTopKey !== undefined && !selectedCircle) {
+                  delete userMatches[matchedTopKey];
+                  updateCirclesUI();
+                  return;
+                }
+              }
+
+              selectedCircle = { id: c.id, type: circleType };
+              const rect = imgContainer.getBoundingClientRect();
+              activeDrag = {
+                startCircle: c,
+                startType: circleType,
+                currentX: ((clientX - rect.left) / rect.width) * 100,
+                currentY: ((clientY - rect.top) / rect.height) * 100
+              };
+              updateCirclesUI();
+            };
+
+            circle.onmousedown = (e) => { e.preventDefault(); handleStart(e.clientX, e.clientY); };
+            circle.ontouchstart = (e) => {
+              if (e.touches && e.touches[0]) handleStart(e.touches[0].clientX, e.touches[0].clientY);
+            };
+            imgContainer.appendChild(circle);
+          };
+
+          activity.topCircles.forEach(tc => createCircleEndpoint(tc, 'top', 'tcirc'));
+          activity.bottomCircles.forEach(bc => createCircleEndpoint(bc, 'bottom', 'bcirc'));
+
+          mountValidateButton((vbtn) => {
+            if (isAnswerCorrect) {
+              cleanupPointerListeners();
+              onNext();
+              return;
+            }
+
+            const fb = createFeedback(feedbackTop());
+            if (Object.keys(userMatches).length < activity.topCircles.length) {
+              fb.textContent = "Relie chaque image \u00e0 une partie de l'histoire (D\u00e9but, Ensuite, Fin) !";
+              fb.style.color = '#ea580c';
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+              return;
+            }
+
+            const allCorrect = activity.topCircles.every(tc => userMatches[tc.id] === tc.matchWith);
+            if (allCorrect) {
+              isAnswerCorrect = true;
+              vbtn.src = 'journe 1/continuer.png';
+              vbtn.animate([
+                { transform: 'scale(0.85)' },
+                { transform: 'scale(1.2)' },
+                { transform: 'scale(1)' }
+              ], { duration: 320 });
+              onSuccess(vbtn, fb, "Bravo ! Tu as parfaitement reli\u00e9 la chronologie de l'histoire !");
+            } else {
+              fb.textContent = "Certaines liaisons ne sont pas correctes. R\u00e9fl\u00e9chis \u00e0 ce qui se passe en premier !";
+              fb.style.color = '#dc2626';
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
+          });
+
+          updateCirclesUI();
+          return true;
+        }
+
+        return false;
+      },
+
       loadJourney6Activity() {
+        this.runActivityCleanups();
         const JOURNEY_6_POPUPS = [
           {
             src: 'journe 6/1.png',
@@ -5805,6 +6411,118 @@ ${criteriaSchema}
             navPos: {
               back: { top: '8.6%', left: '3.8%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' },
               home: { top: '6.85%', left: '93.8%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
+            }
+          },
+          {
+            src: 'journe 6/5.png',
+            type: 'j7-multiselect',
+            groups: [
+              {
+                id: 'qui',
+                name: 'QUI ?',
+                single: false,
+                options: [
+                  { id: 1, label: 'des enfants', left: 48.0, top: 28.0, width: 19.5, height: 3.8, correct: true },
+                  { id: 2, label: 'une élève', left: 48.0, top: 32.5, width: 19.5, height: 3.8, correct: true },
+                  { id: 3, label: 'un professeur', left: 48.0, top: 36.9, width: 19.5, height: 3.8, correct: true }
+                ]
+              },
+              {
+                id: 'ou',
+                name: 'OÙ ?',
+                single: true,
+                options: [
+                  { id: 4, label: 'au marché', left: 73.2, top: 28.0, width: 16.5, height: 3.8, correct: false },
+                  { id: 5, label: 'à la plage', left: 73.2, top: 32.5, width: 16.5, height: 3.8, correct: false },
+                  { id: 6, label: "à l'école", left: 73.2, top: 36.9, width: 16.5, height: 3.8, correct: true }
+                ]
+              },
+              {
+                id: 'quand',
+                name: 'QUAND ?',
+                single: true,
+                options: [
+                  { id: 7, label: 'la nuit', left: 47.6, top: 54.0, width: 21.8, height: 3.9, correct: false },
+                  { id: 8, label: 'le matin', left: 47.6, top: 58.5, width: 21.8, height: 3.9, correct: true },
+                  { id: 9, label: 'pendant les vacances', left: 47.6, top: 63.0, width: 21.8, height: 3.9, correct: false }
+                ]
+              },
+              {
+                id: 'quoi',
+                name: 'QUE FONT-ILS ?',
+                single: true,
+                options: [
+                  { id: 10, label: 'Ils dorment', left: 73.2, top: 54.0, width: 22.8, height: 3.9, correct: false },
+                  { id: 11, label: 'Ils jouent au football', left: 73.2, top: 58.5, width: 22.8, height: 3.9, correct: false },
+                  { id: 12, label: 'Ils entrent en classe', left: 73.2, top: 63.0, width: 22.8, height: 3.9, correct: true }
+                ]
+              }
+            ],
+            valBtnPos: { left: 50.9, top: 101.3, width: 17.4 },
+            navPos: {
+              back: { top: '3.0%', left: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' },
+              home: { top: '3.0%', right: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' }
+            }
+          },
+          {
+            src: 'journe 6/7.png',
+            type: 'j7-build-sentences',
+            sentences: [
+              {
+                id: 1,
+                target: ['La nouvelle élève', 'arrive', "à l'école."],
+                words: [
+                  { id: '1_1', text: 'arrive', left: 8.5, top: 50.7, width: 14.2, height: 7.4, bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899' },
+                  { id: '1_2', text: "à l'école.", left: 25.4, top: 50.5, width: 13.6, height: 6.9, bg: 'rgba(34, 197, 94, 0.2)', border: '#22c55e' },
+                  { id: '1_3', text: 'La nouvelle élève', left: 42.1, top: 50.8, width: 22.6, height: 6.4, bg: 'rgba(59, 130, 246, 0.2)', border: '#3b82f6' }
+                ],
+                displayBox: { left: 7.5, top: 46.0, width: 56.0, height: 4.0 }
+              },
+              {
+                id: 2,
+                target: ['Le directeur', 'accompagne', 'Caroline', 'en classe.'],
+                words: [
+                  { id: '2_1', text: 'Caroline', left: 8.6, top: 61.6, width: 13.7, height: 6.9, bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899' },
+                  { id: '2_2', text: 'Le directeur', left: 25.4, top: 62.1, width: 12.6, height: 7.0, bg: 'rgba(59, 130, 246, 0.2)', border: '#3b82f6' },
+                  { id: '2_3', text: 'en classe.', left: 40.6, top: 62.1, width: 10.5, height: 7.1, bg: 'rgba(14, 165, 233, 0.2)', border: '#0ea5e9' },
+                  { id: '2_4', text: 'accompagne', left: 53.4, top: 62.1, width: 12.0, height: 6.8, bg: 'rgba(168, 85, 247, 0.2)', border: '#a855f7' }
+                ],
+                displayBox: { left: 7.5, top: 57.5, width: 58.0, height: 3.5 }
+              },
+              {
+                id: 3,
+                target: ['Caroline', 'est', 'contente.'],
+                words: [
+                  { id: '3_1', text: 'contente.', left: 8.6, top: 74.3, width: 14.2, height: 7.4, bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899' },
+                  { id: '3_2', text: 'Caroline', left: 24.7, top: 74.5, width: 10.7, height: 6.9, bg: 'rgba(236, 72, 153, 0.2)', border: '#ec4899' },
+                  { id: '3_3', text: 'est', left: 38.0, top: 74.7, width: 12.5, height: 6.8, bg: 'rgba(234, 179, 8, 0.2)', border: '#eab308' }
+                ],
+                displayBox: { left: 7.5, top: 69.2, width: 56.0, height: 3.5 }
+              }
+            ],
+            valBtnPos: { left: 50.1, top: 103.05, width: 16.0 },
+            navPos: {
+              back: { top: '3.0%', left: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' },
+              home: { top: '3.0%', right: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' }
+            }
+          },
+          {
+            src: 'journe 6/6.png',
+            type: 'j7-line-match',
+            topCircles: [
+              { id: 1, label: 'Classe', left: 13.0, top: 48.9, width: 3.1, height: 4.4, matchWith: 6 },
+              { id: 5, label: 'École', left: 35.0, top: 48.9, width: 3.1, height: 4.4, matchWith: 2 },
+              { id: 8, label: 'Amies', left: 56.0, top: 48.9, width: 3.1, height: 4.4, matchWith: 7 }
+            ],
+            bottomCircles: [
+              { id: 2, label: 'Début', left: 13.0, top: 61.8, width: 3.1, height: 4.5, matchWith: 5 },
+              { id: 6, label: 'Ensuite', left: 35.0, top: 61.8, width: 3.1, height: 4.5, matchWith: 1 },
+              { id: 7, label: 'Fin', left: 56.0, top: 61.8, width: 3.1, height: 4.5, matchWith: 8 }
+            ],
+            valBtnPos: { left: 50.45, top: 96.6, width: 16.7 },
+            navPos: {
+              back: { top: '3.0%', left: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' },
+              home: { top: '3.0%', right: '-3.5%', width: 'clamp(62px, 7.2vw, 92px)', height: 'clamp(62px, 7.2vw, 92px)' }
             }
           },
           {
@@ -6511,6 +7229,19 @@ ${criteriaSchema}
           btnWrapper.appendChild(vbtn);
           imgContainer.appendChild(btnWrapper);
           updateUI();
+        } else if (activity.type === 'j7-multiselect' || activity.type === 'j7-build-sentences' || activity.type === 'j7-line-match') {
+          this.renderSharedStoryActivity(activity, imgContainer, {
+            prefix: 'j6',
+            createFeedback: (topPos) => this.createOverlayFeedback(imgContainer, 'j6-feedback', topPos),
+            onNext: () => this.handleJourney6Next(),
+            onSuccess: (vbtn, fb) => {
+              if (fb) {
+                fb.textContent = '';
+                fb.style.display = 'none';
+              }
+              this.showJourney6SuccessPopup();
+            }
+          });
         } else if (activity.type === 'info') {
           const btnWrapper = document.createElement('div');
           btnWrapper.style.position = 'absolute';
@@ -7179,6 +7910,7 @@ ${criteriaSchema}
       },
 
       loadJourney7Activity() {
+        this.runActivityCleanups();
         const JOURNEY_7_POPUPS = [
           {
             src: 'journe 7/1.png',
@@ -7345,703 +8077,18 @@ ${criteriaSchema}
         });
         ro.observe(bgImg);
 
-        // Helper for feedback
-        const createFeedback = (topPos) => {
-          let fb = document.getElementById('j7-feedback');
-          if (!fb) {
-            fb = document.createElement('div');
-            fb.id = 'j7-feedback';
-            fb.style.position = 'absolute';
-            fb.style.left = '50%';
-            fb.style.top = topPos + '%';
-            fb.style.transform = 'translate(-50%, -50%)';
-            fb.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-            fb.style.fontSize = 'calc(var(--img-width) * 0.020)';
-            fb.style.fontWeight = 'bold';
-            fb.style.zIndex = '35';
-            fb.style.pointerEvents = 'none';
-            fb.style.textShadow = '0 2px 8px rgba(0,0,0,0.4)';
-            fb.style.textAlign = 'center';
-            fb.style.whiteSpace = 'nowrap';
-            imgContainer.appendChild(fb);
-          } else {
-            fb.style.top = topPos + '%';
+        const handledShared = this.renderSharedStoryActivity(activity, imgContainer, {
+          prefix: 'j7',
+          createFeedback: (topPos) => this.createOverlayFeedback(imgContainer, 'j7-feedback', topPos),
+          onNext: () => this.handleJourney7Next(),
+          onSuccess: (vbtn, fb, successMessage) => {
+            fb.textContent = successMessage;
+            fb.style.color = '#16a34a';
           }
-          return fb;
-        };
-
-        // --- EXERCISE 1: MULTISELECT (QUI / OÙ / QUAND / QUE FONT-ILS) ---
-        if (activity.type === 'j7-multiselect') {
-          const selected = new Map(); // group.id -> Set of selected option IDs
-          activity.groups.forEach(g => selected.set(g.id, new Set()));
-          let isAnswerCorrect = false;
-
-          activity.groups.forEach(group => {
-            group.options.forEach(opt => {
-              const btn = document.createElement('div');
-              btn.id = 'j7-opt-' + opt.id;
-              btn.style.position = 'absolute';
-              btn.style.left = opt.left + '%';
-              btn.style.top = opt.top + '%';
-              btn.style.width = opt.width + '%';
-              btn.style.height = opt.height + '%';
-              btn.style.cursor = 'pointer';
-              btn.style.border = '2.5px solid transparent';
-              btn.style.borderRadius = '10px';
-              btn.style.backgroundColor = 'transparent';
-              btn.style.transition = 'all 0.18s ease';
-              btn.style.zIndex = '20';
-              btn.title = opt.label;
-
-              btn.onmouseenter = () => { if (!selected.get(group.id).has(opt.id)) btn.style.backgroundColor = 'rgba(59, 130, 246, 0.12)'; };
-              btn.onmouseleave = () => { if (!selected.get(group.id).has(opt.id)) btn.style.backgroundColor = 'transparent'; };
-
-              btn.onclick = () => {
-                const groupSet = selected.get(group.id);
-                if (group.single) {
-                  group.options.forEach(other => {
-                    groupSet.delete(other.id);
-                    const el = document.getElementById('j7-opt-' + other.id);
-                    if (el) {
-                      el.style.border = '2.5px solid transparent';
-                      el.style.backgroundColor = 'transparent';
-                    }
-                  });
-                  groupSet.add(opt.id);
-                  btn.style.border = '2.5px solid #0284c7';
-                  btn.style.backgroundColor = 'rgba(2, 132, 199, 0.28)';
-                } else {
-                  // Toggle selection for multiple choice
-                  if (groupSet.has(opt.id)) {
-                    groupSet.delete(opt.id);
-                    btn.style.border = '2.5px solid transparent';
-                    btn.style.backgroundColor = 'transparent';
-                  } else {
-                    groupSet.add(opt.id);
-                    btn.style.border = '2.5px solid #0284c7';
-                    btn.style.backgroundColor = 'rgba(2, 132, 199, 0.28)';
-                  }
-                }
-
-                btn.animate([
-                  { transform: 'scale(0.96)' },
-                  { transform: 'scale(1.04)' },
-                  { transform: 'scale(1)' }
-                ], { duration: 180 });
-              };
-
-              imgContainer.appendChild(btn);
-            });
-          });
-
-          // Validation button
-          const btnWrapper = document.createElement('div');
-          btnWrapper.style.position = 'absolute';
-          btnWrapper.style.left = activity.valBtnPos.left + '%';
-          btnWrapper.style.top = activity.valBtnPos.top + '%';
-          btnWrapper.style.transform = 'translate(-50%, -50%)';
-          btnWrapper.style.zIndex = '30';
-
-          const vbtn = document.createElement('img');
-          vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
-          vbtn.style.height = 'auto';
-          vbtn.style.cursor = 'pointer';
-          vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
-          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
-          vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'brightness(1)'; };
-
-          vbtn.onclick = () => {
-            if (isAnswerCorrect) {
-              this.handleJourney7Next();
-              return;
-            }
-
-            const fb = createFeedback(activity.valBtnPos.top > 85 ? (activity.valBtnPos.top - 6.5) : (activity.valBtnPos.top + 7.5));
-            let allAnswered = true;
-            activity.groups.forEach(g => {
-              if (selected.get(g.id).size === 0) allAnswered = false;
-            });
-
-            if (!allAnswered) {
-              fb.textContent = 'Réponds à toutes les questions avant de valider !';
-              fb.style.color = '#ea580c';
-              if (window.j1GentleShake) window.j1GentleShake(fb);
-              return;
-            }
-
-            let allCorrect = true;
-            activity.groups.forEach(g => {
-              if (g.id === 'qui') {
-                // In the image, 'des enfants', 'une élève', and 'un professeur' are all present!
-                // Any of them selected (or multiple of them) is valid, as long as none are invalid.
-                const groupSel = selected.get(g.id);
-                if (groupSel.size === 0) {
-                  allCorrect = false;
-                } else {
-                  groupSel.forEach(selId => {
-                    const opt = g.options.find(o => o.id === selId);
-                    if (!opt || !opt.correct) allCorrect = false;
-                  });
-                }
-              } else {
-                g.options.forEach(opt => {
-                  const isSel = selected.get(g.id).has(opt.id);
-                  if (opt.correct && !isSel) allCorrect = false;
-                  if (!opt.correct && isSel) allCorrect = false;
-                });
-              }
-            });
-
-            if (allCorrect) {
-              isAnswerCorrect = true;
-              vbtn.src = 'journe 1/continuer.png';
-              vbtn.animate([
-                { transform: 'scale(0.85)' },
-                { transform: 'scale(1.2)' },
-                { transform: 'scale(1)' }
-              ], { duration: 320 });
-              fb.textContent = 'Bravo ! Tu as parfaitement retrouvé les 4 éléments de l\'histoire !';
-              fb.style.color = '#16a34a';
-            } else {
-              fb.textContent = 'Certaines réponses sont incorrectes. Regarde bien l\'image de l\'école !';
-              fb.style.color = '#dc2626';
-              if (window.j1GentleShake) window.j1GentleShake(fb);
-            }
-          };
-
-          btnWrapper.appendChild(vbtn);
-          imgContainer.appendChild(btnWrapper);
-        }
-
-        // --- EXERCISE 2: BUILD SENTENCES (CLICK WORDS IN CORRECT ORDER) ---
-        else if (activity.type === 'j7-build-sentences') {
-          const sentenceStates = activity.sentences.map(s => ({
-            id: s.id,
-            picked: [],
-            isDone: false
-          }));
-          let isAnswerCorrect = false;
-
-          // Create display boxes for each sentence row
-          const displayEls = [];
-          activity.sentences.forEach(s => {
-            const disp = document.createElement('div');
-            disp.style.position = 'absolute';
-            disp.style.left = s.displayBox.left + '%';
-            disp.style.top = s.displayBox.top + '%';
-            disp.style.width = s.displayBox.width + '%';
-            disp.style.height = s.displayBox.height + '%';
-            disp.style.display = 'flex';
-            disp.style.alignItems = 'center';
-            disp.style.gap = '8px';
-            disp.style.zIndex = '25';
-            disp.style.fontFamily = "'Nunito', 'Quicksand', sans-serif";
-            disp.style.fontSize = 'calc(var(--img-width) * 0.016)';
-            disp.style.fontWeight = 'bold';
-            disp.style.color = '#1e293b';
-            disp.style.pointerEvents = 'none';
-            imgContainer.appendChild(disp);
-            displayEls[s.id] = disp;
-
-            // Render word buttons
-            s.words.forEach(w => {
-              const btn = document.createElement('div');
-              btn.id = 'j7-w-' + w.id;
-              btn.style.position = 'absolute';
-              btn.style.left = w.left + '%';
-              btn.style.top = w.top + '%';
-              btn.style.width = w.width + '%';
-              btn.style.height = w.height + '%';
-              btn.style.cursor = 'pointer';
-              btn.style.border = '3px solid transparent';
-              btn.style.borderRadius = '16px';
-              btn.style.transition = 'all 0.18s ease';
-              btn.style.zIndex = '20';
-
-              btn.onmouseenter = () => { btn.style.transform = 'scale(1.03)'; };
-              btn.onmouseleave = () => { btn.style.transform = 'scale(1)'; };
-
-              btn.onclick = () => {
-                const state = sentenceStates.find(st => st.id === s.id);
-                if (state.picked.includes(w.id)) {
-                  // Deselect
-                  state.picked = state.picked.filter(id => id !== w.id);
-                  btn.style.border = '3px solid transparent';
-                  btn.style.backgroundColor = 'transparent';
-                } else {
-                  // Select next in order
-                  state.picked.push(w.id);
-                  btn.style.border = '3px solid ' + w.border;
-                  btn.style.backgroundColor = w.bg;
-                  btn.animate([
-                    { transform: 'scale(0.92)' },
-                    { transform: 'scale(1.06)' },
-                    { transform: 'scale(1)' }
-                  ], { duration: 180 });
-                }
-
-                // Update text display
-                const wordsOrdered = state.picked.map(pid => s.words.find(w => w.id === pid).text);
-                disp.innerHTML = wordsOrdered.map((txt, idx) => `
-                  <span style="background: rgba(255,255,255,0.92); padding: 3px 10px; border-radius: 9999px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); border: 1.5px solid #0284c7; color: #0369a1;">
-                    <span style="color: #64748b; font-size: 0.85em; margin-right: 4px;">${idx + 1}.</span>${txt}
-                  </span>
-                `).join('');
-              };
-
-              imgContainer.appendChild(btn);
-            });
-          });
-
-          // Validation button
-          const btnWrapper = document.createElement('div');
-          btnWrapper.style.position = 'absolute';
-          btnWrapper.style.left = activity.valBtnPos.left + '%';
-          btnWrapper.style.top = activity.valBtnPos.top + '%';
-          btnWrapper.style.transform = 'translate(-50%, -50%)';
-          btnWrapper.style.zIndex = '30';
-
-          const vbtn = document.createElement('img');
-          vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = activity.valBtnPos.width ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
-          vbtn.style.height = 'auto';
-          vbtn.style.cursor = 'pointer';
-          vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
-          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
-          vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'brightness(1)'; };
-
-          vbtn.onclick = () => {
-            if (isAnswerCorrect) {
-              this.handleJourney7Next();
-              return;
-            }
-
-            const fb = createFeedback(activity.valBtnPos.top > 85 ? (activity.valBtnPos.top - 6.5) : (activity.valBtnPos.top + 7.5));
-            let allComplete = true;
-            let allCorrect = true;
-
-            activity.sentences.forEach(s => {
-              const state = sentenceStates.find(st => st.id === s.id);
-              if (state.picked.length < s.words.length) {
-                allComplete = false;
-              }
-              const currentSentence = state.picked.map(pid => s.words.find(w => w.id === pid).text).join(' ');
-              const targetSentence = s.target.join(' ');
-              if (currentSentence !== targetSentence) {
-                allCorrect = false;
-              }
-            });
-
-            if (!allComplete) {
-              fb.textContent = 'Complète toutes les phrases avant de valider !';
-              fb.style.color = '#ea580c';
-              if (window.j1GentleShake) window.j1GentleShake(fb);
-              return;
-            }
-
-            if (allCorrect) {
-              isAnswerCorrect = true;
-              vbtn.src = 'journe 1/continuer.png';
-              vbtn.animate([
-                { transform: 'scale(0.85)' },
-                { transform: 'scale(1.2)' },
-                { transform: 'scale(1)' }
-              ], { duration: 320 });
-              fb.textContent = 'Bravo ! Toutes tes phrases sont parfaitement construites !';
-              fb.style.color = '#16a34a';
-            } else {
-              fb.textContent = 'L\'ordre des mots n\'est pas correct. Suis les aides progressives à droite !';
-              fb.style.color = '#dc2626';
-              if (window.j1GentleShake) window.j1GentleShake(fb);
-            }
-          };
-
-          btnWrapper.appendChild(vbtn);
-          imgContainer.appendChild(btnWrapper);
-        }
-
-        // --- EXERCISE 3: LINE MATCHING (CONNECT TOP CIRCLES TO BOTTOM CIRCLES) ---
-        // --- EXERCISE 3: LINE MATCHING (CONNECT TOP CIRCLES TO BOTTOM CIRCLES) ---
-        else if (activity.type === 'j7-line-match') {
-          let activeDrag = null; // { startCircle, startType: 'top'|'bottom', currentX, currentY }
-          let selectedCircle = null; // for click-to-connect { id, type: 'top'|'bottom' }
-          const userMatches = {}; // topId -> bottomId
-          let isAnswerCorrect = false;
-
-          // SVG Overlay with viewBox="0 0 100 100" so percentage coordinates map 1:1 precisely!
-          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          svg.setAttribute('viewBox', '0 0 100 100');
-          svg.setAttribute('preserveAspectRatio', 'none');
-          svg.style.position = 'absolute';
-          svg.style.left = '0';
-          svg.style.top = '0';
-          svg.style.width = '100%';
-          svg.style.height = '100%';
-          svg.style.pointerEvents = 'none';
-          svg.style.zIndex = '24';
-          imgContainer.appendChild(svg);
-
-          const getCircleCenter = (c) => ({
-            x: c.left + c.width / 2,
-            y: c.top + c.height / 2
-          });
-
-          // Distinct lively color palette for each line
-          const lineColors = [
-            { stroke: '#0284c7', glow: '#38bdf8' },
-            { stroke: '#ec4899', glow: '#f472b6' },
-            { stroke: '#10b981', glow: '#34d399' }
-          ];
-
-          const redrawSVG = () => {
-            svg.innerHTML = `
-              <defs>
-                <filter id="j7-glow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feDropShadow dx="0" dy="1.5" stdDeviation="1.8" flood-color="#0284c7" flood-opacity="0.6"/>
-                </filter>
-                <filter id="j7-glow-drag" x="-30%" y="-30%" width="160%" height="160%">
-                  <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#f59e0b" flood-opacity="0.75"/>
-                </filter>
-              </defs>
-            `;
-
-            // Draw established matches with smooth bezier curves
-            let pairIdx = 0;
-            Object.entries(userMatches).forEach(([topIdStr, botId]) => {
-              const topId = Number(topIdStr);
-              const topObj = activity.topCircles.find(c => c.id === topId);
-              const botObj = activity.bottomCircles.find(c => c.id === botId);
-              if (!topObj || !botObj) return;
-
-              const p1 = getCircleCenter(topObj);
-              const p2 = getCircleCenter(botObj);
-              const color = lineColors[pairIdx % lineColors.length];
-              pairIdx++;
-
-              const dy = (p2.y - p1.y) * 0.5;
-              const pathD = `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + dy}, ${p2.x} ${p2.y - dy}, ${p2.x} ${p2.y}`;
-
-              const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-              path.setAttribute('d', pathD);
-              path.setAttribute('fill', 'none');
-              path.setAttribute('stroke', color.stroke);
-              path.setAttribute('stroke-width', '2.4');
-              path.setAttribute('stroke-linecap', 'round');
-              path.setAttribute('filter', 'url(#j7-glow)');
-              svg.appendChild(path);
-
-              // Endpoint beads
-              [p1, p2].forEach(p => {
-                const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                dot.setAttribute('cx', p.x);
-                dot.setAttribute('cy', p.y);
-                dot.setAttribute('r', '1.6');
-                dot.setAttribute('fill', color.stroke);
-                dot.setAttribute('stroke', '#ffffff');
-                dot.setAttribute('stroke-width', '0.5');
-                svg.appendChild(dot);
-              });
-            });
-
-            // Draw active line being dragged
-            if (activeDrag) {
-              const p1 = getCircleCenter(activeDrag.startCircle);
-              const p2 = { x: activeDrag.currentX, y: activeDrag.currentY };
-              const dy = (p2.y - p1.y) * 0.5;
-              const pathD = `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + dy}, ${p2.x} ${p2.y - dy}, ${p2.x} ${p2.y}`;
-
-              const dragPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-              dragPath.setAttribute('d', pathD);
-              dragPath.setAttribute('fill', 'none');
-              dragPath.setAttribute('stroke', '#f59e0b');
-              dragPath.setAttribute('stroke-width', '2.6');
-              dragPath.setAttribute('stroke-dasharray', '3.5, 2');
-              dragPath.setAttribute('stroke-linecap', 'round');
-              dragPath.setAttribute('filter', 'url(#j7-glow-drag)');
-              svg.appendChild(dragPath);
-
-              const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-              dot.setAttribute('cx', p2.x);
-              dot.setAttribute('cy', p2.y);
-              dot.setAttribute('r', '1.6');
-              dot.setAttribute('fill', '#f59e0b');
-              dot.setAttribute('stroke', '#ffffff');
-              dot.setAttribute('stroke-width', '0.5');
-              svg.appendChild(dot);
-            }
-          };
-
-          const updateCirclesUI = () => {
-            activity.topCircles.forEach(tc => {
-              const el = document.getElementById('j7-tcirc-' + tc.id);
-              if (!el) return;
-              const isMatched = userMatches[tc.id] !== undefined;
-              const isSelected = selectedCircle && selectedCircle.type === 'top' && selectedCircle.id === tc.id;
-              const isDragging = activeDrag && activeDrag.startType === 'top' && activeDrag.startCircle.id === tc.id;
-
-              if (isSelected || isDragging) {
-                el.style.border = '4px solid #0284c7';
-                el.style.backgroundColor = 'rgba(2, 132, 199, 0.45)';
-                el.style.boxShadow = '0 0 14px rgba(2, 132, 199, 0.85)';
-                el.style.transform = 'scale(1.22)';
-              } else if (isMatched) {
-                el.style.border = '3px solid #16a34a';
-                el.style.backgroundColor = 'rgba(22, 163, 74, 0.35)';
-                el.style.boxShadow = '0 0 8px rgba(22, 163, 74, 0.5)';
-                el.style.transform = 'scale(1)';
-              } else {
-                el.style.border = '2.5px solid rgba(2, 132, 199, 0.5)';
-                el.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-                el.style.boxShadow = 'none';
-                el.style.transform = 'scale(1)';
-              }
-            });
-
-            activity.bottomCircles.forEach(bc => {
-              const el = document.getElementById('j7-bcirc-' + bc.id);
-              if (!el) return;
-              const isMatched = Object.values(userMatches).includes(bc.id);
-              const isSelected = selectedCircle && selectedCircle.type === 'bottom' && selectedCircle.id === bc.id;
-              const isDragging = activeDrag && activeDrag.startType === 'bottom' && activeDrag.startCircle.id === bc.id;
-
-              if (isSelected || isDragging) {
-                el.style.border = '4px solid #0284c7';
-                el.style.backgroundColor = 'rgba(2, 132, 199, 0.45)';
-                el.style.boxShadow = '0 0 14px rgba(2, 132, 199, 0.85)';
-                el.style.transform = 'scale(1.22)';
-              } else if (isMatched) {
-                el.style.border = '3px solid #16a34a';
-                el.style.backgroundColor = 'rgba(22, 163, 74, 0.35)';
-                el.style.boxShadow = '0 0 8px rgba(22, 163, 74, 0.5)';
-                el.style.transform = 'scale(1)';
-              } else {
-                el.style.border = '2.5px solid rgba(2, 132, 199, 0.5)';
-                el.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-                el.style.boxShadow = 'none';
-                el.style.transform = 'scale(1)';
-              }
-            });
-
-            redrawSVG();
-          };
-
-          const connectCircles = (topId, botId) => {
-            delete userMatches[topId];
-            Object.keys(userMatches).forEach(k => {
-              if (userMatches[k] === botId) delete userMatches[k];
-            });
-            userMatches[topId] = botId;
-            selectedCircle = null;
-            activeDrag = null;
-            updateCirclesUI();
-          };
-
-          // Mouse/Touch move on window for smooth interactive drawing even outside bounds
-          const onGlobalPointerMove = (e) => {
-            if (!activeDrag) return;
-            const rect = imgContainer.getBoundingClientRect();
-            const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-            const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
-            activeDrag.currentX = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-            activeDrag.currentY = Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100));
-            redrawSVG();
-          };
-
-          const onGlobalPointerUp = (e) => {
-            if (!activeDrag) return;
-            const rect = imgContainer.getBoundingClientRect();
-            const clientX = e.clientX !== undefined ? e.clientX : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : 0);
-            const clientY = e.clientY !== undefined ? e.clientY : (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : 0);
-            const dropX = ((clientX - rect.left) / rect.width) * 100;
-            const dropY = ((clientY - rect.top) / rect.height) * 100;
-
-            const targets = (activeDrag.startType === 'top') ? activity.bottomCircles : activity.topCircles;
-            const hit = targets.find(c => {
-              const dx = Math.abs((c.left + c.width / 2) - dropX);
-              const dy = Math.abs((c.top + c.height / 2) - dropY);
-              return dx < (c.width * 2.2) && dy < (c.height * 2.2);
-            });
-
-            if (hit) {
-              if (activeDrag.startType === 'top') {
-                connectCircles(activeDrag.startCircle.id, hit.id);
-              } else {
-                connectCircles(hit.id, activeDrag.startCircle.id);
-              }
-            } else {
-              activeDrag = null;
-              updateCirclesUI();
-            }
-          };
-
-          window.addEventListener('mousemove', onGlobalPointerMove);
-          window.addEventListener('mouseup', onGlobalPointerUp);
-          window.addEventListener('touchmove', onGlobalPointerMove, { passive: true });
-          window.addEventListener('touchend', onGlobalPointerUp);
-
-          // Top circles setup
-          activity.topCircles.forEach(tc => {
-            const circle = document.createElement('div');
-            circle.id = 'j7-tcirc-' + tc.id;
-            circle.style.position = 'absolute';
-            circle.style.left = tc.left + '%';
-            circle.style.top = tc.top + '%';
-            circle.style.width = tc.width + '%';
-            circle.style.height = tc.height + '%';
-            circle.style.borderRadius = '50%';
-            circle.style.cursor = 'pointer';
-            circle.style.zIndex = '28';
-            circle.style.boxSizing = 'border-box';
-            circle.style.transition = 'transform 0.15s ease, background 0.15s ease';
-            circle.title = tc.label + ' (Glisse ou clique pour relier)';
-
-            const handleStart = (clientX, clientY) => {
-              if (isAnswerCorrect) return;
-              if (selectedCircle && selectedCircle.type === 'bottom') {
-                connectCircles(tc.id, selectedCircle.id);
-                return;
-              }
-              if (userMatches[tc.id] !== undefined && !selectedCircle) {
-                delete userMatches[tc.id];
-                updateCirclesUI();
-                return;
-              }
-              selectedCircle = { id: tc.id, type: 'top' };
-              const rect = imgContainer.getBoundingClientRect();
-              activeDrag = {
-                startCircle: tc,
-                startType: 'top',
-                currentX: ((clientX - rect.left) / rect.width) * 100,
-                currentY: ((clientY - rect.top) / rect.height) * 100
-              };
-              updateCirclesUI();
-            };
-
-            circle.onmousedown = (e) => { e.preventDefault(); handleStart(e.clientX, e.clientY); };
-            circle.ontouchstart = (e) => {
-              if (e.touches && e.touches[0]) handleStart(e.touches[0].clientX, e.touches[0].clientY);
-            };
-
-            imgContainer.appendChild(circle);
-          });
-
-          // Bottom circles setup
-          activity.bottomCircles.forEach(bc => {
-            const circle = document.createElement('div');
-            circle.id = 'j7-bcirc-' + bc.id;
-            circle.style.position = 'absolute';
-            circle.style.left = bc.left + '%';
-            circle.style.top = bc.top + '%';
-            circle.style.width = bc.width + '%';
-            circle.style.height = bc.height + '%';
-            circle.style.borderRadius = '50%';
-            circle.style.cursor = 'pointer';
-            circle.style.zIndex = '28';
-            circle.style.boxSizing = 'border-box';
-            circle.style.transition = 'transform 0.15s ease, background 0.15s ease';
-            circle.title = bc.label + ' (Glisse ou clique pour relier)';
-
-            const handleStart = (clientX, clientY) => {
-              if (isAnswerCorrect) return;
-              if (selectedCircle && selectedCircle.type === 'top') {
-                connectCircles(selectedCircle.id, bc.id);
-                return;
-              }
-              const matchedTopKey = Object.keys(userMatches).find(k => userMatches[k] === bc.id);
-              if (matchedTopKey !== undefined && !selectedCircle) {
-                delete userMatches[matchedTopKey];
-                updateCirclesUI();
-                return;
-              }
-              selectedCircle = { id: bc.id, type: 'bottom' };
-              const rect = imgContainer.getBoundingClientRect();
-              activeDrag = {
-                startCircle: bc,
-                startType: 'bottom',
-                currentX: ((clientX - rect.left) / rect.width) * 100,
-                currentY: ((clientY - rect.top) / rect.height) * 100
-              };
-              updateCirclesUI();
-            };
-
-            circle.onmousedown = (e) => { e.preventDefault(); handleStart(e.clientX, e.clientY); };
-            circle.ontouchstart = (e) => {
-              if (e.touches && e.touches[0]) handleStart(e.touches[0].clientX, e.touches[0].clientY);
-            };
-
-            imgContainer.appendChild(circle);
-          });
-
-          // Validation button
-          const btnWrapper = document.createElement('div');
-          btnWrapper.style.position = 'absolute';
-          btnWrapper.style.left = activity.valBtnPos.left + '%';
-          btnWrapper.style.top = activity.valBtnPos.top + '%';
-          btnWrapper.style.transform = 'translate(-50%, -50%)';
-          btnWrapper.style.zIndex = '30';
-
-          const vbtn = document.createElement('img');
-          vbtn.src = 'journe 1/valider.png';
-          vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
-          vbtn.style.height = 'auto';
-          vbtn.style.cursor = 'pointer';
-          vbtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
-          vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.05)'; vbtn.style.filter = 'brightness(1.08)'; };
-          vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'brightness(1)'; };
-
-          vbtn.onclick = () => {
-            if (isAnswerCorrect) {
-              window.removeEventListener('mousemove', onGlobalPointerMove);
-              window.removeEventListener('mouseup', onGlobalPointerUp);
-              window.removeEventListener('touchmove', onGlobalPointerMove);
-              window.removeEventListener('touchend', onGlobalPointerUp);
-              this.handleJourney7Next();
-              return;
-            }
-
-            const fb = createFeedback(activity.valBtnPos.top > 85 ? (activity.valBtnPos.top - 6.5) : (activity.valBtnPos.top + 7.5));
-            const matchedCount = Object.keys(userMatches).length;
-
-            if (matchedCount < 3) {
-              fb.textContent = "Relie chaque image \u00e0 une partie de l'histoire (D\u00e9but, Ensuite, Fin) !";
-              fb.style.color = '#ea580c';
-              if (window.j1GentleShake) window.j1GentleShake(fb);
-              return;
-            }
-
-            let allCorrect = true;
-            activity.topCircles.forEach(tc => {
-              if (userMatches[tc.id] !== tc.matchWith) {
-                allCorrect = false;
-              }
-            });
-
-            if (allCorrect) {
-              isAnswerCorrect = true;
-              vbtn.src = 'journe 1/continuer.png';
-              vbtn.animate([
-                { transform: 'scale(0.85)' },
-                { transform: 'scale(1.2)' },
-                { transform: 'scale(1)' }
-              ], { duration: 320 });
-              fb.textContent = "Bravo ! Tu as parfaitement reli\u00e9 la chronologie de l'histoire !";
-              fb.style.color = '#16a34a';
-            } else {
-              fb.textContent = "Certaines liaisons ne sont pas correctes. R\u00e9fl\u00e9chis \u00e0 ce qui se passe en premier !";
-              fb.style.color = '#dc2626';
-              if (window.j1GentleShake) window.j1GentleShake(fb);
-            }
-          };
-
-          btnWrapper.appendChild(vbtn);
-          imgContainer.appendChild(btnWrapper);
-          updateCirclesUI();
-        }
-
+        });
 
         // --- INFO / POPUP PAGES (First & End popup) ---
-        else if (activity.type === 'info') {
+        if (!handledShared && activity.type === 'info') {
           const btnWrapper = document.createElement('div');
           btnWrapper.style.position = 'absolute';
           btnWrapper.style.left = (activity.valBtnPos ? activity.valBtnPos.left : 50) + '%';
@@ -9151,6 +9198,7 @@ ${criteriaSchema}
         this.loadJourney8Activity();
       },
       close() {
+        this.runActivityCleanups();
         if (window.evalCurrentAudio) {
           window.evalCurrentAudio.pause();
           window.evalCurrentAudio = null;
@@ -12479,7 +12527,7 @@ showJourney2SuccessPopup() {
 
 
 
-      
+    
 
 showJourney2EndCelebration() {
 
