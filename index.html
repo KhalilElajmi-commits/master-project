@@ -5842,8 +5842,65 @@ ${criteriaSchema}
               btn.style.zIndex = '20';
               btn.title = opt.label;
 
-              btn.onmouseenter = () => { if (!selected.get(group.id).has(opt.id)) btn.style.backgroundColor = 'rgba(59, 130, 246, 0.12)'; };
-              btn.onmouseleave = () => { if (!selected.get(group.id).has(opt.id)) btn.style.backgroundColor = 'transparent'; };
+              let circleEl = null;
+              if (opt.circle) {
+                circleEl = document.createElement('div');
+                circleEl.id = `${prefix}-circle-${opt.id}`;
+                circleEl.style.position = 'absolute';
+                circleEl.style.left = opt.circle.left + '%';
+                circleEl.style.top = opt.circle.top + '%';
+                circleEl.style.width = opt.circle.width + '%';
+                circleEl.style.height = opt.circle.height + '%';
+                circleEl.style.borderRadius = '50%';
+                circleEl.style.display = 'flex';
+                circleEl.style.alignItems = 'center';
+                circleEl.style.justifyContent = 'center';
+                circleEl.style.pointerEvents = 'none';
+                circleEl.style.boxSizing = 'border-box';
+                circleEl.style.transition = 'all 0.18s ease';
+                circleEl.style.zIndex = '22';
+                imgContainer.appendChild(circleEl);
+              }
+
+              const setOptionVisual = (targetOptId, isSelected) => {
+                const targetBtn = document.getElementById(`${prefix}-opt-${targetOptId}`);
+                const targetCircle = document.getElementById(`${prefix}-circle-${targetOptId}`);
+                if (targetCircle) {
+                  if (isSelected) {
+                    targetCircle.style.backgroundColor = '#0284c7';
+                    targetCircle.style.border = '2px solid #0369a1';
+                    targetCircle.style.boxShadow = '0 0 8px rgba(2, 132, 199, 0.75)';
+                    targetCircle.innerHTML = `<svg viewBox="0 0 24 24" style="width: 72%; height: 72%; stroke: #ffffff; stroke-width: 3.6; fill: none; stroke-linecap: round; stroke-linejoin: round;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                  } else {
+                    targetCircle.style.backgroundColor = 'transparent';
+                    targetCircle.style.border = '2px solid transparent';
+                    targetCircle.style.boxShadow = 'none';
+                    targetCircle.innerHTML = '';
+                  }
+                  return;
+                }
+                if (targetBtn) {
+                  targetBtn.style.border = isSelected ? '2.5px solid #0284c7' : '2.5px solid transparent';
+                  targetBtn.style.backgroundColor = isSelected ? 'rgba(2, 132, 199, 0.28)' : 'transparent';
+                }
+              };
+
+              btn.onmouseenter = () => {
+                if (isAnswerCorrect || selected.get(group.id).has(opt.id)) return;
+                if (circleEl) {
+                  circleEl.style.backgroundColor = 'rgba(2, 132, 199, 0.22)';
+                } else {
+                  btn.style.backgroundColor = 'rgba(59, 130, 246, 0.12)';
+                }
+              };
+              btn.onmouseleave = () => {
+                if (selected.get(group.id).has(opt.id)) return;
+                if (circleEl) {
+                  circleEl.style.backgroundColor = 'transparent';
+                } else {
+                  btn.style.backgroundColor = 'transparent';
+                }
+              };
 
               btn.onclick = () => {
                 if (isAnswerCorrect) return;
@@ -5851,30 +5908,23 @@ ${criteriaSchema}
                 if (group.single) {
                   group.options.forEach(other => {
                     groupSet.delete(other.id);
-                    const el = document.getElementById(`${prefix}-opt-${other.id}`);
-                    if (el) {
-                      el.style.border = '2.5px solid transparent';
-                      el.style.backgroundColor = 'transparent';
-                    }
+                    setOptionVisual(other.id, false);
                   });
                   groupSet.add(opt.id);
-                  btn.style.border = '2.5px solid #0284c7';
-                  btn.style.backgroundColor = 'rgba(2, 132, 199, 0.28)';
+                  setOptionVisual(opt.id, true);
                 } else {
                   if (groupSet.has(opt.id)) {
                     groupSet.delete(opt.id);
-                    btn.style.border = '2.5px solid transparent';
-                    btn.style.backgroundColor = 'transparent';
+                    setOptionVisual(opt.id, false);
                   } else {
                     groupSet.add(opt.id);
-                    btn.style.border = '2.5px solid #0284c7';
-                    btn.style.backgroundColor = 'rgba(2, 132, 199, 0.28)';
+                    setOptionVisual(opt.id, true);
                   }
                 }
 
-                btn.animate([
-                  { transform: 'scale(0.96)' },
-                  { transform: 'scale(1.04)' },
+                (circleEl || btn).animate([
+                  { transform: 'scale(0.85)' },
+                  { transform: 'scale(1.12)' },
                   { transform: 'scale(1)' }
                 ], { duration: 180 });
               };
@@ -6422,9 +6472,9 @@ ${criteriaSchema}
                 name: 'QUI ?',
                 single: false,
                 options: [
-                  { id: 1, label: 'des enfants', left: 48.0, top: 28.0, width: 19.5, height: 3.8, correct: true },
-                  { id: 2, label: 'une élève', left: 48.0, top: 32.5, width: 19.5, height: 3.8, correct: true },
-                  { id: 3, label: 'un professeur', left: 48.0, top: 36.9, width: 19.5, height: 3.8, correct: true }
+                  { id: 1, label: 'des enfants', left: 48.0, top: 28.0, width: 19.5, height: 3.8, correct: true, circle: { left: 48.7, top: 28.1, width: 2.1, height: 3.2 } },
+                  { id: 2, label: 'une élève', left: 48.0, top: 32.5, width: 19.5, height: 3.8, correct: true, circle: { left: 48.7, top: 32.6, width: 2.4, height: 3.6 } },
+                  { id: 3, label: 'un professeur', left: 48.0, top: 36.9, width: 19.5, height: 3.8, correct: true, circle: { left: 48.7, top: 37.2, width: 2.3, height: 3.4 } }
                 ]
               },
               {
@@ -6432,9 +6482,9 @@ ${criteriaSchema}
                 name: 'OÙ ?',
                 single: true,
                 options: [
-                  { id: 4, label: 'au marché', left: 73.2, top: 28.0, width: 16.5, height: 3.8, correct: false },
-                  { id: 5, label: 'à la plage', left: 73.2, top: 32.5, width: 16.5, height: 3.8, correct: false },
-                  { id: 6, label: "à l'école", left: 73.2, top: 36.9, width: 16.5, height: 3.8, correct: true }
+                  { id: 4, label: 'au marché', left: 73.2, top: 28.0, width: 16.5, height: 3.8, correct: false, circle: { left: 74.3, top: 28.1, width: 2.1, height: 3.2 } },
+                  { id: 5, label: 'à la plage', left: 73.2, top: 32.5, width: 16.5, height: 3.8, correct: false, circle: { left: 74.0, top: 32.7, width: 2.4, height: 3.6 } },
+                  { id: 6, label: "à l'école", left: 73.2, top: 36.9, width: 16.5, height: 3.8, correct: true, circle: { left: 74.2, top: 37.1, width: 2.3, height: 3.4 } }
                 ]
               },
               {
@@ -6442,9 +6492,9 @@ ${criteriaSchema}
                 name: 'QUAND ?',
                 single: true,
                 options: [
-                  { id: 7, label: 'la nuit', left: 47.6, top: 54.0, width: 21.8, height: 3.9, correct: false },
-                  { id: 8, label: 'le matin', left: 47.6, top: 58.5, width: 21.8, height: 3.9, correct: true },
-                  { id: 9, label: 'pendant les vacances', left: 47.6, top: 63.0, width: 21.8, height: 3.9, correct: false }
+                  { id: 7, label: 'la nuit', left: 47.6, top: 54.0, width: 21.8, height: 3.9, correct: false, circle: { left: 48.3, top: 54.6, width: 2.1, height: 3.2 } },
+                  { id: 8, label: 'le matin', left: 47.6, top: 58.5, width: 21.8, height: 3.9, correct: true, circle: { left: 48.4, top: 58.5, width: 2.3, height: 3.4 } },
+                  { id: 9, label: 'pendant les vacances', left: 47.6, top: 63.0, width: 21.8, height: 3.9, correct: false, circle: { left: 48.4, top: 63.7, width: 2.0, height: 3.0 } }
                 ]
               },
               {
@@ -6452,9 +6502,9 @@ ${criteriaSchema}
                 name: 'QUE FONT-ILS ?',
                 single: true,
                 options: [
-                  { id: 10, label: 'Ils dorment', left: 73.2, top: 54.0, width: 22.8, height: 3.9, correct: false },
-                  { id: 11, label: 'Ils jouent au football', left: 73.2, top: 58.5, width: 22.8, height: 3.9, correct: false },
-                  { id: 12, label: 'Ils entrent en classe', left: 73.2, top: 63.0, width: 22.8, height: 3.9, correct: true }
+                  { id: 10, label: 'Ils dorment', left: 73.2, top: 54.0, width: 22.8, height: 3.9, correct: false, circle: { left: 74.1, top: 54.6, width: 2.1, height: 3.2 } },
+                  { id: 11, label: 'Ils jouent au football', left: 73.2, top: 58.5, width: 22.8, height: 3.9, correct: false, circle: { left: 74.2, top: 58.5, width: 2.0, height: 3.0 } },
+                  { id: 12, label: 'Ils entrent en classe', left: 73.2, top: 63.0, width: 22.8, height: 3.9, correct: true, circle: { left: 74.2, top: 63.6, width: 2.3, height: 3.4 } }
                 ]
               }
             ],
