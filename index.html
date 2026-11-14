@@ -498,6 +498,7 @@
       color: #ffffff;
       text-shadow: 0 2.5px 0 #1b4b08, 0 4px 10px rgba(0, 0, 0, 0.35);
       padding-top: 1px;
+      pointer-events: none;
     }
 
     #btn-google {
@@ -2692,10 +2693,11 @@ ${criteriaSchema}
     function showFneckScene(index) {
       const scene = SCENES[index];
       currentSceneIndex = index;
-      fneckImg.src = scene.asset;
+      let applied = false;
 
-      // We wait for the image to load to ensure bounding boxes are correct
-      fneckImg.onload = () => {
+      const applyScene = () => {
+        if (applied) return;
+        applied = true;
         fneckGuide.style.transition = 'none';
         positionFneck(scene);
         fneckGuide.style.transform = scene.enterFrom;
@@ -2724,6 +2726,13 @@ ${criteriaSchema}
           }
         }, 350);
       };
+
+      fneckImg.onload = applyScene;
+      fneckImg.onerror = applyScene;
+      fneckImg.src = scene.asset;
+      if (fneckImg.complete && fneckImg.naturalWidth > 0) {
+        applyScene();
+      }
     }
 
     function hideFneck(callback) {
@@ -3580,6 +3589,10 @@ ${criteriaSchema}
       const mapLayer = document.getElementById('map-interaction-layer');
       if (mapLayer) mapLayer.style.opacity = '1';
 
+      if (!MapSystem._initialized) {
+        MapSystem.init();
+      }
+
       // Start dramatic zoom and display arrow so the player can click activities immediately
       MapSystem.startAdventureDramaticZoom();
     }
@@ -3594,8 +3607,14 @@ ${criteriaSchema}
     /* ─── EVENTS ─── */
     btnCommencer.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+        try { window.SoundSystem.playClick(); } catch (_) {}
+      }
       if (isTransitioning) return;
       isTransitioning = true;
+      // Safety unlock in case anything gets interrupted
+      setTimeout(() => { isTransitioning = false; }, 3500);
+
       buttonsGroup.classList.add('fade-out');
       worldCamera.classList.add('camera-zoom-out');
       if (btnSkipIntro) {
@@ -3726,6 +3745,10 @@ ${criteriaSchema}
 
         // Show the interactive SVG layer (overlays and hitboxes)
         document.getElementById('map-interaction-layer').style.opacity = '1';
+
+        if (!MapSystem._initialized) {
+          MapSystem.init();
+        }
 
         // Start the dramatic zoom as the clouds fade out!
         MapSystem.startAdventureDramaticZoom();
@@ -3872,6 +3895,8 @@ ${criteriaSchema}
       },
 
       focusOn(level, zoomLevel, durationMs = 2500) {
+        if (!this.el) this.init();
+        if (!this.el || !level) return;
         this.el.style.transition = "transform " + durationMs + "ms cubic-bezier(0.25, 1, 0.5, 1)";
         this.scale = zoomLevel;
 
@@ -3900,11 +3925,13 @@ ${criteriaSchema}
       },
 
       update() {
+        if (!this.el) return;
         this.el.style.transform = "translate(" + this.x + "px, " + this.y + "px) scale(" + this.scale + ")";
       }
     };
 
     const MapSystem = {
+      _initialized: false,
       state: {
         unlockedLevel: 1,
         introducedLevels: []
@@ -3928,6 +3955,8 @@ ${criteriaSchema}
       },
 
       init() {
+        if (this._initialized) return;
+        this._initialized = true;
         this.loadProgress();
         this.renderMap();
         MapCamera.init();
@@ -4175,6 +4204,9 @@ ${criteriaSchema}
         }
       }
     };
+    window.MapSystem = MapSystem;
+    window.MapCamera = MapCamera;
+
     function closeLevelPopup(startLevel) {
       document.getElementById('level-popup-overlay').classList.remove('active');
       const closeBtn = document.querySelector('#level-popup-overlay .popup-close-btn');
@@ -4204,9 +4236,7 @@ ${criteriaSchema}
       }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      MapSystem.init();
-    }); const EXERCISES_LEVEL_1 = [];
+    const EXERCISES_LEVEL_1 = [];
 
     const ExerciseSystem = {
       currentLevelData: null,
@@ -20127,9 +20157,16 @@ showJourney2EndCelebration() {
     };
     window.ExerciseSystem = ExerciseSystem;
 
-    document.addEventListener('DOMContentLoaded', () => {
-      MapSystem.init();
-    });
+    function bootMapSystem() {
+      if (typeof MapSystem !== 'undefined' && !MapSystem._initialized) {
+        MapSystem.init();
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bootMapSystem);
+    } else {
+      bootMapSystem();
+    }
   </script>
   <script src="ambient_life.js"></script>
   <script src="sound_system.js"></script>
