@@ -1298,6 +1298,22 @@
       background: transparent;
       box-shadow: none;
     }
+
+    /* Journey 2 AI Grading Spinner */
+    @keyframes j2Spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .j2-ai-spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255, 255, 255, 0.35);
+      border-radius: 50%;
+      border-top-color: #38bdf8;
+      animation: j2Spin 0.75s linear infinite;
+      vertical-align: middle;
+    }
   </style>
   <!-- Firebase Compat SDK, App Check & Firestore Service -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -2306,8 +2322,288 @@ ${criteriaSchema}
           status: "evaluated",
           summarizedAt: new Date().toISOString()
         };
+      },
+
+      buildJourney2Prompt(sentence1, sentence2) {
+        return buildJourney2Prompt(sentence1, sentence2);
+      },
+
+      normalizeJourney2Evaluation(rawText, sentence1, sentence2, usedImageContext = true) {
+        return normalizeJourney2Evaluation(rawText, sentence1, sentence2, usedImageContext, this.model);
+      },
+
+      async evaluateJourney2Activity({ sentence1, sentence2 }) {
+        return await evaluateJourney2Activity({ sentence1, sentence2 });
       }
     };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // JOURNEY 2 ACTIVITY 4: REAL GEMINI AI GRADING & REQUEST MANAGER
+    // ═══════════════════════════════════════════════════════════════════════
+
+    class Journey2AiRequestManager {
+      constructor(maxConcurrency = 2, timeoutMs = 30000) {
+        this.maxConcurrency = maxConcurrency;
+        this.timeoutMs = timeoutMs;
+        this.activeRequests = 0;
+        this.queue = [];
+        this.pendingSignatures = new Set();
+      }
+
+      enqueue(signature, taskFn, { onQueued, onStart } = {}) {
+        if (signature && this.pendingSignatures.has(signature)) {
+          console.warn('[Journey2AiRequestManager] Duplicate submission prevented:', signature);
+          return Promise.reject(new Error('DUPLICATE_SUBMISSION'));
+        }
+        if (signature) this.pendingSignatures.add(signature);
+
+        return new Promise((resolve, reject) => {
+          this.queue.push({
+            signature,
+            taskFn,
+            onQueued,
+            onStart,
+            resolve,
+            reject,
+            queuedAt: Date.now()
+          });
+
+          if (this.activeRequests >= this.maxConcurrency && typeof onQueued === 'function') {
+            onQueued({ queuePos: this.queue.length, activeRequests: this.activeRequests });
+          }
+
+          this._processNext();
+        });
+      }
+
+      _processNext() {
+        if (this.activeRequests >= this.maxConcurrency || this.queue.length === 0) {
+          return;
+        }
+
+        const item = this.queue.shift();
+        this.activeRequests++;
+
+        if (typeof item.onStart === 'function') {
+          item.onStart({ activeRequests: this.activeRequests, queueRemaining: this.queue.length });
+        }
+
+        const executeTask = async () => {
+          let timer = null;
+          const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+              const err = new Error("Le délai de correction par l'IA a expiré (timeout). Veuillez réessayer.");
+              err.code = 'gemini/timeout';
+              reject(err);
+            }, this.timeoutMs);
+          });
+
+          try {
+            const res = await Promise.race([item.taskFn(), timeoutPromise]);
+            clearTimeout(timer);
+            return res;
+          } catch (err) {
+            clearTimeout(timer);
+            throw err;
+          }
+        };
+
+        const isTransient = (err) => {
+          if (!err || err.isAppCheckFatal) return false;
+          const msg = `${err.code || ''} ${err.message || err}`;
+          if (/appCheck|recaptcha|401|403/i.test(msg)) return false;
+          return /fetch-error|Failed to fetch|network|timeout|429|500|502|503|504|unavailable|resource-exhausted/i.test(msg);
+        };
+
+        const runWithRetry = async () => {
+          const delays = [1200, 2400];
+          for (let attempt = 0; attempt <= delays.length; attempt++) {
+            try {
+              return await executeTask();
+            } catch (err) {
+              if (attempt < delays.length && isTransient(err)) {
+                console.warn(`[Journey2AiRequestManager] Transient error (attempt ${attempt + 1}), retrying in ${delays[attempt]}ms:`, err.message);
+                await new Promise(r => setTimeout(r, delays[attempt]));
+                continue;
+              }
+              throw err;
+            }
+          }
+        };
+
+        runWithRetry()
+          .then(res => {
+            if (item.signature) this.pendingSignatures.delete(item.signature);
+            this.activeRequests--;
+            item.resolve(res);
+            this._processNext();
+          })
+          .catch(err => {
+            if (item.signature) this.pendingSignatures.delete(item.signature);
+            this.activeRequests--;
+            item.reject(err);
+            this._processNext();
+          });
+      }
+    }
+
+    function buildJourney2Prompt(sentence1, sentence2) {
+      return `Tu es un professeur de français de l'école primaire évaluant la production écrite d'un élève de 4ème année primaire (âgé de 9 à 10 ans) pour l'Activité 4 : « J'écris la suite de l'histoire ».
+
+CONSIGNE OFFICIELLE DE L'ACTIVITÉ :
+« Imagine ce que Caroline peut faire pendant la récréation. Observe l’image et écris deux phrases pour raconter la suite. »
+
+CONTEXTE VISUEL DE L'ILLUSTRATION JOINTE :
+Une cour d'école primaire pendant la récréation. Caroline est avec ses camarades de classe. Les élèves jouent, parlent, rient et s'amusent dans la cour. Un ballon rouge est visible au sol.
+
+ATTENTE PÉDAGOGIQUE (SOUPLESSE DE FORMULATION) :
+Deux phrases originales en français décrivant une suite plausible et cohérente de l'histoire en lien avec la récréation.
+Mots suggérés (simples suggestions d'aide, non obligatoires) : jouer, récréation, camarades, cour, rire, parler.
+IMPORTANT : Ne compare PAS à une réponse modèle unique. Comprends la tâche et accepte différentes réponses correctes, pertinentes et créatives adaptées à l'école primaire.
+
+PRODUCTION ÉCRITE DE L'ÉLÈVE (DEUX PHRASES) :
+Phrase 1 : """${sentence1}"""
+Phrase 2 : """${sentence2}"""
+
+BARÈME OFFICIEL D'ÉVALUATION — STRICTEMENT 9 POINTS AU TOTAL :
+Évalue UNIQUEMENT les 3 critères officiels suivants selon le niveau de 4ème année primaire :
+
+1. C1 — Adéquation avec la situation (Maximum : 4.5 points) :
+   - L'élève produit-il le nombre de phrases demandé (deux phrases distinctes) ?
+   - Comprend-il et réalise-t-il la consigne demandée (imaginer ce que fait Caroline pendant la récréation) ?
+   - Utilise-t-il un vocabulaire adéquat à la situation de communication (lieux : cour/école/récréation, personnages : Caroline/camarades/amis/élèves, actions : jouer/parler/rire/s'amuser/courir) ?
+   (Si l'élève n'écrit qu'une seule phrase sur les deux demandées, pénalise proportionnellement C1).
+
+2. C3 — Correction linguistique (Maximum : 3.0 points) :
+   - Agencement correct des mots dans chaque phrase (ordre sujet-verbe-complément).
+   - Respect des accords grammaticaux étudiés (accords en genre et nombre, accord sujet-verbe).
+   - Formes verbales étudiées correctes au présent de l'indicatif.
+   - Respect de la ponctuation forte (majuscule en début de phrase, point à la fin).
+
+3. C6 — Richesse du vocabulaire (Maximum : 1.5 points) :
+   - Emploi d'un vocabulaire varié et adapté à l'école primaire.
+   - Utilisation de compléments du nom, comparaisons ou phrases enrichies adaptées au niveau 4ème année.
+   (Rappel : être bienveillant pour l'école primaire ; ne pas exiger de vocabulaire avancé pour de jeunes élèves).
+
+CRITÈRES EXCLUS (NE PAS ÉVALUER NI PÉNALISER) :
+- Ne pas évaluer C2, C4 ou C5. N'utilise pas C7.
+
+RÈGLE STRICTE SUR LE CHARABIA, LE VIDE OU LE HORS-SUJET :
+Si le texte est vide, constitué de lettres aléatoires ou charabia (ex: "zdzadz", "asdfgh"), ou totalement hors-sujet, attribue 0 point à chaque critère (C1: 0, C3: 0, C6: 0, Total = 0 / 9).
+
+FORMAT DE RÉPONSE JSON STRICTEMENT OBLIGATOIRE :
+Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en dehors de l'objet) :
+{
+  "criteria": {
+    "C1": { "name": "Adéquation avec la situation", "score": 0, "max": 4.5, "justification": "" },
+    "C3": { "name": "Correction linguistique", "score": 0, "max": 3.0, "justification": "" },
+    "C6": { "name": "Richesse du vocabulaire", "score": 0, "max": 1.5, "justification": "" }
+  },
+  "feedback": "Commentaire encourageant et bienveillant en français",
+  "suggestions": "Conseils pédagogiques constructifs pour progresser"
+}`;
+    }
+
+    function normalizeJourney2Evaluation(rawText, sentence1, sentence2, usedImageContext, modelName) {
+      if (!rawText || typeof rawText !== "string") {
+        throw new Error("Réponse vide reçue de Gemini pour la correction de l'activité 4.");
+      }
+      let clean = rawText.trim();
+      if (clean.startsWith("```json")) clean = clean.substring(7);
+      else if (clean.startsWith("```")) clean = clean.substring(3);
+      if (clean.endsWith("```")) clean = clean.substring(0, clean.length - 3);
+      clean = clean.trim();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(clean);
+      } catch (parseErr) {
+        throw new Error("Format JSON invalide retourné par Gemini : " + parseErr.message);
+      }
+
+      if (!parsed || typeof parsed !== "object" || !parsed.criteria || typeof parsed.criteria !== "object") {
+        throw new Error("Format de critères incomplet retourné par Gemini.");
+      }
+
+      const s1 = String(sentence1 || "").trim();
+      const s2 = String(sentence2 || "").trim();
+      const isBlank = !s1 && !s2;
+
+      const rawC1 = parsed.criteria.C1;
+      const rawC3 = parsed.criteria.C3;
+      const rawC6 = parsed.criteria.C6;
+
+      const c1Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(4.5, Number(rawC1 && rawC1.score) || 0)));
+      const c3Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(3.0, Number(rawC3 && rawC3.score) || 0)));
+      const c6Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(1.5, Number(rawC6 && rawC6.score) || 0)));
+
+      // Application computes the total score strictly from C1 + C3 + C6
+      const totalScore = roundScore(c1Score + c3Score + c6Score);
+      // Application enforces the passing threshold: >= 5.0 accepts (5/9 to 9/9), < 5.0 rejects
+      const isAccepted = totalScore >= 5.0;
+
+      return {
+        activityId: "journey2_activity4",
+        sentences: [s1, s2],
+        score: totalScore,
+        maxScore: 9.0,
+        isAccepted,
+        criteria: {
+          C1: {
+            code: "C1",
+            name: "Adéquation avec la situation",
+            score: c1Score,
+            max: 4.5,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC1 && typeof rawC1.justification === "string" ? rawC1.justification.trim() : "")
+          },
+          C3: {
+            code: "C3",
+            name: "Correction linguistique",
+            score: c3Score,
+            max: 3.0,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC3 && typeof rawC3.justification === "string" ? rawC3.justification.trim() : "")
+          },
+          C6: {
+            code: "C6",
+            name: "Richesse du vocabulaire",
+            score: c6Score,
+            max: 1.5,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC6 && typeof rawC6.justification === "string" ? rawC6.justification.trim() : "")
+          }
+        },
+        feedback: isBlank
+          ? "Écris tes deux phrases pour raconter ce que fait Caroline pendant la récréation."
+          : (typeof parsed.feedback === "string" && parsed.feedback.trim() ? parsed.feedback.trim() : "Merci pour ton travail !"),
+        suggestions: typeof parsed.suggestions === "string" ? parsed.suggestions.trim() : "",
+        status: "evaluated",
+        evaluatedAt: new Date().toISOString(),
+        model: modelName,
+        usedImageContext: Boolean(usedImageContext)
+      };
+    }
+
+    async function evaluateJourney2Activity({ sentence1, sentence2 }) {
+      const s1 = String(sentence1 || "").trim();
+      const s2 = String(sentence2 || "").trim();
+
+      const model = await initFirebaseAiLogic();
+      const imagePart = await loadImageAsInlineData("journe 2/5.png");
+      const prompt = buildJourney2Prompt(s1, s2);
+      const contentPayload = imagePart ? [prompt, imagePart] : prompt;
+
+      if (lastAiDiagnostics) {
+        lastAiDiagnostics.reachedGemini = true;
+      }
+      console.log(`[GeminiAIService] Evaluating Journey 2 Activity 4 (image attached: ${Boolean(imagePart)}, maxScore: 9, reachedGemini: true)...`);
+
+      const result = await model.generateContent(contentPayload);
+      const response = await result.response;
+      const rawText = response.text();
+      return normalizeJourney2Evaluation(rawText, s1, s2, Boolean(imagePart), window.GeminiAIService.model);
+    }
+
+    window.Journey2AiRequestManager = Journey2AiRequestManager;
+    window.GeminiAIService.requestManager = new Journey2AiRequestManager(2, 30000);
   </script>
 </head>
 
@@ -4238,7 +4534,7 @@ ${criteriaSchema}
 
     const EXERCISES_LEVEL_1 = [];
 
-    const ExerciseSystem = {
+    var ExerciseSystem = window.ExerciseSystem = {
       currentLevelData: null,
       currentExIndex: 0,
       state: {},
@@ -11712,7 +12008,7 @@ ${criteriaSchema}
 
 
       loadJourney2Activity() {
-        const JOURNEY_2_POPUPS = [
+        const JOURNEY_2_POPUPS = ExerciseSystem.journey2Popups || (ExerciseSystem.journey2Popups = [
           {
             src: 'journe 2/1.png',
             type: 'info',
@@ -11830,10 +12126,6 @@ ${criteriaSchema}
               { id: 'j2-w2', left: 6.8, top: 66.3, width: 51.8, height: 3.9, num: '2.' }
             ],
             hintBox: { left: 61.6, top: 28.5, width: 31.5, height: 31.8 },
-            expectedSentences: [
-              "Pendant la récréation, Caroline joue avec ses nouveaux camarades dans la cour.",
-              "Avec ses camarades, elle parle, rit et s’amuse."
-            ],
             needsValidation: true,
             valBtnPos: { left: 50, top: 96, width: 22 },
             navPos: {
@@ -11847,7 +12139,7 @@ ${criteriaSchema}
             needsValidation: false,
             valBtnPos: { left: 50, top: 96 }
           }
-        ];
+        ]);
 
         const container = document.getElementById('exercise-content-area');
         container.innerHTML = '';
@@ -12461,75 +12753,163 @@ ${criteriaSchema}
           isCorrect = activity.validSentences.some(s => normalize(s) === builtNorm) || builtNorm === 'karim achete un bouquet de jasmin';
         }
         else if (activity.type === 'writing') {
-          const inputs = activity.inputs.map(inp => (document.getElementById(inp.id).value || '').trim());
+          const inp1 = document.getElementById(activity.inputs[0].id);
+          const inp2 = document.getElementById(activity.inputs[1].id);
+          const s1 = (inp1 ? inp1.value : '').trim();
+          const s2 = (inp2 ? inp2.value : '').trim();
 
-          // Helper to clean accents, punctuation and normalize spaces
-          const cleanStr = (s) => {
-            return s.toLowerCase()
-              .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-              .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()'"’]/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-          };
+          const fb = document.getElementById('j2-feedback');
+          const hintEl = document.getElementById('j2-hints-area');
+          const valBtnWrapper = document.getElementById('j2-val-btn-wrapper');
+          const valBtn = document.getElementById('j2-val-btn');
 
-          // Key concepts for Sentence 1: recreation/cour, caroline, joue, camarades/amis
-          const checkSentence1 = (raw) => {
-            const c = cleanStr(raw);
-            if (c.length < 8) return false;
-            const hasSubject = c.includes('caroline') || c.includes('elle');
-            const hasAction = c.includes('joue') || c.includes('jouer') || c.includes('amuse') || c.includes('court') || c.includes('parle');
-            const hasContext = c.includes('recreation') || c.includes('cour') || c.includes('camarade') || c.includes('ami') || c.includes('eleve');
-            // Match either key content or good semantic coverage
-            return (hasSubject && (hasAction || hasContext)) || (hasAction && hasContext) || c.includes('pendant la recreation');
-          };
+          // Empty check: prompts student without sending an empty request
+          if (!s1 && !s2) {
+            if (fb) {
+              fb.style.display = 'block';
+              fb.style.color = '#f59e0b';
+              fb.textContent = "Écris tes deux phrases avant de valider.";
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
+            return;
+          }
 
-          // Key concepts for Sentence 2: camarades/amis, elle/caroline, parle, rit, amuse
-          const checkSentence2 = (raw) => {
-            const c = cleanStr(raw);
-            if (c.length < 8) return false;
-            const hasAction = c.includes('parle') || c.includes('rit') || c.includes('amuse') || c.includes('joue') || c.includes('sourit');
-            const hasContext = c.includes('camarade') || c.includes('ami') || c.includes('elle') || c.includes('caroline') || c.includes('avec');
-            return hasAction && hasContext;
-          };
-
-          const s1Ok = checkSentence1(inputs[0] || '');
-          const s2Ok = checkSentence2(inputs[1] || '');
-
-          state.writingTrials = (state.writingTrials || 0) + 1;
-
-          if (s1Ok && s2Ok) {
-            isCorrect = true;
-          } else {
-            // Escalate hints based on trials
-            const hintEl = document.getElementById('j2-hints-area');
-            if (hintEl) {
-              if (state.writingTrials === 1) {
-                hintEl.innerHTML = `
-                  <div style="font-weight: 700; color: #ea580c; margin-bottom: 2px;">💡 Indice (Essai 1) :</div>
-                  <div style="font-size: 0.95em; color: #1e293b;">
-                    Essaye de commencer ainsi :
-                  </div>
-                  <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-weight: 600; font-size: 0.9em; color: #0f172a; border-left: 3px solid #f97316;">
-                    1. Pendant la récréation, Caroline joue...<br>
-                    2. Avec ses camarades, elle...
-                  </div>
-                `;
-              } else {
-                // After 2 trials, show the full model sentences clearly
-                hintEl.innerHTML = `
-                  <div style="font-weight: 700; color: #16a34a; margin-bottom: 2px;">⭐ Réponses modèles :</div>
-                  <div style="font-size: 0.92em; color: #1e293b; line-height: 1.4;">
-                    Tu peux t'inspirer ou recopier :
-                  </div>
-                  <div style="background: #f0fdf4; padding: 6px 10px; border-radius: 6px; font-size: 0.88em; color: #166534; border-left: 3px solid #22c55e;">
-                    <b>1.</b> Pendant la récréation, Caroline joue avec ses nouveaux camarades dans la cour.<br>
-                    <b>2.</b> Avec ses camarades, elle parle, rit et s’amuse.
-                  </div>
-                `;
-              }
-              hintEl.animate([{ transform: 'scale(0.96)' }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
+          // Disable button and show loading state to prevent duplicate submissions
+          if (valBtnWrapper) {
+            valBtnWrapper.style.pointerEvents = 'none';
+            if (valBtn) {
+              valBtn.style.opacity = '0.65';
+              valBtn.style.filter = 'grayscale(0.3)';
             }
           }
+
+          if (fb) {
+            fb.style.display = 'block';
+            fb.style.color = '#38bdf8';
+            fb.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> Correction par l\'IA Gemini en cours...</span>';
+          }
+
+          const signature = `j2_act4_${s1}__${s2}`;
+
+          const restoreButton = () => {
+            if (valBtnWrapper) {
+              valBtnWrapper.style.pointerEvents = 'auto';
+              if (valBtn) {
+                valBtn.style.opacity = '1';
+                valBtn.style.filter = 'none';
+              }
+            }
+          };
+
+          const evaluateTask = async () => {
+            return await window.GeminiAIService.evaluateJourney2Activity({
+              sentence1: s1,
+              sentence2: s2
+            });
+          };
+
+          const reqManager = (window.GeminiAIService && window.GeminiAIService.requestManager) || window.Journey2AiRequestManager;
+
+          const evaluationPromise = reqManager
+            ? reqManager.enqueue(signature, evaluateTask, {
+                onQueued: ({ queuePos }) => {
+                  if (fb) {
+                    fb.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> En file d'attente (position ${queuePos})... Correction bientôt.</span>`;
+                  }
+                },
+                onStart: () => {
+                  if (fb) {
+                    fb.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> Correction par l\'IA Gemini en cours...</span>`;
+                  }
+                }
+              })
+            : evaluateTask();
+
+          evaluationPromise
+            .then(evalRes => {
+              restoreButton();
+
+              // Update the progressive hints area with detailed official criteria breakdown
+              if (hintEl) {
+                const isPass = evalRes.isAccepted;
+                hintEl.innerHTML = `
+                  <div style="font-weight: 800; color: ${isPass ? '#15803d' : '#c2410c'}; font-size: 1.02em; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>${isPass ? '⭐ Bravo ! Validé' : '✍️ Évaluation Gemini'}</span>
+                    <span style="background: ${isPass ? '#dcfce7' : '#ffedd5'}; padding: 2px 8px; border-radius: 9999px; font-size: 0.9em; font-weight: 700;">${evalRes.score} / 9</span>
+                  </div>
+                  <div style="font-size: 0.88em; color: #334155; line-height: 1.35; margin-bottom: 5px;">
+                    <div>• <b>C1 (Adéquation) :</b> ${evalRes.criteria.C1.score}/4.5</div>
+                    <div>• <b>C3 (Correction) :</b> ${evalRes.criteria.C3.score}/3.0</div>
+                    <div>• <b>C6 (Vocabulaire) :</b> ${evalRes.criteria.C6.score}/1.5</div>
+                  </div>
+                  <div style="font-size: 0.84em; color: #1e293b; background: rgba(255,255,255,0.75); padding: 6px 8px; border-radius: 6px; border-left: 3px solid ${isPass ? '#22c55e' : '#f97316'}; line-height: 1.3;">
+                    ${evalRes.feedback || ''}
+                    ${evalRes.suggestions ? `<div style="margin-top: 4px; color: #475569;">💡 <i>${evalRes.suggestions}</i></div>` : ''}
+                  </div>
+                `;
+                hintEl.animate([{ transform: 'scale(0.97)' }, { transform: 'scale(1)' }], { duration: 250, easing: 'ease-out' });
+              }
+
+              if (evalRes.isAccepted) {
+                // Score >= 5/9: ACCEPT
+                if (fb) {
+                  fb.style.color = '#4ade80';
+                  fb.textContent = `Bravo ! Ton histoire est validée (${evalRes.score}/9).`;
+                }
+
+                // Record completion in journey state
+                this.state.journey2Completed = this.state.journey2Completed || {};
+                this.state.journey2Completed[this.currentExIndex] = {
+                  completed: true,
+                  score: evalRes.score,
+                  maxScore: 9,
+                  criteria: evalRes.criteria,
+                  feedback: evalRes.feedback,
+                  evaluatedAt: evalRes.evaluatedAt
+                };
+
+                // Dynamically check whether another activity exists
+                const nextIdx = this.currentExIndex + 1;
+                const popups = this.journey2Popups || (typeof ExerciseSystem !== 'undefined' && ExerciseSystem.journey2Popups) || [];
+                const isEnd = (act) => !act || act.src === 'journe 2/end journe 2.png' || act.type === 'end' || act.type === 'celebration';
+                const hasNextActivity = nextIdx < popups.length && !isEnd(popups[nextIdx]);
+
+                if (!hasNextActivity) {
+                  this.state.journey2Finished = true;
+                }
+
+                // Show success modal with celebration card
+                this.showJourney2SuccessPopup();
+              } else {
+                // Score < 5/9: REJECT and allow another attempt
+                if (fb) {
+                  fb.style.color = '#f87171';
+                  fb.textContent = `Note : ${evalRes.score}/9 (minimum 5/9 requis). Lis les conseils à droite et améliore tes phrases !`;
+                  if (window.j1GentleShake) window.j1GentleShake(fb);
+                }
+                // Original answers are kept in the fields for correction. Progression blocked until passing.
+              }
+            })
+            .catch(err => {
+              restoreButton();
+              if (err && err.message === 'DUPLICATE_SUBMISSION') {
+                return;
+              }
+              console.error('[Journey2 AI Evaluation Error]:', err);
+              if (fb) {
+                fb.style.color = '#fbbf24';
+                fb.innerHTML = `⚠️ Oups ! La correction par l'IA a rencontré un problème technique. <button id="j2-retry-ai-btn" style="background: #f59e0b; color: #ffffff; border: none; padding: 4px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 8px;">Réessayer</button>`;
+                const retryBtn = document.getElementById('j2-retry-ai-btn');
+                if (retryBtn) {
+                  retryBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.validateJourney2Activity(activity);
+                  };
+                }
+              }
+              // Do NOT assign a score (no automatic zero) and do NOT erase student answers!
+            });
+          return;
         }
 
         if (isCorrect) {
