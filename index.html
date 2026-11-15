@@ -2334,7 +2334,19 @@ ${criteriaSchema}
 
       async evaluateJourney2Activity({ sentence1, sentence2 }) {
         return await evaluateJourney2Activity({ sentence1, sentence2 });
-      }
+      },
+
+      buildJourney4Prompt(sentence1, sentence2, sentence3) {
+        return buildJourney4Prompt(sentence1, sentence2, sentence3);
+      },
+
+      normalizeJourney4Evaluation(rawText, sentence1, sentence2, sentence3, usedImageContext = true) {
+        return normalizeJourney4Evaluation(rawText, sentence1, sentence2, sentence3, usedImageContext, this.model);
+      },
+
+      async evaluateJourney4Activity({ sentence1, sentence2, sentence3 }) {
+        return await evaluateJourney4Activity({ sentence1, sentence2, sentence3 });
+      },
     };
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -2602,8 +2614,186 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
       return normalizeJourney2Evaluation(rawText, s1, s2, Boolean(imagePart), window.GeminiAIService.model);
     }
 
+
+    function buildJourney4Prompt(sentence1, sentence2, sentence3) {
+      return `Tu es un professeur de français de l'école primaire évaluant la production écrite d'un élève de 4ème année primaire (âgé de 9 à 10 ans) pour l'Activité 4 : « Je raconte une nouvelle histoire ».
+
+CONSIGNE OFFICIELLE DE L'ACTIVITÉ :
+« Observe trois nouvelles images montrant un élève qui prépare une activité en classe. Écris trois phrases pour raconter ce qui se passe. »
+
+CONTEXTE VISUEL DE L'ILLUSTRATION JOINTE (3 IMAGES DANS L'ACTIVITÉ) :
+- Image 1 — Préparation : Un jeune élève portant un sweat à capuche bleu est assis à son bureau dans la salle de classe. Il prépare des feuilles de papier et range le matériel scolaire, notamment des crayons.
+- Image 2 — Distribution : Le même élève distribue une feuille de papier à une camarade de classe. D'autres élèves sont assis à leurs bureaux et attendent leurs feuilles.
+- Image 3 — Présentation : L'élève se tient debout devant la classe (au tableau) en tenant une feuille de papier. Ses camarades le regardent, et il s'apprête à présenter, expliquer son travail ou commencer l'activité.
+
+BANQUE DE MOTS FOURNIE :
+élève, classe, feuilles, crayons, préparer, distribuer, commencer.
+
+AIDES PROGRESSIVES FOURNIES À L'ÉLÈVE :
+L'élève est encouragé à observer les trois images et à utiliser les connecteurs temporels :
+- D'abord
+- Ensuite
+- Enfin
+(Ces connecteurs et les mots de la banque sont des suggestions utiles d'aide, et non des mots obligatoires).
+
+ATTENTE PÉDAGOGIQUE (PROGRESSION LOGIQUE & SOUPLESSE DE FORMULATION) :
+Trois phrases originales en français décrivant de manière cohérente la succession des trois événements :
+1. L'élève prépare les feuilles et le matériel.
+2. L'élève distribue les feuilles à ses camarades.
+3. L'élève se place devant la classe pour présenter, expliquer ou commencer l'activité.
+IMPORTANT : Ne compare PAS à une réponse modèle fixe. Comprends le sens réel des phrases produites par l'élève et accepte différentes formulations naturelles, correctes et adaptées au niveau du primaire.
+
+PRODUCTION ÉCRITE DE L'ÉLÈVE (TROIS PHRASES) :
+Phrase 1 : """${sentence1}"""
+Phrase 2 : """${sentence2}"""
+Phrase 3 : """${sentence3}"""
+
+BARÈME OFFICIEL D'ÉVALUATION — STRICTEMENT 9 POINTS AU TOTAL :
+Évalue UNIQUEMENT les 3 critères officiels suivants selon le niveau de 4ème année primaire :
+
+1. C1 — Adéquation avec la situation (Maximum : 4.5 points) :
+   - L'élève produit-il le nombre de phrases demandé (TROIS phrases distinctes) ?
+   - Comprend-il et réalise-t-il la tâche demandée ?
+   - Utilise-t-il un vocabulaire adéquat à la situation de communication (lieux : classe/bureau, personnages : élève/camarades/garçon, actions : préparer, distribuer, présenter/commencer) ?
+   - Décrit-il les trois images de manière logique et pertinente en montrant la progression entre elles ?
+   (Si l'élève n'écrit que 1 ou 2 phrases sur les 3 demandées, pénalise proportionnellement C1).
+
+2. C3 — Correction linguistique (Maximum : 3.0 points) :
+   - Agencement correct des mots dans chaque phrase (ordre sujet-verbe-complément).
+   - Respect des accords grammaticaux étudiés (accords en genre et nombre, accord sujet-verbe).
+   - Formes verbales étudiées correctes au présent de l'indicatif.
+   - Respect de la ponctuation forte (majuscule en début de phrase, point à la fin).
+   (Considère le niveau d'un élève d'école primaire).
+
+3. C6 — Richesse du vocabulaire (Maximum : 1.5 points) :
+   - Emploi d'un vocabulaire varié et adapté à l'école primaire.
+   - Utilisation de compléments du nom, comparaisons ou phrases enrichies lorsque approprié.
+   (Rappel : ne force pas l'utilisation de tous les mots de la banque ; ne pénalise pas excessivement une phrase simple mais correcte).
+
+CRITÈRES EXCLUS (NE PAS ÉVALUER NI PÉNALISER) :
+- Ne pas évaluer C2, C4 ou C5. N'utilise pas C7.
+
+RÈGLE STRICTE SUR LE CHARABIA, LE VIDE OU LE HORS-SUJET :
+Si le texte est vide, constitué de lettres aléatoires ou charabia (ex: "zdzadz", "asdfgh"), ou totalement hors-sujet (ex: jouer au football au marché), attribue 0 point à chaque critère (C1: 0, C3: 0, C6: 0, Total = 0 / 9).
+
+FORMAT DE RÉPONSE JSON STRICTEMENT OBLIGATOIRE :
+Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en dehors de l'objet) :
+{
+  "criteria": {
+    "C1": { "name": "Adéquation avec la situation", "score": 0, "max": 4.5, "justification": "" },
+    "C3": { "name": "Correction linguistique", "score": 0, "max": 3.0, "justification": "" },
+    "C6": { "name": "Richesse du vocabulaire", "score": 0, "max": 1.5, "justification": "" }
+  },
+  "feedback": "Commentaire encourageant et bienveillant en français",
+  "suggestions": "Conseils pédagogiques constructifs pour progresser"
+}`;
+    }
+
+    function normalizeJourney4Evaluation(rawText, sentence1, sentence2, sentence3, usedImageContext, modelName) {
+      if (!rawText || typeof rawText !== "string") {
+        throw new Error("Réponse vide reçue de Gemini pour la correction de l'activité 4.");
+      }
+      let clean = rawText.trim();
+      if (clean.startsWith("```json")) clean = clean.substring(7);
+      else if (clean.startsWith("```")) clean = clean.substring(3);
+      if (clean.endsWith("```")) clean = clean.substring(0, clean.length - 3);
+      clean = clean.trim();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(clean);
+      } catch (parseErr) {
+        throw new Error("Format JSON invalide retourné par Gemini : " + parseErr.message);
+      }
+
+      if (!parsed || typeof parsed !== "object" || !parsed.criteria || typeof parsed.criteria !== "object") {
+        throw new Error("Format de critères incomplet retourné par Gemini.");
+      }
+
+      const s1 = String(sentence1 || "").trim();
+      const s2 = String(sentence2 || "").trim();
+      const s3 = String(sentence3 || "").trim();
+      const isBlank = !s1 && !s2 && !s3;
+
+      const rawC1 = parsed.criteria.C1;
+      const rawC3 = parsed.criteria.C3;
+      const rawC6 = parsed.criteria.C6;
+
+      const c1Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(4.5, Number(rawC1 && rawC1.score) || 0)));
+      const c3Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(3.0, Number(rawC3 && rawC3.score) || 0)));
+      const c6Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(1.5, Number(rawC6 && rawC6.score) || 0)));
+
+      // Application calculates total score strictly from C1 + C3 + C6
+      const totalScore = roundScore(c1Score + c3Score + c6Score);
+      // Passing condition: >= 5.0 (out of 9) accepts, < 5.0 rejects
+      const isAccepted = totalScore >= 5.0;
+
+      return {
+        activityId: "journey4_activity4",
+        sentences: [s1, s2, s3],
+        score: totalScore,
+        maxScore: 9.0,
+        isAccepted,
+        criteria: {
+          C1: {
+            code: "C1",
+            name: "Adéquation avec la situation",
+            score: c1Score,
+            max: 4.5,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC1 && typeof rawC1.justification === "string" ? rawC1.justification.trim() : "")
+          },
+          C3: {
+            code: "C3",
+            name: "Correction linguistique",
+            score: c3Score,
+            max: 3.0,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC3 && typeof rawC3.justification === "string" ? rawC3.justification.trim() : "")
+          },
+          C6: {
+            code: "C6",
+            name: "Richesse du vocabulaire",
+            score: c6Score,
+            max: 1.5,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC6 && typeof rawC6.justification === "string" ? rawC6.justification.trim() : "")
+          }
+        },
+        feedback: isBlank
+          ? "Écris tes trois phrases pour raconter ce qui se passe."
+          : (typeof parsed.feedback === "string" && parsed.feedback.trim() ? parsed.feedback.trim() : "Merci pour ton travail !"),
+        suggestions: typeof parsed.suggestions === "string" ? parsed.suggestions.trim() : "",
+        status: "evaluated",
+        evaluatedAt: new Date().toISOString(),
+        model: modelName,
+        usedImageContext: Boolean(usedImageContext)
+      };
+    }
+
+    async function evaluateJourney4Activity({ sentence1, sentence2, sentence3 }) {
+      const s1 = String(sentence1 || "").trim();
+      const s2 = String(sentence2 || "").trim();
+      const s3 = String(sentence3 || "").trim();
+
+      const model = await initFirebaseAiLogic();
+      const imagePart = await loadImageAsInlineData("journe 4/5.png");
+      const prompt = buildJourney4Prompt(s1, s2, s3);
+      const contentPayload = imagePart ? [prompt, imagePart] : prompt;
+
+      if (lastAiDiagnostics) {
+        lastAiDiagnostics.reachedGemini = true;
+      }
+      console.log(`[GeminiAIService] Evaluating Journey 4 Activity 4 (image attached: ${Boolean(imagePart)}, maxScore: 9, reachedGemini: true)...`);
+
+      const result = await model.generateContent(contentPayload);
+      const response = await result.response;
+      const rawText = response.text();
+      return normalizeJourney4Evaluation(rawText, s1, s2, s3, Boolean(imagePart), window.GeminiAIService.model);
+    }
+
     window.Journey2AiRequestManager = Journey2AiRequestManager;
     window.GeminiAIService.requestManager = new Journey2AiRequestManager(2, 30000);
+
+    window.Journey4AiRequestManager = Journey2AiRequestManager;
+    window.GeminiAIService.requestManagerJ4 = new Journey2AiRequestManager(2, 30000);
   </script>
 </head>
 
@@ -4886,7 +5076,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
         wrapper.style.flexDirection = 'column';
 
         const imgContainer = document.createElement('div');
-        imgContainer.style.position = 'relative';
+        imgContainer.id = 'j3-img-container';
         imgContainer.style.display = 'inline-block';
         imgContainer.style.maxWidth = '95vw';
         imgContainer.style.maxHeight = '85vh';
@@ -5437,7 +5627,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
         wrapper.style.flexDirection = 'column';
 
         const imgContainer = document.createElement('div');
-        imgContainer.style.position = 'relative';
+        imgContainer.id = 'j3-img-container';
         imgContainer.style.display = 'inline-block';
         imgContainer.style.maxWidth = '95vw';
         imgContainer.style.maxHeight = '85vh';
@@ -6938,7 +7128,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
         wrapper.style.flexDirection = 'column';
 
         const imgContainer = document.createElement('div');
-        imgContainer.style.position = 'relative';
+        imgContainer.id = 'j3-img-container';
         imgContainer.style.display = 'inline-block';
         imgContainer.style.maxWidth = '95vw';
         imgContainer.style.maxHeight = '85vh';
@@ -8803,7 +8993,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
         wrapper.style.flexDirection = 'column';
 
         const imgContainer = document.createElement('div');
-        imgContainer.style.position = 'relative';
+        imgContainer.id = 'j3-img-container';
         imgContainer.style.display = 'inline-block';
         imgContainer.style.maxWidth = '95vw';
         imgContainer.style.maxHeight = '85vh';
@@ -9165,7 +9355,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
         wrapper.style.flexDirection = 'column';
 
         const imgContainer = document.createElement('div');
-        imgContainer.style.position = 'relative';
+        imgContainer.id = 'j3-img-container';
         imgContainer.style.display = 'inline-block';
         imgContainer.style.maxWidth = '92vw';
         imgContainer.style.maxHeight = '84vh';
@@ -16282,7 +16472,7 @@ showJourney2EndCelebration() {
               { id: 'j4-w2', left: 9.8, top: 83.4, width: 82.3, height: 4.7, num: '2.' },
               { id: 'j4-w3', left: 9.9, top: 89.2, width: 81.8, height: 3.8, num: '3.' }
             ],
-            hintBox: { left: 6.2, top: 66.8, width: 86.5, height: 8.7 },
+            hintBox: { left: 8.2, top: 59.8, width: 83.6, height: 15.0 },
             expectedSentences: [
               "D’abord, un élève est dans la classe et prépare ses feuilles.",
               "Ensuite, il distribue les feuilles à ses camarades.",
@@ -16417,15 +16607,8 @@ showJourney2EndCelebration() {
             hintEl.style.background = 'transparent';
             hintEl.style.scrollbarWidth = 'none'; // clean, no ugly scrollbar
 
-            // Initial helpful guidance
-            hintEl.innerHTML = `
-              <div style="font-size: 0.96em; color: #7c2d12; line-height: 1.35; font-weight: 600;">
-                💡 <b style="color: #9a3412;">Astuce :</b> Observe les trois images et utilise les connecteurs : <span style="color: #b45309; font-weight: 700;">D’abord</span>, <span style="color: #b45309; font-weight: 700;">Ensuite</span>, <span style="color: #b45309; font-weight: 700;">Enfin</span>.
-              </div>
-              <div style="font-size: 0.88em; color: #854d0e; margin-top: 2px;">
-                Mots utiles : <i>élève, classe, feuilles, crayons, préparer, distribuer, commencer...</i>
-              </div>
-            `;
+            // Box will receive Gemini evaluation card upon submission
+            hintEl.innerHTML = '';
             imgContainer.appendChild(hintEl);
           }
 
@@ -16628,6 +16811,7 @@ showJourney2EndCelebration() {
         // Validation / Continuation button at bottom if needed
         if (activity.valBtnPos) {
           const btnWrapper = document.createElement('div');
+          btnWrapper.id = 'j4-val-btn-wrapper';
           btnWrapper.style.position = 'absolute';
           btnWrapper.style.left = activity.valBtnPos.left + '%';
           btnWrapper.style.top = activity.valBtnPos.top + '%';
@@ -16809,93 +16993,158 @@ showJourney2EndCelebration() {
           }
         }
         else if (activity.type === 'writing') {
-          const inputs = activity.inputs.map(inp => {
-            const el = document.getElementById(inp.id);
-            return el ? el.value.trim() : '';
-          });
+          const inp1 = document.getElementById(activity.inputs[0].id);
+          const inp2 = document.getElementById(activity.inputs[1].id);
+          const inp3 = document.getElementById(activity.inputs[2].id);
+          const s1 = (inp1 ? inp1.value : '').trim();
+          const s2 = (inp2 ? inp2.value : '').trim();
+          const s3 = (inp3 ? inp3.value : '').trim();
 
-          const normalize = (str) => {
-            return str
-              .toLowerCase()
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .replace(/['’]/g, "'")
-              .replace(/[^a-z0-9'\s]/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-          };
+          const fb = document.getElementById('j4-feedback');
+          const hintEl = document.getElementById('j4-hints-area');
+          const valBtnWrapper = document.getElementById('j4-val-btn-wrapper');
+          const valBtn = document.getElementById('j4-val-btn');
 
-          // Semantic flexible validation for each of the 3 sentences
-          // 1. D'abord, un élève est dans la classe et prépare ses feuilles.
-          const checkSentence1 = (raw) => {
-            const c = normalize(raw);
-            if (c.length < 8) return false;
-            const hasConnector = c.includes('dabord') || c.includes("d'abord") || c.includes('premierement') || c.includes('au debut');
-            const hasSubject = c.includes('eleve') || c.includes('garcon') || c.includes('enfant') || c.includes('sami') || c.includes('il');
-            const hasActionOrPlace = c.includes('classe') || c.includes('prepare') || c.includes('feuille') || c.includes('bureau') || c.includes('table');
-            return hasSubject && (hasConnector || (hasActionOrPlace && c.includes('feuille')));
-          };
+          // Check if all fields are empty
+          if (!s1 && !s2 && !s3) {
+            if (fb) {
+              fb.style.display = 'block';
+              fb.style.color = '#f59e0b';
+              fb.textContent = "Écris tes trois phrases avant de valider.";
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
+            return;
+          }
 
-          // 2. Ensuite, il distribue les feuilles à ses camarades.
-          const checkSentence2 = (raw) => {
-            const c = normalize(raw);
-            if (c.length < 8) return false;
-            const hasConnector = c.includes('ensuite') || c.includes('puis') || c.includes('apres');
-            const hasAction = c.includes('distribue') || c.includes('donne') || c.includes('partage');
-            const hasObjectOrTarget = c.includes('feuille') || c.includes('camarade') || c.includes('ami') || c.includes('eleve');
-            return (hasConnector && (hasAction || hasObjectOrTarget)) || (hasAction && hasObjectOrTarget);
-          };
+          // Check if any sentence is missing (Test F)
+          if (!s1 || !s2 || !s3) {
+            if (fb) {
+              fb.style.display = 'block';
+              fb.style.color = '#f59e0b';
+              const missingNum = !s1 ? 'première' : (!s2 ? 'deuxième' : 'troisième');
+              fb.textContent = `Complète la ${missingNum} phrase avant de valider.`;
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
+            return;
+          }
 
-          // 3. Enfin, il commence l’activité avec les élèves.
-          const checkSentence3 = (raw) => {
-            const c = normalize(raw);
-            if (c.length < 8) return false;
-            const hasConnector = c.includes('enfin') || c.includes('finalement') || c.includes('a la fin');
-            const hasAction = c.includes('commence') || c.includes('debut') || c.includes('fait') || c.includes('travaille');
-            const hasContext = c.includes('activite') || c.includes('eleve') || c.includes('camarade') || c.includes('dessin') || c.includes('classe');
-            return (hasConnector && (hasAction || hasContext)) || (hasAction && hasContext);
-          };
-
-          const s1Ok = checkSentence1(inputs[0] || '');
-          const s2Ok = checkSentence2(inputs[1] || '');
-          const s3Ok = checkSentence3(inputs[2] || '');
-
-          state.writingTrials = (state.writingTrials || 0) + 1;
-
-          if (s1Ok && s2Ok && s3Ok) {
-            isCorrect = true;
-          } else {
-            const hintEl = document.getElementById('j4-hints-area');
-            if (hintEl) {
-              if (state.writingTrials === 1) {
-                hintEl.innerHTML = `
-                  <div style="font-size: 0.92em; color: #9a3412; font-weight: 700; margin-bottom: 3px;">
-                    💡 Indice : Pense à commencer chaque phrase par un connecteur :
-                  </div>
-                  <div style="font-size: 0.90em; color: #78350f; line-height: 1.45; font-weight: 600;">
-                    • <b style="color: #b45309;">1.</b> D’abord, un élève prépare ses feuilles...<br>
-                    • <b style="color: #b45309;">2.</b> Ensuite, il distribue les feuilles...<br>
-                    • <b style="color: #b45309;">3.</b> Enfin, il commence l’activité...
-                  </div>
-                `;
-              } else {
-                // After 2 trials, show the full model sentences clearly
-                hintEl.innerHTML = `
-                  <div style="font-size: 0.90em; color: #166534; font-weight: 700; margin-bottom: 2px;">
-                    ⭐ Réponses modèles (tu peux t'inspirer ou recopier) :
-                  </div>
-                  <div style="font-size: 0.88em; color: #14532d; line-height: 1.42; font-weight: 600;">
-                    <b style="color: #15803d;">1.</b> D’abord, un élève est dans la classe et prépare ses feuilles.<br>
-                    <b style="color: #15803d;">2.</b> Ensuite, il distribue les feuilles à ses camarades.<br>
-                    <b style="color: #15803d;">3.</b> Enfin, il commence l’activité avec les élèves.
-                  </div>
-                `;
-              }
-              hintEl.animate([{ transform: 'scale(0.98)' }, { transform: 'scale(1)' }], { duration: 300, easing: 'ease-out' });
+          // Disable button and show loading state to prevent duplicate submissions
+          if (valBtnWrapper) {
+            valBtnWrapper.style.pointerEvents = 'none';
+            if (valBtn) {
+              valBtn.style.opacity = '0.65';
+              valBtn.style.filter = 'grayscale(0.3)';
             }
           }
-        }
 
+          if (fb) {
+            fb.style.display = 'block';
+            fb.style.color = '#38bdf8';
+            fb.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> Correction par l\'IA Gemini en cours...</span>';
+          }
+
+          const signature = `j4_act4_${s1}__${s2}__${s3}`;
+
+          const restoreButton = () => {
+            if (valBtnWrapper) {
+              valBtnWrapper.style.pointerEvents = 'auto';
+              if (valBtn) {
+                valBtn.style.opacity = '1';
+                valBtn.style.filter = 'none';
+              }
+            }
+          };
+
+          const evaluateTask = async () => {
+            return await window.GeminiAIService.evaluateJourney4Activity({
+              sentence1: s1,
+              sentence2: s2,
+              sentence3: s3
+            });
+          };
+
+          const reqManager = (window.GeminiAIService && (window.GeminiAIService.requestManagerJ4 || window.GeminiAIService.requestManager)) || window.Journey4AiRequestManager;
+
+          const evaluationPromise = reqManager
+            ? reqManager.enqueue(signature, evaluateTask, {
+                onQueued: ({ queuePos }) => {
+                  if (fb) {
+                    fb.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> En file d'attente (position ${queuePos})... Correction bientôt.</span>`;
+                  }
+                },
+                onStart: () => {
+                  if (fb) {
+                    fb.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> Correction par l'IA Gemini en cours...</span>`;
+                  }
+                }
+              })
+            : evaluateTask();
+
+          evaluationPromise
+            .then(evalRes => {
+              restoreButton();
+
+              // Update the hints area with detailed official criteria breakdown
+              if (hintEl) {
+                const isPass = evalRes.isAccepted;
+                hintEl.style.background = '#fefce8';
+                hintEl.style.border = isPass ? '2px solid #86efac' : '2px solid #fed7aa';
+                hintEl.style.borderRadius = '14px';
+                hintEl.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.12)';
+                hintEl.style.padding = '8px 14px';
+                hintEl.style.zIndex = '30';
+                hintEl.innerHTML = `
+                  <div style="font-weight: 800; color: ${isPass ? '#15803d' : '#c2410c'}; font-size: 1.02em; margin-bottom: 3px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>${isPass ? '⭐ Bravo ! Validé' : '✍️ Évaluation Gemini'}</span>
+                    <span style="background: ${isPass ? '#dcfce7' : '#ffedd5'}; color: ${isPass ? '#166534' : '#9a3412'}; padding: 2px 10px; border-radius: 9999px; font-size: 0.92em; font-weight: 800;">${evalRes.score} / 9</span>
+                  </div>
+                  <div style="font-size: 0.88em; color: #334155; line-height: 1.35; margin-bottom: 4px; display: flex; gap: 14px; flex-wrap: wrap;">
+                    <div>• <b>C1 (Adéquation) :</b> ${evalRes.criteria.C1.score}/4.5</div>
+                    <div>• <b>C3 (Correction) :</b> ${evalRes.criteria.C3.score}/3.0</div>
+                    <div>• <b>C6 (Vocabulaire) :</b> ${evalRes.criteria.C6.score}/1.5</div>
+                  </div>
+                  <div style="font-size: 0.84em; color: #1e293b; background: rgba(255,255,255,0.88); padding: 5px 8px; border-radius: 6px; border-left: 3px solid ${isPass ? '#22c55e' : '#f97316'}; line-height: 1.25;">
+                    ${evalRes.feedback || ''}
+                    ${evalRes.suggestions ? `<div style="margin-top: 3px; color: #475569;">💡 <i>${evalRes.suggestions}</i></div>` : ''}
+                  </div>
+                `;
+                hintEl.animate([{ transform: 'scale(0.97)' }, { transform: 'scale(1)' }], { duration: 250, easing: 'ease-out' });
+              }
+
+              if (evalRes.isAccepted) {
+                if (fb) {
+                  fb.style.display = 'block';
+                  fb.style.color = '#4ade80';
+                  fb.textContent = "⭐ Excellent travail ! Tu passes à l'étape suivante.";
+                }
+                setTimeout(() => {
+                  this.showJourney4SuccessPopup();
+                }, 1200);
+              } else {
+                if (fb) {
+                  fb.style.display = 'block';
+                  fb.style.color = '#f87171';
+                  fb.textContent = "Tu peux améliorer tes phrases. Regarde les conseils ci-dessus et réessaie !";
+                  if (window.j1GentleShake) window.j1GentleShake(fb);
+                }
+              }
+            })
+            .catch(err => {
+              restoreButton();
+              if (err && err.message === 'DUPLICATE_SUBMISSION') {
+                return;
+              }
+              console.error("[Journey 4] Gemini evaluation error:", err);
+              if (fb) {
+                fb.style.display = 'block';
+                fb.style.color = '#f87171';
+                fb.textContent = "Une erreur est survenue lors de la correction par l'IA. Veuillez cliquer à nouveau sur Valider.";
+                if (window.j1GentleShake) window.j1GentleShake(fb);
+              }
+            });
+
+          return;
+        }
         if (isCorrect) {
           const fb = document.getElementById('j4-feedback');
           if (fb) {
