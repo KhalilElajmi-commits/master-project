@@ -2371,6 +2371,18 @@ ${criteriaSchema}
       async evaluateJourney8Activity({ q1, q2, q3, q4 }) {
         return await evaluateJourney8Activity({ q1, q2, q3, q4 });
       },
+
+      buildJourney8WritingPrompt(text, prepCard) {
+        return buildJourney8WritingPrompt(text, prepCard);
+      },
+
+      normalizeJourney8WritingEvaluation(rawText, text, prepCard, usedImageContext = true) {
+        return normalizeJourney8WritingEvaluation(rawText, text, prepCard, usedImageContext, this.model);
+      },
+
+      async evaluateJourney8WritingActivity({ text, prepCard }) {
+        return await evaluateJourney8WritingActivity({ text, prepCard });
+      },
     };
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -3203,6 +3215,197 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
       const response = await result.response;
       const rawText = response.text();
       return normalizeJourney8Evaluation(rawText, q1, q2, q3, q4, Boolean(imagePart), window.GeminiAIService.model);
+    }
+
+    function buildJourney8WritingPrompt(text, prepCard) {
+      let prepContext = "";
+      if (prepCard && typeof prepCard === "object") {
+        const p = prepCard.personnages ? `Personnages : "${prepCard.personnages}"` : "";
+        const l = prepCard.lieu ? `Lieu : "${prepCard.lieu}"` : "";
+        const m = prepCard.moment ? `Moment : "${prepCard.moment}"` : "";
+        const evs = Array.isArray(prepCard.evenements) ? prepCard.evenements.filter(Boolean) : [];
+        const evText = evs.length > 0 ? `Événements préparés : ${evs.map((e, i) => `${i + 1}. "${e}"`).join(", ")}` : "";
+        const parts = [p, l, m, evText].filter(Boolean);
+        if (parts.length > 0) {
+          prepContext = `\nCARTE DE PRÉPARATION DE L'ÉLÈVE (contexte indicatif) :\n${parts.join("\n")}\n`;
+        }
+      }
+
+      return `Tu es un professeur de français de l'école primaire bienveillant et rigoureux, évaluant une production écrite libre pour des élèves de 4ème année primaire (âgés de 9 à 10 ans) : Activité 4 — « J'écris mon texte ».
+
+CONSIGNE OFFICIELLE :
+« Utilise ta carte d'organisation et les phrases que tu as créées pour écrire un court texte. Ton texte doit être cohérent et bien organisé. »
+${prepContext ? prepContext : "(La carte de préparation n'est pas renseignée. Évalue le texte en toute liberté selon sa cohérence et sa qualité narrative.)"}
+
+TEXTE ÉCRIT PAR L'ÉLÈVE :
+"""${text}"""
+
+BARÈME OFFICIEL DU MINISTÈRE DE L'ÉDUCATION (TOTAL : 9 POINTS) :
+Évalue la production de l'élève STRICTEMENT selon les 3 critères officiels suivants (n'évalue pas C2, C4 ou C5) :
+
+1. C1 — Adéquation avec la situation (Maximum : 4.5 points)
+   - L'élève produit un court texte narratif (pas seulement une collection de mots isolés).
+   - Présente les personnages et le cadre (école, classe, cour, matin/journée).
+   - Raconte une suite d'événements dans un ordre chronologique et logique.
+   - Fait bon usage des idées préparées si présentes, ou raconte une histoire personnelle cohérente.
+   - Ne pas exiger un nombre fixe de phrases (un texte court de 3 à 6 phrases est tout à fait approprié).
+   - Accepter différentes histoires créatives et personnages ; ne pas pénaliser l'imagination tant que l'histoire reste compréhensible et cohérente.
+   - Paliers indicatifs C1 :
+     * 4.0 à 4.5 : Histoire très bien organisée, événements logiques, personnages et cadre bien posés.
+     * 3.0 à 3.5 : Histoire compréhensible avec un début et des actions, progression logique globale.
+     * 2.0 à 2.5 : Quelques phrases liées mais progression un peu maladroite ou incomplète.
+     * 0 à 1.5 : Phrases totalement décousues, hors-sujet ou sans lien logique.
+
+2. C3 — Correction linguistique (Maximum : 3.0 points)
+   - Structure correcte des phrases simples (Sujet + Verbe + Complément).
+   - Accords grammaticaux de base (sujet-verbe, féminin/pluriel élémentaire).
+   - Conjugaison des verbes usuels au présent de l'indicatif.
+   - Présence de majuscules en début de phrase et de points finaux.
+   - Bienveillance pour le niveau primaire (4ème année) : distinguer les fautes d'orthographe/accord mineures d'un problème de sens. Un texte compréhensible avec 2 ou 3 petites erreurs d'accord ne doit pas être rejeté.
+   - Paliers indicatifs C3 :
+     * 2.5 à 3.0 : Phrases bien construites, ponctuation correcte, verbes bien employés.
+     * 1.5 à 2.0 : Quelques erreurs d'accord ou de terminaison verbale, mais phrases bien compréhensibles.
+     * 0.5 à 1.0 : Nombreuses confusions grammaticales rendant la lecture difficile.
+     * 0 : Phrases incompréhensibles ou mots isolés sans syntaxe.
+
+3. C6 — Richesse du vocabulaire (Maximum : 1.5 points)
+   - Vocabulaire approprié à la vie scolaire et aux activités des enfants.
+   - Utilisation de connecteurs chronologiques (d'abord, ensuite, puis, enfin, après, pendant...).
+   - Présence d'adjectifs, de compléments de lieu ou de temps enrichissant le récit.
+   - Paliers indicatifs C6 :
+     * 1.5 : Vocabulaire riche, présence de connecteurs variés et phrases enrichies.
+     * 1.0 : Vocabulaire correct et adapté, au moins un ou deux connecteurs chronologiques.
+     * 0.5 : Vocabulaire basique et répétitif mais adapté.
+     * 0 : Vocabulaire très pauvre, répétitif ou inadapté.
+
+RÈGLE D'ACCEPTATION :
+- Note globale = C1 + C3 + C6 (sur 9).
+- Si la note globale est >= 5.0 sur 9 : l'activité est VALIDÉE ("isAccepted": true).
+- Si la note globale est < 5.0 sur 9 : l'activité n'est pas validée ("isAccepted": false).
+
+FORMAT DE RÉPONSE OBLIGATOIRE (JSON UNIQUEMENT) :
+Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehors :
+{
+  "criteria": {
+    "C1": {
+      "score": 4.0,
+      "max": 4.5,
+      "feedback": "Explication bienveillante sur l'organisation et la cohérence de l'histoire."
+    },
+    "C3": {
+      "score": 2.5,
+      "max": 3.0,
+      "feedback": "Remarques sur la grammaire, la conjugaison et la ponctuation."
+    },
+    "C6": {
+      "score": 1.0,
+      "max": 1.5,
+      "feedback": "Remarques sur le vocabulaire et l'usage des connecteurs."
+    }
+  },
+  "totalScore": 7.5,
+  "isAccepted": true,
+  "feedback": "Appréciation générale encourageante adressée directement à l'élève.",
+  "strengths": [
+    "Point fort 1 (ex: Ton histoire se déroule dans un ordre logique)",
+    "Point fort 2 (ex: Les personnages sont bien présentés)"
+  ],
+  "improvements": [
+    "Conseil d'amélioration 1 (ex: Pense à ajouter des mots de liaison comme ensuite ou enfin pour relier tes phrases)"
+  ]
+}`;
+    }
+
+    function normalizeJourney8WritingEvaluation(rawText, text, prepCard, usedImageContext, modelName) {
+      if (!rawText || typeof rawText !== "string") {
+        throw new Error("Réponse vide reçue de Gemini pour la correction de l'activité 4.");
+      }
+      let clean = rawText.trim();
+      if (clean.startsWith("```json")) clean = clean.substring(7);
+      else if (clean.startsWith("```")) clean = clean.substring(3);
+      if (clean.endsWith("```")) clean = clean.substring(0, clean.length - 3);
+      clean = clean.trim();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(clean);
+      } catch (parseErr) {
+        throw new Error("Format JSON invalide retourné par Gemini : " + parseErr.message);
+      }
+
+      if (!parsed || typeof parsed !== "object" || !parsed.criteria || typeof parsed.criteria !== "object") {
+        throw new Error("Format de critères incomplet retourné par Gemini.");
+      }
+
+      const cleanText = String(text || "").trim();
+      const isBlank = cleanText.length < 5;
+
+      const rawC1 = parsed.criteria.C1;
+      const rawC3 = parsed.criteria.C3;
+      const rawC6 = parsed.criteria.C6;
+
+      const c1Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(4.5, Number(rawC1 && rawC1.score) || 0)));
+      const c3Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(3.0, Number(rawC3 && rawC3.score) || 0)));
+      const c6Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(1.5, Number(rawC6 && rawC6.score) || 0)));
+
+      // Application independently calculates total score strictly from C1 + C3 + C6
+      const totalScore = roundScore(c1Score + c3Score + c6Score);
+      // Passing condition: >= 5.0 (out of 9) accepts, < 5.0 rejects
+      const isAccepted = totalScore >= 5.0;
+
+      const strengths = Array.isArray(parsed.strengths) ? parsed.strengths.filter(s => typeof s === "string" && s.trim()) : [];
+      const improvements = Array.isArray(parsed.improvements) ? parsed.improvements.filter(s => typeof s === "string" && s.trim()) : [];
+
+      return {
+        score: totalScore,
+        maxScore: 9,
+        isAccepted,
+        criteria: {
+          C1: {
+            score: c1Score,
+            max: 4.5,
+            name: "Adéquation avec la situation",
+            feedback: String((rawC1 && rawC1.feedback) || "").trim() || (c1Score >= 3.0 ? "Très bonne cohérence narrative." : "L'histoire manque de cohérence ou d'organisation.")
+          },
+          C3: {
+            score: c3Score,
+            max: 3.0,
+            name: "Correction linguistique",
+            feedback: String((rawC3 && rawC3.feedback) || "").trim() || (c3Score >= 2.0 ? "Phrases bien construites." : "Attention aux accords et à la ponctuation.")
+          },
+          C6: {
+            score: c6Score,
+            max: 1.5,
+            name: "Richesse du vocabulaire",
+            feedback: String((rawC6 && rawC6.feedback) || "").trim() || (c6Score >= 1.0 ? "Vocabulaire varié et adapté." : "Essaie d'enrichir ton vocabulaire avec des connecteurs.")
+          }
+        },
+        feedback: String(parsed.feedback || "").trim() || (isAccepted ? "Bravo ! Tu as écrit une belle histoire bien organisée !" : "Tu peux améliorer ton texte. Lis les conseils et réessaie !"),
+        strengths,
+        improvements,
+        status: "evaluated",
+        evaluatedAt: new Date().toISOString(),
+        model: modelName,
+        usedImageContext: Boolean(usedImageContext)
+      };
+    }
+
+    async function evaluateJourney8WritingActivity({ text, prepCard }) {
+      const cleanText = String(text || "").trim();
+      const model = await initFirebaseAiLogic();
+      const imagePart = await loadImageAsInlineData("journe 8/5.png");
+      const prompt = buildJourney8WritingPrompt(cleanText, prepCard);
+      const contentPayload = imagePart ? [prompt, imagePart] : prompt;
+
+      if (lastAiDiagnostics) {
+        lastAiDiagnostics.reachedGemini = true;
+      }
+      console.log(`[GeminiAIService] Evaluating Journey 8 Activity 4 (« J'écris mon texte », text length: ${cleanText.length}, image attached: ${Boolean(imagePart)}, maxScore: 9, reachedGemini: true)...`);
+
+      const result = await model.generateContent(contentPayload);
+      const response = await result.response;
+      const rawText = response.text();
+      return normalizeJourney8WritingEvaluation(rawText, cleanText, prepCard, Boolean(imagePart), window.GeminiAIService.model);
     }
 
     window.Journey2AiRequestManager = Journey2AiRequestManager;
@@ -9791,11 +9994,14 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
             fb.style.top = topPos + '%';
             fb.style.transform = 'translate(-50%, -50%)';
             fb.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-            fb.style.fontSize = 'calc(var(--img-width) * 0.020)';
+            fb.style.fontSize = 'calc(var(--img-width) * 0.016)';
             fb.style.fontWeight = 'bold';
             fb.style.zIndex = '35';
             fb.style.pointerEvents = 'none';
-            fb.style.textShadow = '0 2px 8px rgba(0,0,0,0.45)';
+            fb.style.backgroundColor = 'rgba(255, 255, 255, 0.94)';
+            fb.style.padding = '4px 14px';
+            fb.style.borderRadius = '9999px';
+            fb.style.boxShadow = '0 3px 10px rgba(0, 0, 0, 0.2)';
             fb.style.textAlign = 'center';
             fb.style.whiteSpace = 'nowrap';
             imgContainer.appendChild(fb);
@@ -10032,6 +10238,12 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
                 aideBox.style.padding = '10px 14px';
 
                 if (evalRes.isAccepted) {
+                  window._j8State = {
+                    q1: inputElements[1]?.value?.trim() || "",
+                    q2: inputElements[2]?.value?.trim() || "",
+                    q3: inputElements[3]?.value?.trim() || "",
+                    q4: inputElements[4]?.value?.trim() || ""
+                  };
                   // Turn all inputs green
                   [1, 2, 3, 4].forEach(num => {
                     const inputEl = inputElements[num];
@@ -10524,12 +10736,14 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           imgContainer.appendChild(btnWrapper);
         }
 
-        // --- ACTIVITY 5: FINAL TEXT PRODUCTION (J'écris mon texte) ---
+        // --- ACTIVITY 4: FINAL TEXT PRODUCTION WITH GEMINI AI EVALUATION (J'écris mon texte) ---
         else if (activity.type === 'j8-final-text') {
           let isAnswerCorrect = false;
+          let isEvaluating = false;
 
-          // Main writing textarea
+          // Main writing textarea container on the left
           const writeBox = document.createElement('div');
+          writeBox.id = 'j8-write-box';
           writeBox.style.position = 'absolute';
           writeBox.style.left = (activity.writingBox.left + 1.2) + '%';
           writeBox.style.top = (activity.writingBox.top + 2.0) + '%';
@@ -10538,64 +10752,155 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           writeBox.style.zIndex = '25';
 
           const textarea = document.createElement('textarea');
+          textarea.id = 'j8-final-textarea';
           textarea.addEventListener('focus', () => playEvalClickSound());
           textarea.addEventListener('click', () => playEvalClickSound());
-          textarea.placeholder = "D'abord, Caroline arrive à l'école le matin.\nEnsuite, elle rencontre son amie dans la classe.\nPuis, les élèves jouent ensemble dans la cour.\nEnfin, elles rentrent contentes chez elles.";
+          textarea.placeholder = "Écris ton histoire ici...\nExemple : Un matin, Caroline arrive à l'école avec son amie...";
           textarea.style.width = '100%';
           textarea.style.height = '100%';
-          textarea.style.border = 'none';
+          textarea.style.border = '2px solid transparent';
+          textarea.style.borderRadius = '12px';
           textarea.style.outline = 'none';
           textarea.style.background = 'transparent';
           textarea.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-          textarea.style.fontSize = 'calc(var(--img-width) * 0.016)';
+          textarea.style.fontSize = 'calc(var(--img-width) * 0.0155)';
           textarea.style.fontWeight = '700';
           textarea.style.color = '#1e293b';
-          textarea.style.lineHeight = '2.4';
+          textarea.style.lineHeight = '2.35';
           textarea.style.resize = 'none';
-          textarea.style.padding = '10px 16px';
+          textarea.style.padding = '8px 14px';
           textarea.style.boxSizing = 'border-box';
+          textarea.style.transition = 'all 0.2s ease';
+
+          textarea.onfocus = () => {
+            if (!textarea.style.borderColor.includes('16a34a') && !textarea.style.borderColor.includes('f59e0b')) {
+              textarea.style.borderColor = 'rgba(2, 132, 199, 0.4)';
+              textarea.style.background = 'rgba(255, 255, 255, 0.3)';
+            }
+          };
+          textarea.onblur = () => {
+            if (!textarea.style.borderColor.includes('16a34a') && !textarea.style.borderColor.includes('f59e0b')) {
+              textarea.style.borderColor = 'transparent';
+              textarea.style.background = 'transparent';
+            }
+          };
+
           writeBox.appendChild(textarea);
           imgContainer.appendChild(writeBox);
 
-          // Interactive helper cards in right panel
-          const prepPanel = document.createElement('div');
-          prepPanel.style.position = 'absolute';
-          prepPanel.style.left = (activity.prepCard.left + 2.0) + '%';
-          prepPanel.style.top = (activity.prepCard.top + 8.0) + '%';
-          prepPanel.style.width = (activity.prepCard.width - 12.0) + '%';
-          prepPanel.style.height = (activity.prepCard.height - 12.0) + '%';
-          prepPanel.style.zIndex = '25';
-          prepPanel.style.display = 'flex';
-          prepPanel.style.flexDirection = 'column';
-          prepPanel.style.justifyContent = 'space-between';
-          prepPanel.style.pointerEvents = 'auto';
+          // Interactive Preparation Card on the right
+          const prepInputs = {};
+          const prepFieldsConfig = [
+            { id: 'personnages', left: 66.5, top: 32.8, width: 29.0, height: 4.6, placeholder: 'Caroline et son amie' },
+            { id: 'lieu', left: 61.5, top: 41.6, width: 34.0, height: 4.6, placeholder: 'À l\'école, dans la classe et la cour' },
+            { id: 'moment', left: 65.0, top: 48.8, width: 30.5, height: 4.6, placeholder: 'Le matin, pendant la récréation' },
+            { id: 'ev1', left: 58.0, top: 62.0, width: 27.5, height: 4.6, placeholder: 'Arrivée à l\'école' },
+            { id: 'ev2', left: 58.0, top: 68.6, width: 27.5, height: 4.6, placeholder: 'Rencontre de l\'amie' },
+            { id: 'ev3', left: 58.0, top: 75.2, width: 27.5, height: 4.6, placeholder: 'Jeux dans la cour' },
+            { id: 'ev4', left: 58.0, top: 82.0, width: 27.5, height: 4.6, placeholder: 'Retour à la maison' }
+          ];
 
+          prepFieldsConfig.forEach(f => {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.id = 'j8-prep-' + f.id;
+            input.placeholder = f.placeholder;
+            input.style.position = 'absolute';
+            input.style.left = f.left + '%';
+            input.style.top = f.top + '%';
+            input.style.width = f.width + '%';
+            input.style.height = f.height + '%';
+            input.style.border = 'none';
+            input.style.borderBottom = '2px dashed transparent';
+            input.style.outline = 'none';
+            input.style.background = 'transparent';
+            input.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
+            input.style.fontSize = 'calc(var(--img-width) * 0.0125)';
+            input.style.fontWeight = '700';
+            input.style.color = '#1e3a8a';
+            input.style.padding = '0 6px';
+            input.style.boxSizing = 'border-box';
+            input.style.zIndex = '26';
+            input.style.transition = 'all 0.15s ease';
+
+            input.onfocus = () => {
+              input.style.borderBottom = '2px dashed #0284c7';
+              input.style.background = 'rgba(255, 255, 255, 0.75)';
+              input.style.borderRadius = '4px';
+            };
+            input.onblur = () => {
+              input.style.borderBottom = '2px dashed transparent';
+              input.style.background = 'transparent';
+            };
+
+            // Pre-fill from previous activities or realistic defaults
+            if (f.id === 'personnages') input.value = window._j8State?.q1 || "Caroline et son amie";
+            else if (f.id === 'lieu') input.value = window._j8State?.q2 || "À l'école, dans la classe et la cour";
+            else if (f.id === 'moment') input.value = window._j8State?.q3 || "Le matin, pendant la récréation";
+            else if (f.id === 'ev1') input.value = "D'abord, la nouvelle élève arrive à l'école.";
+            else if (f.id === 'ev2') input.value = "Ensuite, elle rencontre son amie en classe.";
+            else if (f.id === 'ev3') input.value = "Puis, elles jouent ensemble dans la cour.";
+            else if (f.id === 'ev4') input.value = "Enfin, elles rentrent chez elles après l'école.";
+
+            prepInputs[f.id] = input;
+            imgContainer.appendChild(input);
+          });
+
+          // Helpful button above prep card to transfer ideas into the writing box
           const insertBtn = document.createElement('button');
           insertBtn.type = 'button';
-          insertBtn.innerHTML = '✨ Insérer le texte complet';
-          insertBtn.style.alignSelf = 'flex-start';
-          insertBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+          insertBtn.id = 'j8-final-insert-btn';
+          insertBtn.innerHTML = '✨ Remplir mon texte depuis ma préparation';
+          insertBtn.style.position = 'absolute';
+          insertBtn.style.left = (activity.prepCard.left + 3.0) + '%';
+          insertBtn.style.top = (activity.prepCard.top + activity.prepCard.height - 4.5) + '%';
+          insertBtn.style.background = 'linear-gradient(135deg, #0284c7, #0369a1)';
           insertBtn.style.color = '#ffffff';
           insertBtn.style.border = 'none';
           insertBtn.style.borderRadius = '9999px';
-          insertBtn.style.padding = '6px 14px';
+          insertBtn.style.padding = '4px 12px';
           insertBtn.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-          insertBtn.style.fontSize = 'calc(var(--img-width) * 0.012)';
+          insertBtn.style.fontSize = 'calc(var(--img-width) * 0.011)';
           insertBtn.style.fontWeight = '800';
           insertBtn.style.cursor = 'pointer';
-          insertBtn.style.boxShadow = '0 3px 8px rgba(16, 185, 129, 0.4)';
-          insertBtn.style.transition = 'transform 0.15s ease';
-          insertBtn.onmouseenter = () => { insertBtn.style.transform = 'scale(1.06)'; };
+          insertBtn.style.boxShadow = '0 2px 6px rgba(2, 132, 199, 0.35)';
+          insertBtn.style.zIndex = '28';
+          insertBtn.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+          insertBtn.onmouseenter = () => { insertBtn.style.transform = 'scale(1.05)'; };
           insertBtn.onmouseleave = () => { insertBtn.style.transform = 'scale(1)'; };
           insertBtn.onclick = () => {
-            textarea.value = "D'abord, Caroline arrive à l'école le matin.\nEnsuite, elle rencontre son amie dans la classe.\nPuis, les deux élèves jouent ensemble avec joie.\nEnfin, elles rentrent heureuses chez elles après l'école.";
+            const e1 = prepInputs.ev1?.value?.trim() || "D'abord, Caroline arrive à l'école le matin.";
+            const e2 = prepInputs.ev2?.value?.trim() || "Ensuite, elle rencontre son amie en classe.";
+            const e3 = prepInputs.ev3?.value?.trim() || "Puis, les deux élèves jouent ensemble dans la cour.";
+            const e4 = prepInputs.ev4?.value?.trim() || "Enfin, elles rentrent heureuses chez elles après l'école.";
+            textarea.value = `${e1}\n${e2}\n${e3}\n${e4}`;
             textarea.animate([
               { opacity: 0.5, transform: 'scale(0.98)' },
               { opacity: 1, transform: 'scale(1)' }
-            ], { duration: 250 });
+            ], { duration: 240 });
           };
-          prepPanel.appendChild(insertBtn);
-          imgContainer.appendChild(prepPanel);
+          imgContainer.appendChild(insertBtn);
+
+          // Evaluation Card Overlay (replaces or overlays prepCard when evaluated)
+          const evalCard = document.createElement('div');
+          evalCard.id = 'j8-writing-eval-card';
+          evalCard.style.position = 'absolute';
+          evalCard.style.left = activity.prepCard.left + '%';
+          evalCard.style.top = activity.prepCard.top + '%';
+          evalCard.style.width = activity.prepCard.width + '%';
+          evalCard.style.height = activity.prepCard.height + '%';
+          evalCard.style.borderRadius = '16px';
+          evalCard.style.background = 'rgba(255, 255, 255, 0.98)';
+          evalCard.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.15)';
+          evalCard.style.border = '2px solid #0284c7';
+          evalCard.style.boxSizing = 'border-box';
+          evalCard.style.padding = '10px 14px';
+          evalCard.style.display = 'none';
+          evalCard.style.flexDirection = 'column';
+          evalCard.style.justifyContent = 'space-between';
+          evalCard.style.overflowY = 'auto';
+          evalCard.style.zIndex = '32';
+          imgContainer.appendChild(evalCard);
 
           // Valider button at bottom with tip touching inside
           const btnWrapper = document.createElement('div');
@@ -10616,36 +10921,180 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.08) translateY(-2px)'; vbtn.style.filter = 'drop-shadow(0 8px 18px rgba(0,0,0,0.45)) brightness(1.1)'; };
           vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.35))'; };
 
+          const restoreButton = () => {
+            isEvaluating = false;
+            vbtn.style.pointerEvents = 'auto';
+            vbtn.style.opacity = '1';
+            vbtn.style.cursor = 'pointer';
+          };
+
           vbtn.onclick = () => {
             if (isAnswerCorrect) {
               this.handleJourney8Next();
               return;
             }
 
-            const fb = createFeedback(activity.valBtnPos.top - 5.5);
+            if (isEvaluating) return;
+
             const text = textarea.value.trim();
+            const fb = createFeedback(activity.valBtnPos.top - 6.2);
 
             if (text.length < 15) {
-              fb.textContent = 'Écris ton histoire ou clique sur ✨ Insérer le texte complet !';
+              fb.textContent = 'Écris ton histoire (au moins quelques phrases) avant de valider !';
               fb.style.color = '#ea580c';
               if (window.j1GentleShake) window.j1GentleShake(fb);
               return;
             }
 
-            isAnswerCorrect = true;
-            vbtn.src = 'journe 1/continuer.png';
-            vbtn.animate([
-              { transform: 'scale(0.85)' },
-              { transform: 'scale(1.2)' },
-              { transform: 'scale(1)' }
-            ], { duration: 320 });
-            fb.textContent = 'Félicitations ! Ton mini-projet d\'écriture est un grand succès !';
-            fb.style.color = '#16a34a';
+            // Set loading state
+            isEvaluating = true;
+            vbtn.style.pointerEvents = 'none';
+            vbtn.style.opacity = '0.7';
+            vbtn.style.cursor = 'wait';
 
-            // Show encouragement modal from contiuer/ with audio and celebration!
-            setTimeout(() => {
-              this.showJourney8SuccessPopup();
-            }, 600);
+            fb.style.display = 'block';
+            fb.style.color = '#0284c7';
+            fb.innerHTML = `
+              <span class="j2-ai-spinner" style="display:inline-block; width:14px; height:14px; border:2px solid #0284c7; border-top-color:transparent; border-radius:50%; animation:j2-spin 0.8s linear infinite; vertical-align:middle; margin-right:6px;"></span>
+              Correction par l'IA Gemini en cours...
+            `;
+
+            // Collect prep card data if provided
+            const prepCard = {
+              personnages: prepInputs.personnages?.value?.trim() || "",
+              lieu: prepInputs.lieu?.value?.trim() || "",
+              moment: prepInputs.moment?.value?.trim() || "",
+              evenements: [
+                prepInputs.ev1?.value?.trim() || "",
+                prepInputs.ev2?.value?.trim() || "",
+                prepInputs.ev3?.value?.trim() || "",
+                prepInputs.ev4?.value?.trim() || ""
+              ].filter(Boolean)
+            };
+
+            const signature = `j8_write_${text.replace(/\s+/g, '_').slice(0, 80)}`;
+            const reqManager = (window.GeminiAIService && (window.GeminiAIService.requestManagerJ8 || window.GeminiAIService.requestManager)) ||
+                               new (window.Journey8AiRequestManager || window.Journey2AiRequestManager)(2, 30000);
+
+            const evaluateTask = () => window.GeminiAIService.evaluateJourney8WritingActivity({ text, prepCard });
+
+            reqManager.enqueue(
+              signature,
+              evaluateTask,
+              {
+                onQueued: () => {
+                  if (fb) fb.textContent = "En attente du service d'évaluation Gemini...";
+                },
+                onStart: () => {
+                  if (fb) {
+                    fb.innerHTML = `
+                      <span class="j2-ai-spinner" style="display:inline-block; width:14px; height:14px; border:2px solid #0284c7; border-top-color:transparent; border-radius:50%; animation:j2-spin 0.8s linear infinite; vertical-align:middle; margin-right:6px;"></span>
+                      Correction par l'IA Gemini en cours...
+                    `;
+                  }
+                }
+              }
+            )
+            .then(evalRes => {
+              restoreButton();
+
+              // Render evaluation feedback card in evalCard
+              const badgeColor = evalRes.isAccepted ? '#16a34a' : '#ea580c';
+              const badgeBg = evalRes.isAccepted ? '#dcfce7' : '#ffedd5';
+              const headerText = evalRes.isAccepted ? '⭐ Validé par Gemini' : '📝 Évaluation Gemini';
+
+              const strengthsHtml = (evalRes.strengths && evalRes.strengths.length > 0)
+                ? evalRes.strengths.map(s => `<div style="display:flex; align-items:flex-start; gap:4px; font-size:calc(var(--img-width) * 0.011); color:#15803d; margin-bottom:2px;"><span>✅</span><span>${s}</span></div>`).join('')
+                : '';
+
+              const improvementsHtml = (evalRes.improvements && evalRes.improvements.length > 0)
+                ? evalRes.improvements.map(i => `<div style="display:flex; align-items:flex-start; gap:4px; font-size:calc(var(--img-width) * 0.011); color:#c2410c; margin-bottom:2px;"><span>💡</span><span>${i}</span></div>`).join('')
+                : '';
+
+              evalCard.style.display = 'flex';
+              evalCard.style.borderColor = badgeColor;
+              if (insertBtn) insertBtn.style.display = 'none';
+              evalCard.innerHTML = `
+                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:6px;">
+                  <span style="font-size:calc(var(--img-width) * 0.013); font-weight:800; color:${badgeColor};">${headerText}</span>
+                  <span style="background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:calc(var(--img-width) * 0.013); padding:2px 8px; border-radius:9999px;">${evalRes.score} / 9</span>
+                </div>
+                <div style="width:100%; display:flex; justify-content:space-around; font-size:calc(var(--img-width) * 0.0105); font-weight:700; color:#475569; margin-bottom:6px; background:#f8fafc; padding:3px 4px; border-radius:6px;">
+                  <span>C1: ${evalRes.criteria.C1.score}/4.5</span>
+                  <span>C3: ${evalRes.criteria.C3.score}/3.0</span>
+                  <span>C6: ${evalRes.criteria.C6.score}/1.5</span>
+                </div>
+                <div style="font-size:calc(var(--img-width) * 0.0115); font-weight:700; color:#1e293b; line-height:1.3; margin-bottom:6px;">
+                  ${evalRes.feedback || ''}
+                </div>
+                <div style="width:100%; max-height:36%; overflow-y:auto; margin-bottom:4px;">
+                  ${strengthsHtml}
+                  ${improvementsHtml}
+                </div>
+                <div style="width:100%; display:flex; justify-content:flex-end; gap:6px; margin-top:auto;">
+                  <button type="button" id="j8-toggle-prep-btn" style="background:#e2e8f0; color:#334155; border:none; border-radius:9999px; padding:3px 10px; font-size:calc(var(--img-width) * 0.0105); font-weight:700; cursor:pointer;">📋 Voir ma préparation</button>
+                </div>
+              `;
+
+              const toggleBtn = evalCard.querySelector('#j8-toggle-prep-btn');
+              if (toggleBtn) {
+                toggleBtn.onclick = () => {
+                  evalCard.style.display = 'none';
+                  if (insertBtn) insertBtn.style.display = 'block';
+                };
+              }
+
+              if (evalRes.isAccepted) {
+                isAnswerCorrect = true;
+                textarea.style.borderColor = '#16a34a';
+                textarea.style.background = 'rgba(240, 253, 244, 0.45)';
+
+                vbtn.src = 'journe 1/continuer.png';
+                vbtn.animate([
+                  { transform: 'scale(0.85)' },
+                  { transform: 'scale(1.15)' },
+                  { transform: 'scale(1)' }
+                ], { duration: 320 });
+
+                fb.style.display = 'block';
+                fb.style.color = '#16a34a';
+                fb.textContent = `⭐ Excellent travail ! Ton texte est validé avec ${evalRes.score} / 9 !`;
+
+                if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+                  window.SoundSystem.playSuccess();
+                }
+
+                // Show encouragement modal from contiuer/ with audio and celebration!
+                setTimeout(() => {
+                  this.showJourney8SuccessPopup();
+                }, 1000);
+              } else {
+                textarea.style.borderColor = '#f59e0b';
+                textarea.style.background = 'rgba(255, 251, 235, 0.45)';
+
+                fb.style.display = 'block';
+                fb.style.color = '#ef4444';
+                fb.textContent = `Note obtenue : ${evalRes.score} / 9. Lis les conseils dans la carte à droite pour améliorer ton texte et réessaie !`;
+                if (window.j1GentleShake) window.j1GentleShake(fb);
+              }
+            })
+            .catch(err => {
+              restoreButton();
+              console.error('[GeminiAIService] Error evaluating Journey 8 Activity 4:', err);
+              if (err && err.message === 'DUPLICATE_SUBMISSION') {
+                if (fb) fb.textContent = "Une évaluation est déjà en cours...";
+                return;
+              }
+              if (fb) {
+                fb.style.color = '#ef4444';
+                fb.innerHTML = `
+                  <span>Une erreur temporaire est survenue lors de la correction.</span>
+                  <button id="j8-retry-val-btn" style="margin-left:8px; padding:2px 8px; border-radius:9999px; background:#0284c7; color:#fff; border:none; cursor:pointer; font-size:0.9em; font-weight:700;">Réessayer</button>
+                `;
+                const retryBtn = document.getElementById('j8-retry-val-btn');
+                if (retryBtn) retryBtn.onclick = () => vbtn.click();
+              }
+            });
           };
 
           btnWrapper.appendChild(vbtn);
