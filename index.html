@@ -11790,7 +11790,7 @@ ${criteriaSchema}
               { id: 9, group: 3, text: 'se présente', left: 74.8, top: 75.5, width: 2.6, height: 2.7, box: { left: 73.2, top: 73.2, width: 20.5, height: 8.5 }, correct: true }
             ],
             needsValidation: true,
-            valBtnPos: { left: 50, top: 96, width: 22 },
+            valBtnPos: { left: 41.4, top: 97.3, width: 19.3, height: 6.9, box: true },
             navPos: {
               back: { top: '9.2%', left: '2.05%', transform: 'translate(-50%, -50%)', width: 'clamp(58px, 6.8vw, 86px)', height: 'clamp(58px, 6.8vw, 86px)' },
               home: { top: '8.55%', left: '97.05%', transform: 'translate(-50%, -50%)', width: 'clamp(65px, 7.6vw, 98px)', height: 'clamp(65px, 7.6vw, 98px)' }
@@ -12302,13 +12302,27 @@ ${criteriaSchema}
           valBtn.style.transformOrigin = 'center center';
           valBtn.style.transition = 'transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.15s ease';
 
-          btnWrapper.style.left = activity.valBtnPos.left + '%';
-          btnWrapper.style.top = activity.valBtnPos.top + '%';
-          btnWrapper.style.transform = 'translate(-50%, -50%)';
-          btnWrapper.style.width = activity.valBtnPos.width ? activity.valBtnPos.width + '%' : 'calc(var(--img-width) * 0.20)';
-          btnWrapper.style.height = 'auto';
-          valBtn.style.width = '100%';
-          valBtn.style.height = 'auto';
+          if (activity.valBtnPos.box) {
+            btnWrapper.style.left = activity.valBtnPos.left + '%';
+            btnWrapper.style.top = activity.valBtnPos.top + '%';
+            btnWrapper.style.width = activity.valBtnPos.width + '%';
+            btnWrapper.style.height = activity.valBtnPos.height + '%';
+            btnWrapper.style.transform = 'none';
+            btnWrapper.style.display = 'flex';
+            btnWrapper.style.alignItems = 'center';
+            btnWrapper.style.justifyContent = 'center';
+            valBtn.style.width = '100%';
+            valBtn.style.height = '100%';
+            valBtn.style.objectFit = 'contain';
+          } else {
+            btnWrapper.style.left = activity.valBtnPos.left + '%';
+            btnWrapper.style.top = activity.valBtnPos.top + '%';
+            btnWrapper.style.transform = 'translate(-50%, -50%)';
+            btnWrapper.style.width = activity.valBtnPos.width ? activity.valBtnPos.width + '%' : 'calc(var(--img-width) * 0.20)';
+            btnWrapper.style.height = 'auto';
+            valBtn.style.width = '100%';
+            valBtn.style.height = 'auto';
+          }
 
           btnWrapper.onmouseenter = () => {
             valBtn.style.transform = 'scale(1.05)';
