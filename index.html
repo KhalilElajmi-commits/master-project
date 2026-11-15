@@ -9696,14 +9696,14 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
             src: 'journe 8/4.png',
             type: 'j8-chronology',
             cards: [
-              // Box 1: Girls on bench eating snacks during recess -> chronological step 3
-              { id: 1, left: 6.7, top: 28.2, width: 19.8, height: 31.7, boxLeft: 14.5, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 3 },
-              // Box 2: Girl walking home along the path at sunset -> chronological step 4
-              { id: 2, left: 28.3, top: 28.0, width: 20.1, height: 31.8, boxLeft: 36.2, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 4 },
-              // Box 3: Meeting classmate in the classroom -> chronological step 2
-              { id: 3, left: 50.2, top: 28.2, width: 20.3, height: 31.6, boxLeft: 58.2, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 2 },
-              // Box 4: Arriving at the school entrance under the « ÉCOLE » sign -> chronological step 1
-              { id: 4, left: 72.2, top: 28.2, width: 21.1, height: 30.8, boxLeft: 80.5, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 1 }
+              // Box 1: Girls on bench eating snacks during recess -> chronological step 3 (user box: 13.9%, 62.7%, 4.9%, 6.2%)
+              { id: 1, left: 6.7, top: 28.2, width: 19.8, height: 31.7, boxLeft: 13.9, boxTop: 62.7, boxW: 4.9, boxH: 6.2, correctOrder: 3 },
+              // Box 2: Girl walking home along the path at sunset -> chronological step 4 (user box: 35.8%, 62.9%, 5.3%, 5.8%)
+              { id: 2, left: 28.3, top: 28.0, width: 20.1, height: 31.8, boxLeft: 35.8, boxTop: 62.9, boxW: 5.3, boxH: 5.8, correctOrder: 4 },
+              // Box 3: Meeting classmate in the classroom -> chronological step 2 (user box: 57.6%, 62.7%, 5.0%, 6.4%)
+              { id: 3, left: 50.2, top: 28.2, width: 20.3, height: 31.6, boxLeft: 57.6, boxTop: 62.7, boxW: 5.0, boxH: 6.4, correctOrder: 2 },
+              // Box 4: Arriving at the school entrance under the « ÉCOLE » sign -> chronological step 1 (user box: 79.6%, 61.7%, 5.2%, 7.0%)
+              { id: 4, left: 72.2, top: 28.2, width: 21.1, height: 30.8, boxLeft: 79.6, boxTop: 61.7, boxW: 5.2, boxH: 7.0, correctOrder: 1 }
             ],
             valBtnPos: { left: 49.75, top: 102.9, width: 17.1 },
             navPos: {
@@ -10264,10 +10264,10 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           let isAnswerCorrect = false;
 
           const cards = activity.cards || [
-            { id: 1, left: 6.7, top: 28.2, width: 19.8, height: 31.7, boxLeft: 14.5, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 3 },
-            { id: 2, left: 28.3, top: 28.0, width: 20.1, height: 31.8, boxLeft: 36.2, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 4 },
-            { id: 3, left: 50.2, top: 28.2, width: 20.3, height: 31.6, boxLeft: 58.2, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 2 },
-            { id: 4, left: 72.2, top: 28.2, width: 21.1, height: 30.8, boxLeft: 80.5, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 1 }
+            { id: 1, left: 6.7, top: 28.2, width: 19.8, height: 31.7, boxLeft: 13.9, boxTop: 62.7, boxW: 4.9, boxH: 6.2, correctOrder: 3 },
+            { id: 2, left: 28.3, top: 28.0, width: 20.1, height: 31.8, boxLeft: 35.8, boxTop: 62.9, boxW: 5.3, boxH: 5.8, correctOrder: 4 },
+            { id: 3, left: 50.2, top: 28.2, width: 20.3, height: 31.6, boxLeft: 57.6, boxTop: 62.7, boxW: 5.0, boxH: 6.4, correctOrder: 2 },
+            { id: 4, left: 72.2, top: 28.2, width: 21.1, height: 30.8, boxLeft: 79.6, boxTop: 61.7, boxW: 5.2, boxH: 7.0, correctOrder: 1 }
           ];
 
           const cardElements = {};
