@@ -10153,20 +10153,20 @@ ${criteriaSchema}
             src: 'journe 1/5.png',
             type: 'match',
             left: [
-              { id: 'l0', text: 'Bi', left: 9.1, top: 28.8, width: 22, height: 6.7, resBox: { left: 80.1, top: 28.9, width: 12.5, height: 6.3 } },
-              { id: 'l1', text: 'mu', left: 8.6, top: 37.2, width: 22.5, height: 7, resBox: { left: 77.7, top: 37, width: 14.9, height: 7.2 } },
-              { id: 'l2', text: 'ro', left: 9, top: 45.2, width: 22.4, height: 7.5, resBox: { left: 77.7, top: 46.1, width: 15, height: 7.1 } },
-              { id: 'l3', text: 'mai', left: 9.1, top: 54.6, width: 22, height: 6.9, resBox: { left: 77.8, top: 54.7, width: 15, height: 6.8 } },
-              { id: 'l4', text: 'rai', left: 9.2, top: 63.1, width: 22.1, height: 7, resBox: { left: 78.3, top: 62.9, width: 15.1, height: 7.8 } },
-              { id: 'l5', text: 'To', left: 9.5, top: 71.1, width: 21.8, height: 8.7, resBox: { left: 78.6, top: 71.9, width: 14.3, height: 7.2 } }
+              { id: 'l0', text: 'Bi', left: 9.1, top: 28.2, width: 22.0, height: 6.2, dotX: 30.8, dotY: 31.25, resBox: { left: 77.5, top: 28.5, width: 14.0, height: 6.0 }, word: 'Bizerte', colorIdx: 0 },
+              { id: 'l1', text: 'mu', left: 8.6, top: 36.5, width: 22.5, height: 6.2, dotX: 30.8, dotY: 39.60, resBox: { left: 77.5, top: 37.0, width: 14.0, height: 6.0 }, word: 'musée', colorIdx: 1 },
+              { id: 'l2', text: 'ro', left: 9.0, top: 44.4, width: 22.4, height: 6.2, dotX: 30.8, dotY: 47.50, resBox: { left: 77.5, top: 45.0, width: 14.0, height: 6.0 }, word: 'rose', colorIdx: 2 },
+              { id: 'l3', text: 'mai', left: 9.1, top: 52.8, width: 22.0, height: 6.2, dotX: 30.8, dotY: 55.90, resBox: { left: 77.5, top: 53.5, width: 14.0, height: 6.0 }, word: 'maison', colorIdx: 3 },
+              { id: 'l4', text: 'rai', left: 9.2, top: 61.2, width: 22.1, height: 6.2, dotX: 30.8, dotY: 64.25, resBox: { left: 77.5, top: 62.0, width: 14.0, height: 6.0 }, word: 'raisin', colorIdx: 4 },
+              { id: 'l5', text: 'To', left: 9.5, top: 69.8, width: 21.8, height: 6.2, dotX: 30.8, dotY: 72.95, resBox: { left: 77.5, top: 70.5, width: 14.0, height: 6.0 }, word: 'Tozeur', colorIdx: 5 }
             ],
             right: [
-              { id: 'r0', text: 'son', left: 39.4, top: 28.5, width: 18.2, height: 6.5 },
-              { id: 'r1', text: 'sin', left: 38.8, top: 37, width: 19.5, height: 7 },
-              { id: 'r2', text: 'sée', left: 38.4, top: 45.9, width: 19.9, height: 6.8 },
-              { id: 'r3', text: 'zeur', left: 38.4, top: 54.2, width: 19.9, height: 7.2 },
-              { id: 'r4', text: 'zerte', left: 38.8, top: 62.8, width: 19.9, height: 7.6 },
-              { id: 'r5', text: 'se', left: 38.9, top: 72.3, width: 19.4, height: 7.1 }
+              { id: 'r0', text: 'son', left: 38.2, top: 28.2, width: 19.5, height: 6.2, dotX: 38.4, dotY: 31.25 },
+              { id: 'r1', text: 'sin', left: 38.2, top: 36.5, width: 19.5, height: 6.2, dotX: 38.4, dotY: 39.60 },
+              { id: 'r2', text: 'sée', left: 38.2, top: 44.4, width: 19.5, height: 6.2, dotX: 38.4, dotY: 47.50 },
+              { id: 'r3', text: 'zeur', left: 38.2, top: 52.8, width: 19.5, height: 6.2, dotX: 38.4, dotY: 55.90 },
+              { id: 'r4', text: 'zerte', left: 38.2, top: 61.2, width: 19.5, height: 6.2, dotX: 38.4, dotY: 64.25 },
+              { id: 'r5', text: 'se', left: 38.2, top: 69.8, width: 19.5, height: 6.2, dotX: 38.4, dotY: 72.95 }
             ],
             matches: { 'l0': 'r4', 'l1': 'r2', 'l2': 'r5', 'l3': 'r0', 'l4': 'r1', 'l5': 'r3' },
             needsValidation: true,
@@ -10429,193 +10429,367 @@ ${criteriaSchema}
         }
 
         if (activity.type === 'match') {
+          const PALETTES = [
+            { id: 0, from: '#0284c7', to: '#0ea5e9', shadow: '#0284c7', arrow: '#0ea5e9' }, // 0: Sky Blue (Bi -> zerte)
+            { id: 1, from: '#059669', to: '#10b981', shadow: '#059669', arrow: '#10b981' }, // 1: Emerald (mu -> sée)
+            { id: 2, from: '#e11d48', to: '#f43f5e', shadow: '#e11d48', arrow: '#f43f5e' }, // 2: Rose Pink (ro -> se)
+            { id: 3, from: '#d97706', to: '#f59e0b', shadow: '#d97706', arrow: '#f59e0b' }, // 3: Amber Gold (mai -> son)
+            { id: 4, from: '#7c3aed', to: '#8b5cf6', shadow: '#7c3aed', arrow: '#8b5cf6' }, // 4: Violet (rai -> sin)
+            { id: 5, from: '#ea580c', to: '#f97316', shadow: '#ea580c', arrow: '#f97316' }  // 5: Tangerine (To -> zeur)
+          ];
+
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', '0 0 100 100');
+          svg.setAttribute('preserveAspectRatio', 'none');
           svg.style.position = 'absolute';
-          svg.style.top = '0'; svg.style.left = '0';
-          svg.style.width = '100%'; svg.style.height = '100%';
+          svg.style.top = '0';
+          svg.style.left = '0';
+          svg.style.width = '100%';
+          svg.style.height = '100%';
           svg.style.pointerEvents = 'none';
+          svg.style.zIndex = '22';
+
+          let defsHtml = '<defs>';
+          PALETTES.forEach(p => {
+            defsHtml += `
+              <linearGradient id="j1-grad-${p.id}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${p.from}" />
+                <stop offset="100%" stop-color="${p.to}" />
+              </linearGradient>
+              <filter id="j1-shadow-${p.id}" filterUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+                <feDropShadow dx="0" dy="1.4" stdDeviation="1.4" flood-color="${p.shadow}" flood-opacity="0.45"/>
+              </filter>
+              <marker id="j1-arrow-${p.id}" viewBox="0 0 10 10" refX="6.5" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto">
+                <path d="M 1 2 L 8 5 L 1 8 Q 3 5 1 2" fill="${p.arrow}" stroke="#ffffff" stroke-width="0.6"/>
+              </marker>
+            `;
+          });
+          defsHtml += `
+            <marker id="j1-arrow-prev" viewBox="0 0 10 10" refX="6.5" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto">
+              <path d="M 1 2 L 8 5 L 1 8 Q 3 5 1 2" fill="#38bdf8" stroke="#ffffff" stroke-width="0.6"/>
+            </marker>
+            <filter id="j1-shadow-prev" filterUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+              <feDropShadow dx="0" dy="1.2" stdDeviation="1.2" flood-color="#0284c7" flood-opacity="0.4"/>
+            </filter>
+          </defs>`;
+          svg.innerHTML = defsHtml;
           imgContainer.appendChild(svg);
           this.currentActivityState.svg = svg;
 
-          let currentLeft = null;
+          // Drag preview path
+          const previewPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          previewPath.setAttribute('fill', 'none');
+          previewPath.setAttribute('stroke', '#38bdf8');
+          previewPath.setAttribute('stroke-width', '0.72');
+          previewPath.setAttribute('stroke-dasharray', '2.2, 1.4');
+          previewPath.setAttribute('stroke-linecap', 'round');
+          previewPath.setAttribute('filter', 'url(#j1-shadow-prev)');
+          previewPath.setAttribute('marker-end', 'url(#j1-arrow-prev)');
+          previewPath.style.display = 'none';
+          svg.appendChild(previewPath);
+
+          let activeSelection = null; // { opt, isLeft, el }
+          let dragInfo = null;
+          const pillEntries = [];
+
+          const getContainerPct = e => {
+            const r = imgContainer.getBoundingClientRect();
+            const x = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
+            const y = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
+            return { x, y };
+          };
+
+          const updatePreview = (ox, oy, cx, cy, isLeft) => {
+            const x1 = isLeft ? ox : cx;
+            const y1 = isLeft ? oy : cy;
+            const x2 = isLeft ? cx : ox;
+            const y2 = isLeft ? cy : oy;
+            const distY = Math.abs(y2 - y1);
+            const curve = Math.max(3.0, Math.min(6.5, distY * 0.18 + 2.5));
+            const cx1 = x1 + curve;
+            const cx2 = x2 - curve;
+            previewPath.setAttribute('d', `M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`);
+            previewPath.style.display = 'block';
+          };
+
+          const hidePreview = () => {
+            previewPath.style.display = 'none';
+            previewPath.removeAttribute('d');
+          };
+
+          const drawConnection = (leftOpt, rightOpt, leftEl, rightEl) => {
+            if (this.currentActivityState.selected.has(leftOpt.id) || this.currentActivityState.selected.has(rightOpt.id)) return;
+
+            this.currentActivityState.selected.add(leftOpt.id);
+            this.currentActivityState.selected.add(rightOpt.id);
+            this.currentActivityState.lines.push({ l: leftOpt.id, r: rightOpt.id });
+
+            // Reset selection visuals
+            [leftEl, rightEl].forEach(el => {
+              if (el) {
+                el.style.border = 'none';
+                el.style.boxShadow = 'none';
+                el.style.background = 'transparent';
+                el.style.cursor = 'default';
+                el.style.pointerEvents = 'none';
+              }
+            });
+            activeSelection = null;
+
+            const p = PALETTES[leftOpt.colorIdx ?? 0];
+            const x1 = leftOpt.dotX;
+            const y1 = leftOpt.dotY;
+            const x2 = rightOpt.dotX;
+            const y2 = rightOpt.dotY;
+            const distY = Math.abs(y2 - y1);
+            const curve = Math.max(3.2, Math.min(6.5, distY * 0.18 + 2.5));
+            const cx1 = x1 + curve;
+            const cx2 = x2 - curve;
+            const d = `M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`;
+
+            // Permanent Bezier path
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', `url(#j1-grad-${p.id})`);
+            path.setAttribute('stroke-width', '0.72');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('filter', `url(#j1-shadow-${p.id})`);
+            path.setAttribute('marker-end', `url(#j1-arrow-${p.id})`);
+            svg.appendChild(path);
+
+            // Left anchor circle dot
+            const startDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            startDot.setAttribute('cx', x1);
+            startDot.setAttribute('cy', y1);
+            startDot.setAttribute('r', '0.85');
+            startDot.setAttribute('fill', p.from);
+            startDot.setAttribute('stroke', '#ffffff');
+            startDot.setAttribute('stroke-width', '0.3');
+            svg.appendChild(startDot);
+
+            // Right anchor circle dot
+            const endDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            endDot.setAttribute('cx', x2);
+            endDot.setAttribute('cy', y2);
+            endDot.setAttribute('r', '0.85');
+            endDot.setAttribute('fill', p.to);
+            endDot.setAttribute('stroke', '#ffffff');
+            endDot.setAttribute('stroke-width', '0.3');
+            svg.appendChild(endDot);
+
+            // Animate stroke draw-in
+            const len = path.getTotalLength();
+            path.style.strokeDasharray = len;
+            path.style.strokeDashoffset = len;
+            path.animate(
+              [{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
+              { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' }
+            );
+
+            // Pop completed word into the corresponding result box
+            const targetResBox = leftOpt.resBox || rightOpt.resBox;
+            if (targetResBox) {
+              const resWord = document.createElement('div');
+              resWord.style.position = 'absolute';
+              resWord.style.left = targetResBox.left + '%';
+              resWord.style.top = targetResBox.top + '%';
+              resWord.style.width = targetResBox.width + '%';
+              resWord.style.height = targetResBox.height + '%';
+              resWord.style.display = 'flex';
+              resWord.style.alignItems = 'center';
+              resWord.style.justifyContent = 'center';
+              resWord.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
+              resWord.style.fontSize = 'calc(var(--img-width) * 0.024)';
+              resWord.style.fontWeight = '800';
+              resWord.style.color = '#1e3a8a';
+              resWord.style.letterSpacing = '0.5px';
+              resWord.style.textShadow = '0 1px 2px rgba(255,255,255,0.85)';
+              resWord.style.pointerEvents = 'none';
+              resWord.style.zIndex = '24';
+              resWord.textContent = leftOpt.word || (leftOpt.text + rightOpt.text);
+              imgContainer.appendChild(resWord);
+
+              resWord.animate([
+                { transform: 'scale(0.5) translateY(4px)', opacity: 0 },
+                { transform: 'scale(1.15) translateY(-2px)', opacity: 0.95, offset: 0.7 },
+                { transform: 'scale(1) translateY(0)', opacity: 1 }
+              ], { duration: 450, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'forwards' });
+
+              // Sparkle burst
+              const sparkle = document.createElement('div');
+              sparkle.style.position = 'absolute';
+              sparkle.style.left = (targetResBox.left + targetResBox.width / 2) + '%';
+              sparkle.style.top = (targetResBox.top + targetResBox.height / 2) + '%';
+              sparkle.style.transform = 'translate(-50%, -50%)';
+              sparkle.style.pointerEvents = 'none';
+              sparkle.style.zIndex = '35';
+              sparkle.style.fontSize = 'calc(var(--img-width) * 0.022)';
+              sparkle.textContent = '✨';
+              imgContainer.appendChild(sparkle);
+              sparkle.animate([
+                { transform: 'translate(-50%, -50%) scale(0.2) rotate(0deg)', opacity: 1 },
+                { transform: 'translate(-50%, -130%) scale(1.3) rotate(45deg)', opacity: 1, offset: 0.6 },
+                { transform: 'translate(-50%, -180%) scale(0.8) rotate(90deg)', opacity: 0 }
+              ], { duration: 600, easing: 'ease-out' }).onfinish = () => sparkle.remove();
+            }
+
+            // Sound feedback
+            if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+              try { window.SoundSystem.playClick(); } catch (_) {}
+            }
+
+            const fb = document.getElementById('j1-feedback');
+            if (fb) fb.textContent = '';
+
+            // Check if all pairs are solved
+            if (this.currentActivityState.lines.length === Object.keys(activity.matches).length) {
+              if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+                try { window.SoundSystem.playSuccess(); } catch (_) {}
+              }
+              setTimeout(() => {
+                this.validateJourney1Activity(activity);
+              }, 700);
+            }
+          };
 
           const setupMatchBtn = (opt, isLeft) => {
             const btn = document.createElement('div');
+            btn.className = 'j1-match-pill-btn';
+            btn.dataset.id = opt.id;
+            btn.dataset.isLeft = isLeft ? 'true' : 'false';
             btn.style.position = 'absolute';
-            btn.style.left = opt.left + '%'; btn.style.top = opt.top + '%';
-            btn.style.width = opt.width + '%'; btn.style.height = opt.height + '%';
+            btn.style.left = opt.left + '%';
+            btn.style.top = opt.top + '%';
+            btn.style.width = opt.width + '%';
+            btn.style.height = opt.height + '%';
             btn.style.cursor = 'pointer';
-            btn.style.borderRadius = '10px';
+            btn.style.borderRadius = '12px';
             btn.style.zIndex = '20';
             btn.style.background = 'rgba(255, 255, 255, 0.01)';
-            btn.style.transition = 'transform 0.2s ease, background 0.2s ease';
+            btn.style.transition = 'transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease';
 
-            btn.onmouseenter = () => { if (!btn.classList.contains('match-left-active')) btn.style.transform = 'scale(1.05)'; };
-            btn.onmouseleave = () => { if (!btn.classList.contains('match-left-active')) btn.style.transform = 'scale(1)'; };
+            pillEntries.push({ opt, isLeft, el: btn });
 
-            btn.onclick = () => {
-              if (isLeft) {
-                if (this.currentActivityState.selected.has(opt.id)) return;
-                document.querySelectorAll('.match-left-active').forEach(e => {
-                  e.style.border = 'none'; e.classList.remove('match-left-active'); e.style.transform = 'scale(1)';
-                });
-                btn.style.border = '3px solid #0984e3';
-                btn.style.transform = 'scale(1.05)';
-                btn.classList.add('match-left-active');
-                currentLeft = opt;
-              } else {
-                if (this.currentActivityState.selected.has(opt.id) || !currentLeft) return;
-
-                if (activity.matches[currentLeft.id] === opt.id) {
-                  // Correct pair!
-                  this.currentActivityState.selected.add(currentLeft.id);
-                  this.currentActivityState.selected.add(opt.id);
-                  this.currentActivityState.lines.push({ l: currentLeft.id, r: opt.id });
-
-                  // Smooth curved bezier connector with animated glow
-                  const x1 = currentLeft.left + currentLeft.width;
-                  const y1 = currentLeft.top + currentLeft.height / 2;
-                  const x2 = opt.left;
-                  const y2 = opt.top + opt.height / 2;
-                  const dx = (x2 - x1) * 0.45;
-                  const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
-
-                  // Ensure defs and filter exist
-                  if (!svg.querySelector('#match-glow')) {
-                    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-                    defs.innerHTML = `
-                      <filter id="match-glow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0284c7" flood-opacity="0.35"/>
-                      </filter>
-                      <linearGradient id="match-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#0ea5e9"/>
-                        <stop offset="50%" stop-color="#38bdf8"/>
-                        <stop offset="100%" stop-color="#2563eb"/>
-                      </linearGradient>
-                    `;
-                    svg.insertBefore(defs, svg.firstChild);
-                  }
-
-                  // Path element
-                  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                  path.setAttribute('d', pathD);
-                  path.setAttribute('fill', 'none');
-                  path.setAttribute('stroke', 'url(#match-grad)');
-                  path.setAttribute('stroke-width', '4.5');
-                  path.setAttribute('stroke-linecap', 'round');
-                  path.setAttribute('filter', 'url(#match-glow)');
-                  svg.appendChild(path);
-
-                  // Endpoint dots
-                  const startDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                  startDot.setAttribute('cx', x1 + '%');
-                  startDot.setAttribute('cy', y1 + '%');
-                  startDot.setAttribute('r', '4');
-                  startDot.setAttribute('fill', '#0284c7');
-                  svg.appendChild(startDot);
-
-                  const endDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                  endDot.setAttribute('cx', x2 + '%');
-                  endDot.setAttribute('cy', y2 + '%');
-                  endDot.setAttribute('r', '0');
-                  endDot.setAttribute('fill', '#2563eb');
-                  svg.appendChild(endDot);
-
-                  const len = path.getTotalLength();
-                  path.style.strokeDasharray = len;
-                  path.style.strokeDashoffset = len;
-                  const anim = path.animate(
-                    [{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
-                    { duration: 480, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' }
-                  );
-                  anim.onfinish = () => {
-                    path.style.strokeDashoffset = 0;
-                    endDot.animate([
-                      { r: 0, opacity: 0 },
-                      { r: 6, opacity: 1 },
-                      { r: 4, opacity: 1 }
-                    ], { duration: 250, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'forwards' });
-                  };
-
-                  const targetResBox = currentLeft.resBox || opt.resBox;
-                  if (targetResBox) {
-                    const resBox = document.createElement('div');
-                    resBox.style.position = 'absolute';
-                    resBox.style.left = targetResBox.left + '%';
-                    resBox.style.top = targetResBox.top + '%';
-                    resBox.style.width = targetResBox.width + '%';
-                    resBox.style.height = targetResBox.height + '%';
-                    resBox.style.display = 'flex';
-                    resBox.style.alignItems = 'center';
-                    resBox.style.justifyContent = 'center';
-                    resBox.style.color = '#1e3a8a';
-                    resBox.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-                    resBox.style.fontSize = 'calc(var(--img-width) * 0.026)';
-                    resBox.style.fontWeight = '700';
-                    resBox.style.letterSpacing = '0.5px';
-                    resBox.style.textShadow = '0 1px 2px rgba(255,255,255,0.8)';
-                    resBox.style.pointerEvents = 'none';
-                    resBox.textContent = currentLeft.text + opt.text;
-                    imgContainer.appendChild(resBox);
-
-                    // Elegant pop-in and float animation
-                    resBox.animate([
-                      { transform: 'scale(0.5) translateY(4px)', opacity: 0, filter: 'blur(3px)' },
-                      { transform: 'scale(1.12) translateY(-2px)', opacity: 0.9, filter: 'blur(0px)', offset: 0.7 },
-                      { transform: 'scale(1) translateY(0)', opacity: 1 }
-                    ], { duration: 450, delay: 200, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'both' });
-
-                    // Confetti / sparkle burst at the result box
-                    try {
-                      const conf = document.createElement('div');
-                      conf.style.position = 'absolute';
-                      conf.style.left = (targetResBox.left + targetResBox.width / 2) + '%';
-                      conf.style.top = (targetResBox.top + targetResBox.height / 2) + '%';
-                      conf.style.pointerEvents = 'none';
-                      conf.style.zIndex = '35';
-                      conf.innerHTML = '✨';
-                      conf.style.fontSize = 'calc(var(--img-width) * 0.02)';
-                      imgContainer.appendChild(conf);
-                      conf.animate([
-                        { transform: 'translate(-50%, -50%) scale(0.2) rotate(0deg)', opacity: 1 },
-                        { transform: 'translate(-50%, -120%) scale(1.4) rotate(45deg)', opacity: 1, offset: 0.6 },
-                        { transform: 'translate(-50%, -160%) scale(0.8) rotate(90deg)', opacity: 0 }
-                      ], { duration: 650, delay: 350, easing: 'ease-out' }).onfinish = () => conf.remove();
-                    } catch (e) { }
-                  }
-
-                  // Flash highlight on the completed buttons
-                  [btn, document.querySelector('.match-left-active')].forEach(el => {
-                    if (el) {
-                      el.animate([
-                        { transform: 'scale(1.08)', filter: 'brightness(1.15)' },
-                        { transform: 'scale(1)', filter: 'brightness(1)' }
-                      ], { duration: 350, easing: 'ease-out' });
-                    }
-                  });
-
-                  document.querySelectorAll('.match-left-active').forEach(e => {
-                    e.style.border = 'none'; e.classList.remove('match-left-active'); e.style.transform = 'scale(1)';
-                  });
-                  currentLeft = null;
-
-                  const fb = document.getElementById('j1-feedback');
-                  if (fb) fb.textContent = '';
-                } else {
-                  const fb = document.getElementById('j1-feedback');
-                  if (fb) {
-                    fb.textContent = 'Essaie encore !';
-                    fb.style.color = '#f87171';
-                    window.j1GentleShake(fb);
-                  }
-                  window.j1GentleShake(btn);
-                  document.querySelectorAll('.match-left-active').forEach(e => {
-                    e.style.border = 'none'; e.classList.remove('match-left-active'); e.style.transform = 'scale(1)';
-                  });
-                  currentLeft = null;
-                }
+            btn.onmouseenter = () => {
+              if (!this.currentActivityState.selected.has(opt.id) && activeSelection?.el !== btn) {
+                btn.style.transform = 'scale(1.03)';
+                btn.style.background = 'rgba(255, 255, 255, 0.15)';
               }
             };
+            btn.onmouseleave = () => {
+              if (!this.currentActivityState.selected.has(opt.id) && activeSelection?.el !== btn) {
+                btn.style.transform = 'scale(1)';
+                btn.style.background = 'rgba(255, 255, 255, 0.01)';
+              }
+            };
+
+            btn.addEventListener('pointerdown', e => {
+              if (this.currentActivityState.selected.has(opt.id)) return;
+              dragInfo = {
+                opt,
+                isLeft,
+                el: btn,
+                startX: e.clientX,
+                startY: e.clientY,
+                isDragging: false
+              };
+              try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+            });
+
+            btn.addEventListener('pointermove', e => {
+              if (!dragInfo || dragInfo.opt.id !== opt.id) return;
+              const dist = Math.hypot(e.clientX - dragInfo.startX, e.clientY - dragInfo.startY);
+              if (dist > 7) {
+                dragInfo.isDragging = true;
+                const pt = getContainerPct(e);
+                updatePreview(opt.dotX, opt.dotY, pt.x, pt.y, isLeft);
+              }
+            });
+
+            btn.addEventListener('pointerup', e => {
+              if (!dragInfo || dragInfo.opt.id !== opt.id) return;
+              const wasDragging = dragInfo.isDragging;
+              hidePreview();
+
+              if (wasDragging) {
+                // Find dropped pill target
+                const targetEntry = pillEntries.find(p => {
+                  if (p.isLeft === isLeft || this.currentActivityState.selected.has(p.opt.id)) return false;
+                  const rect = p.el.getBoundingClientRect();
+                  return e.clientX >= rect.left && e.clientX <= rect.right &&
+                         e.clientY >= rect.top && e.clientY <= rect.bottom;
+                });
+
+                if (targetEntry) {
+                  const leftOpt = isLeft ? opt : targetEntry.opt;
+                  const rightOpt = isLeft ? targetEntry.opt : opt;
+                  const leftEl = isLeft ? btn : targetEntry.el;
+                  const rightEl = isLeft ? targetEntry.el : btn;
+
+                  if (activity.matches[leftOpt.id] === rightOpt.id) {
+                    drawConnection(leftOpt, rightOpt, leftEl, rightEl);
+                  } else {
+                    window.j1GentleShake(btn);
+                    window.j1GentleShake(targetEntry.el);
+                    const fb = document.getElementById('j1-feedback');
+                    if (fb) {
+                      fb.textContent = 'Essaie encore !';
+                      fb.style.color = '#f87171';
+                      window.j1GentleShake(fb);
+                    }
+                  }
+                }
+              } else {
+                // Click interaction
+                if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+                  try { window.SoundSystem.playClick(); } catch (_) {}
+                }
+
+                if (!activeSelection) {
+                  // Select first pill
+                  activeSelection = { opt, isLeft, el: btn };
+                  btn.style.boxShadow = '0 0 0 3px #0284c7, 0 4px 14px rgba(2, 132, 199, 0.45)';
+                  btn.style.background = 'rgba(2, 132, 199, 0.12)';
+                  btn.style.transform = 'scale(1.04)';
+                } else if (activeSelection.isLeft === isLeft) {
+                  // Switch selection on same side
+                  activeSelection.el.style.boxShadow = 'none';
+                  activeSelection.el.style.background = 'rgba(255, 255, 255, 0.01)';
+                  activeSelection.el.style.transform = 'scale(1)';
+                  activeSelection = { opt, isLeft, el: btn };
+                  btn.style.boxShadow = '0 0 0 3px #0284c7, 0 4px 14px rgba(2, 132, 199, 0.45)';
+                  btn.style.background = 'rgba(2, 132, 199, 0.12)';
+                  btn.style.transform = 'scale(1.04)';
+                } else {
+                  // Opposing side clicked!
+                  const leftOpt = isLeft ? opt : activeSelection.opt;
+                  const rightOpt = isLeft ? activeSelection.opt : opt;
+                  const leftEl = isLeft ? btn : activeSelection.el;
+                  const rightEl = isLeft ? activeSelection.el : btn;
+
+                  if (activity.matches[leftOpt.id] === rightOpt.id) {
+                    drawConnection(leftOpt, rightOpt, leftEl, rightEl);
+                  } else {
+                    window.j1GentleShake(btn);
+                    window.j1GentleShake(activeSelection.el);
+                    activeSelection.el.style.boxShadow = 'none';
+                    activeSelection.el.style.background = 'rgba(255, 255, 255, 0.01)';
+                    activeSelection.el.style.transform = 'scale(1)';
+                    activeSelection = null;
+
+                    const fb = document.getElementById('j1-feedback');
+                    if (fb) {
+                      fb.textContent = 'Essaie encore !';
+                      fb.style.color = '#f87171';
+                      window.j1GentleShake(fb);
+                    }
+                  }
+                }
+              }
+              dragInfo = null;
+            });
+
             imgContainer.appendChild(btn);
           };
 
@@ -11197,6 +11371,8 @@ ${criteriaSchema}
         } else {
           if (activity.type === 'underline') {
             fb.textContent = "Essaie encore ! Écoute bien le son [z].";
+          } else if (activity.type === 'match') {
+            fb.textContent = "Relie toutes les syllabes pour former les mots !";
           } else {
             fb.textContent = "Oups, ce n'est pas tout à fait ça. Réessaie !";
           }
@@ -11204,7 +11380,7 @@ ${criteriaSchema}
           window.j1GentleShake(fb);
 
           // Optional: hide error after a few seconds or allow immediate retry
-          if (activity.type === 'match' || activity.type === 'sentence') {
+          if (activity.type === 'sentence') {
             setTimeout(() => this.loadJourney1Activity(), 1500);
           }
         }
