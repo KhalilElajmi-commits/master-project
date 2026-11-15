@@ -9642,7 +9642,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
                   { id: '1_3', text: 'à l\'école', left: 61.95, top: 24.97, width: 17.63, height: 6.06, bg: 'rgba(236, 72, 153, 0.22)', border: '#ec4899' },
                   { id: '1_4', text: '.', left: 81.0, top: 25.0, width: 3.8, height: 6.0, bg: 'rgba(148, 163, 184, 0.2)', border: '#94a3b8' }
                 ],
-                displayBox: { left: 11.5, top: 32.2, width: 75.0, height: 4.8 }
+                displayBox: { left: 10.8, top: 32.2, width: 78.0, height: 4.8 }
               },
               {
                 id: 2,
@@ -9653,7 +9653,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
                   { id: '2_3', text: 'rencontre', left: 47.47, top: 38.41, width: 21.05, height: 5.97, bg: 'rgba(236, 72, 153, 0.22)', border: '#ec4899' },
                   { id: '2_4', text: '.', left: 70.21, top: 38.41, width: 5.74, height: 5.97, bg: 'rgba(148, 163, 184, 0.2)', border: '#94a3b8' }
                 ],
-                displayBox: { left: 11.5, top: 45.6, width: 75.0, height: 4.8 }
+                displayBox: { left: 10.8, top: 45.6, width: 78.0, height: 4.8 }
               },
               {
                 id: 3,
@@ -9664,7 +9664,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
                   { id: '3_3', text: 'jouent', left: 48.58, top: 53.05, width: 18.16, height: 6.01, bg: 'rgba(236, 72, 153, 0.22)', border: '#ec4899' },
                   { id: '3_4', text: '.', left: 68.21, top: 53.14, width: 4.63, height: 5.87, bg: 'rgba(148, 163, 184, 0.2)', border: '#94a3b8' }
                 ],
-                displayBox: { left: 11.5, top: 60.1, width: 75.0, height: 4.8 }
+                displayBox: { left: 10.8, top: 60.1, width: 78.0, height: 4.8 }
               },
               {
                 id: 4,
@@ -9675,7 +9675,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
                   { id: '4_3', text: 'chez elles', left: 48.16, top: 67.05, width: 20.47, height: 5.87, bg: 'rgba(236, 72, 153, 0.22)', border: '#ec4899' },
                   { id: '4_4', text: '.', left: 70.26, top: 67.05, width: 5.11, height: 5.87, bg: 'rgba(148, 163, 184, 0.2)', border: '#94a3b8' }
                 ],
-                displayBox: { left: 11.5, top: 74.0, width: 75.0, height: 4.8 }
+                displayBox: { left: 10.8, top: 74.0, width: 78.0, height: 4.8 }
               }
             ],
             valBtnPos: { left: 50.7, top: 100.75, width: 20.0 },
@@ -10155,12 +10155,13 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
             disp.style.height = s.displayBox.height + '%';
             disp.style.display = 'flex';
             disp.style.alignItems = 'center';
-            disp.style.flexWrap = 'wrap';
-            disp.style.gap = '6px';
-            disp.style.padding = '2px 8px';
+            disp.style.flexWrap = 'nowrap';
+            disp.style.whiteSpace = 'nowrap';
+            disp.style.gap = '5px';
+            disp.style.padding = '0';
             disp.style.boxSizing = 'border-box';
             disp.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-            disp.style.fontSize = 'calc(var(--img-width) * 0.024)';
+            disp.style.fontSize = 'calc(var(--img-width) * 0.0165)';
             disp.style.fontWeight = '700';
             disp.style.zIndex = '22';
             imgContainer.appendChild(disp);
@@ -10201,11 +10202,14 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
 
                 // Update text display
                 const wordsOrdered = state.picked.map(pid => s.words.find(wd => wd.id === pid).text);
-                disp.innerHTML = wordsOrdered.map((txt, idx) => `
-                  <span style="background: rgba(255,255,255,0.95); padding: 4px 14px; border-radius: 9999px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 2px solid #0284c7; color: #0369a1; display: inline-flex; align-items: center; line-height: 1.2;">
-                    <span style="color: #64748b; font-size: 0.85em; margin-right: 5px; font-weight: 800;">${idx + 1}.</span>${txt}
-                  </span>
-                `).join('');
+                disp.innerHTML = wordsOrdered.map((txt, idx) => {
+                  const isPeriod = txt === '.';
+                  return `
+                    <span style="background: rgba(255,255,255,0.95); padding: ${isPeriod ? '3px 8px' : '3px 11px'}; border-radius: 9999px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); border: 2px solid #0284c7; color: #0369a1; display: inline-flex; align-items: center; line-height: 1.2; flex-shrink: 0;">
+                      <span style="color: #64748b; font-size: 0.85em; margin-right: 4px; font-weight: 800;">${idx + 1}.</span>${txt}
+                    </span>
+                  `;
+                }).join('');
               };
 
               imgContainer.appendChild(btn);
