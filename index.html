@@ -8278,7 +8278,15 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
         btnBack.onmouseleave = () => { btnBack.style.transform = navBackPos.transform || 'scale(1)'; btnBack.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'; };
         btnBack.onclick = (e) => {
           e.stopPropagation();
-          if (window.j6CurrentAudio) {
+          if (window.j8CurrentAudio) {
+          try {
+            window.j8CurrentAudio.pause();
+            window.j8CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j8CurrentAudio = null;
+        }
+        this._j8ShowingSuccess = false;
+        if (window.j6CurrentAudio) {
             try {
               window.j6CurrentAudio.pause();
               window.j6CurrentAudio.currentTime = 0;
@@ -9687,45 +9695,15 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           {
             src: 'journe 8/4.png',
             type: 'j8-chronology',
-            checkboxes: [
-              { id: 1, label: 'Image 1', left: 8.21, top: 53.12, width: 2.36, height: 3.98, correctNum: 1 },
-              { id: 2, label: 'Image 2', left: 27.98, top: 53.12, width: 2.33, height: 3.98, correctNum: 2 },
-              { id: 3, label: 'Image 3', left: 46.53, top: 53.12, width: 2.26, height: 3.98, correctNum: 3 },
-              { id: 4, label: 'Image 4', left: 61.52, top: 53.18, width: 2.26, height: 3.98, correctNum: 4 }
-            ],
-            sentences: [
-              {
-                order: 1,
-                connector: 'D\'abord, l\'élève',
-                lineTop: 67.89,
-                defaultText: 'arrive à l\'école.',
-                left: 25.0,
-                width: 48.0
-              },
-              {
-                order: 2,
-                connector: 'Ensuite,',
-                lineTop: 75.31,
-                defaultText: 'elle rencontre son amie en classe.',
-                left: 18.0,
-                width: 55.0
-              },
-              {
-                order: 3,
-                connector: 'Puis,',
-                lineTop: 82.73,
-                defaultText: 'elles jouent ensemble dans la cour.',
-                left: 16.0,
-                width: 57.0
-              },
-              {
-                order: 4,
-                connector: 'Enfin,',
-                lineTop: 90.09,
-                defaultText: 'elles rentrent chez elles après l\'école.',
-                left: 17.0,
-                width: 56.0
-              }
+            cards: [
+              // Box 1: Girls on bench eating snacks during recess -> chronological step 3
+              { id: 1, left: 6.7, top: 28.2, width: 19.8, height: 31.7, boxLeft: 14.5, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 3 },
+              // Box 2: Girl walking home along the path at sunset -> chronological step 4
+              { id: 2, left: 28.3, top: 28.0, width: 20.1, height: 31.8, boxLeft: 36.2, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 4 },
+              // Box 3: Meeting classmate in the classroom -> chronological step 2
+              { id: 3, left: 50.2, top: 28.2, width: 20.3, height: 31.6, boxLeft: 58.2, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 2 },
+              // Box 4: Arriving at the school entrance under the « ÉCOLE » sign -> chronological step 1
+              { id: 4, left: 72.2, top: 28.2, width: 21.1, height: 30.8, boxLeft: 80.5, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 1 }
             ],
             valBtnPos: { left: 49.75, top: 102.9, width: 17.1 },
             navPos: {
@@ -10039,58 +10017,47 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
               restoreButton();
               if (!evalRes) throw new Error("Réponse d'évaluation vide.");
 
-              // Populate Aide box with detailed Gemini feedback card
+              // Populate Aide box with joyful encouragement (without exposing dry criteria or question scores)
               if (aideBox) {
-                const badgeColor = evalRes.isAccepted ? '#16a34a' : '#ef4444';
-                const badgeBg = evalRes.isAccepted ? '#dcfce7' : '#fee2e2';
-                const headerText = evalRes.isAccepted ? '⭐ Validé par Gemini' : '📝 Évaluation Gemini';
-
-                const qf = evalRes.questionFeedback || {};
-                const qItems = [1, 2, 3, 4].map(num => {
-                  const item = qf[`Q${num}`] || {};
-                  const isOk = Boolean(item.correct);
-                  const icon = isOk ? '✅' : '⚠️';
-                  const clr = isOk ? '#15803d' : '#b91c1c';
-                  const inputEl = inputElements[num];
-                  if (inputEl) {
-                    inputEl.style.borderColor = isOk ? '#16a34a' : '#ef4444';
-                    inputEl.style.background = isOk ? '#f0fdf4' : '#fef2f2';
-                  }
-                  return `
-                    <div style="display:flex; align-items:flex-start; gap:4px; font-size:calc(var(--img-width) * 0.0115); margin-bottom:2px; text-align:left;">
-                      <span>${icon}</span>
-                      <span style="color:${clr}; font-weight:700;">Q${num}:</span>
-                      <span style="color:#334155; line-height:1.2;">${item.feedback || ''}</span>
-                    </div>
-                  `;
-                }).join('');
-
                 aideBox.style.pointerEvents = 'auto';
-                aideBox.style.justifyContent = 'flex-start';
+                aideBox.style.justifyContent = 'center';
                 aideBox.style.background = 'rgba(255, 255, 255, 0.96)';
                 aideBox.style.borderRadius = '14px';
                 aideBox.style.boxShadow = '0 4px 14px rgba(0,0,0,0.08)';
-                aideBox.style.overflowY = 'auto';
-                aideBox.style.maxHeight = (activity.aideBox ? activity.aideBox.height : 24.2) + '%';
-                aideBox.style.padding = '8px 10px';
-                aideBox.innerHTML = `
-                  <div style="width:100%; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #cbd5e1; padding-bottom:3px; margin-bottom:4px;">
-                    <span style="font-size:calc(var(--img-width) * 0.013); font-weight:800; color:${badgeColor};">${headerText}</span>
-                    <span style="background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:calc(var(--img-width) * 0.0125); padding:1px 6px; border-radius:9999px;">${evalRes.score} / 9</span>
-                  </div>
-                  <div style="width:100%; display:flex; justify-content:space-around; font-size:calc(var(--img-width) * 0.011); font-weight:700; color:#475569; margin-bottom:4px; background:#f8fafc; padding:2px 4px; border-radius:4px;">
-                    <span>C1: ${evalRes.criteria.C1.score}/4.5</span>
-                    <span>C3: ${evalRes.criteria.C3.score}/3.0</span>
-                    <span>C6: ${evalRes.criteria.C6.score}/1.5</span>
-                  </div>
-                  <div style="width:100%; margin-bottom:4px;">
-                    ${qItems}
-                  </div>
-                  <div style="font-size:calc(var(--img-width) * 0.0115); font-weight:600; color:#1e293b; line-height:1.25; background:rgba(255,255,255,0.7); border-radius:4px; padding:3px 5px; text-align:left;">
-                    ${evalRes.feedback || ''}
-                    ${evalRes.suggestions ? `<div style="color:#0284c7; font-weight:700; margin-top:2px;">💡 ${evalRes.suggestions}</div>` : ''}
-                  </div>
-                `;
+                aideBox.style.padding = '10px 14px';
+
+                if (evalRes.isAccepted) {
+                  // Turn all inputs green
+                  [1, 2, 3, 4].forEach(num => {
+                    const inputEl = inputElements[num];
+                    if (inputEl) {
+                      inputEl.style.borderColor = '#16a34a';
+                      inputEl.style.background = '#f0fdf4';
+                    }
+                  });
+
+                  aideBox.innerHTML = `
+                    <div style="font-size:calc(var(--img-width) * 0.0165); font-weight:800; color:#16a34a; margin-bottom:5px;">
+                      🎉 Bravo !
+                    </div>
+                    <div style="font-size:calc(var(--img-width) * 0.0135); font-weight:700; color:#15803d; line-height:1.35; margin-bottom:6px;">
+                      Excellent travail ! Tu as très bien compris l'histoire et répondu avec succès à toutes les questions !
+                    </div>
+                    <div style="font-size:calc(var(--img-width) * 0.012); font-weight:600; color:#334155; line-height:1.3;">
+                      Félicitations pour ton sérieux ! Clique sur Continuer pour passer à l'activité suivante.
+                    </div>
+                  `;
+                } else {
+                  aideBox.innerHTML = `
+                    <div style="font-size:calc(var(--img-width) * 0.015); font-weight:800; color:#0284c7; margin-bottom:4px;">
+                      💡 Conseils :
+                    </div>
+                    <div style="font-size:calc(var(--img-width) * 0.013); font-weight:600; color:#334155; line-height:1.3;">
+                      Observe bien les 4 images de l'histoire pour trouver les personnages, le lieu, le moment et ce qu'elles font ensemble. Tu peux y arriver !
+                    </div>
+                  `;
+                }
+
                 aideBox.animate([
                   { transform: 'scale(0.97)' },
                   { transform: 'scale(1)' }
@@ -10108,15 +10075,16 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
 
                 fb.style.display = 'block';
                 fb.style.color = '#16a34a';
-                fb.textContent = "⭐ Excellent travail ! Tu as réussi l'activité. Clique sur Continuer !";
+                fb.textContent = "⭐ Bravo ! Tu as réussi l'activité !";
 
-                if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
-                  window.SoundSystem.playSuccess();
-                }
+                // Show encouragement modal from contiuer/ with audio and celebration!
+                setTimeout(() => {
+                  this.showJourney8SuccessPopup();
+                }, 600);
               } else {
                 fb.style.display = 'block';
                 fb.style.color = '#ef4444';
-                fb.textContent = "Tu peux améliorer tes réponses. Regarde les conseils ci-dessus et réessaie !";
+                fb.textContent = "Tu peux améliorer tes réponses. Observe bien les images et réessaie !";
                 if (window.j1GentleShake) window.j1GentleShake(fb);
               }
             })
@@ -10225,6 +10193,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           btnWrapper.style.zIndex = '35';
 
           const vbtn = document.createElement('img');
+          vbtn.id = 'j8-val-btn';
           vbtn.src = 'journe 1/valider.png';
           vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
@@ -10273,6 +10242,11 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
               ], { duration: 320 });
               fb.textContent = 'Bravo ! Toutes tes phrases sont parfaitement ordonnées !';
               fb.style.color = '#16a34a';
+
+              // Show encouragement modal from contiuer/ with audio and celebration!
+              setTimeout(() => {
+                this.showJourney8SuccessPopup();
+              }, 600);
             } else {
               fb.textContent = 'L\'ordre de certains mots n\'est pas correct. Pense à la majuscule et au point !';
               fb.style.color = '#dc2626';
@@ -10284,110 +10258,185 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           imgContainer.appendChild(btnWrapper);
         }
 
-        // --- ACTIVITY 4: CHRONOLOGY & CONNECTORS (J'organise mon histoire) ---
+        // --- ACTIVITY 3: CHRONOLOGY / SELECT IMAGES BY ORDER (J'organise mon histoire) ---
         else if (activity.type === 'j8-chronology') {
-          const userOrder = {}; // checkbox id -> chosen number (1..4)
-          const connectorTexts = {};
-          let nextNumberToAssign = 1;
+          const selectedOrder = {}; // card id -> assigned step (1..4)
           let isAnswerCorrect = false;
 
-          // Checkboxes setup
-          activity.checkboxes.forEach(cb => {
-            const el = document.createElement('div');
-            el.id = 'j8-cb-' + cb.id;
-            el.style.position = 'absolute';
-            el.style.left = cb.left + '%';
-            el.style.top = cb.top + '%';
-            el.style.width = cb.width + '%';
-            el.style.height = cb.height + '%';
-            el.style.cursor = 'pointer';
-            el.style.borderRadius = '6px';
-            el.style.display = 'flex';
-            el.style.alignItems = 'center';
-            el.style.justifyContent = 'center';
-            el.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-            el.style.fontSize = 'calc(var(--img-width) * 0.016)';
-            el.style.fontWeight = '900';
-            el.style.color = '#ffffff';
-            el.style.backgroundColor = 'transparent';
-            el.style.border = '2px solid transparent';
-            el.style.transition = 'all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)';
-            el.style.zIndex = '25';
-            el.title = cb.label + ' (Cliquer pour numéroter l\'image 1 à 4)';
+          const cards = activity.cards || [
+            { id: 1, left: 6.7, top: 28.2, width: 19.8, height: 31.7, boxLeft: 14.5, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 3 },
+            { id: 2, left: 28.3, top: 28.0, width: 20.1, height: 31.8, boxLeft: 36.2, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 4 },
+            { id: 3, left: 50.2, top: 28.2, width: 20.3, height: 31.6, boxLeft: 58.2, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 2 },
+            { id: 4, left: 72.2, top: 28.2, width: 21.1, height: 30.8, boxLeft: 80.5, boxTop: 60.5, boxW: 4.5, boxH: 6.0, correctOrder: 1 }
+          ];
 
-            el.onclick = () => {
-              if (isAnswerCorrect) return;
-              if (userOrder[cb.id] !== undefined) {
-                delete userOrder[cb.id];
-                el.innerHTML = '';
-                el.style.backgroundColor = 'transparent';
-                el.style.border = '2px solid transparent';
-              } else {
-                // Find smallest unassigned number 1..4
-                const used = Object.values(userOrder);
-                let pickNum = 1;
-                while (used.includes(pickNum) && pickNum <= 4) pickNum++;
-                if (pickNum <= 4) {
-                  userOrder[cb.id] = pickNum;
-                  el.innerHTML = pickNum;
-                  el.style.backgroundColor = '#0284c7';
-                  el.style.border = '2px solid #38bdf8';
-                  el.style.boxShadow = '0 0 10px rgba(2, 132, 199, 0.6)';
-                  el.animate([
-                    { transform: 'scale(0.8)' },
-                    { transform: 'scale(1.15)' },
-                    { transform: 'scale(1)' }
-                  ], { duration: 200 });
-                }
+          const cardElements = {};
+          const badgeElements = {};
+          const boxBadgeElements = {};
+
+          const updateCardVisuals = (cardId) => {
+            const cardEl = cardElements[cardId];
+            const badgeEl = badgeElements[cardId];
+            const boxBadgeEl = boxBadgeElements[cardId];
+            const num = selectedOrder[cardId];
+
+            if (num !== undefined) {
+              // Highlight card
+              if (cardEl) {
+                cardEl.style.borderColor = '#0284c7';
+                cardEl.style.backgroundColor = 'rgba(2, 132, 199, 0.12)';
+                cardEl.style.boxShadow = '0 0 14px rgba(2, 132, 199, 0.45)';
+                cardEl.style.transform = 'scale(1.02) translateY(-2px)';
+              }
+              // Top-left floating badge on image
+              if (badgeEl) {
+                badgeEl.style.display = 'flex';
+                badgeEl.textContent = num;
+                badgeEl.animate([
+                  { transform: 'scale(0.5)' },
+                  { transform: 'scale(1.2)' },
+                  { transform: 'scale(1)' }
+                ], { duration: 220, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+              }
+              // Number badge inside white box below image
+              if (boxBadgeEl) {
+                boxBadgeEl.innerHTML = `
+                  <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Quicksand','Nunito',sans-serif; font-size:calc(var(--img-width) * 0.024); font-weight:900; color:#0284c7; text-shadow:0 1px 2px rgba(0,0,0,0.12);">
+                    ${num}
+                  </div>
+                `;
+                boxBadgeEl.animate([
+                  { transform: 'scale(0.6)' },
+                  { transform: 'scale(1.15)' },
+                  { transform: 'scale(1)' }
+                ], { duration: 200 });
+              }
+            } else {
+              // Reset card
+              if (cardEl) {
+                cardEl.style.borderColor = 'transparent';
+                cardEl.style.backgroundColor = 'transparent';
+                cardEl.style.boxShadow = 'none';
+                cardEl.style.transform = 'scale(1)';
+              }
+              if (badgeEl) {
+                badgeEl.style.display = 'none';
+                badgeEl.textContent = '';
+              }
+              if (boxBadgeEl) {
+                boxBadgeEl.innerHTML = '';
+              }
+            }
+          };
+
+          const handleCardClick = (cardId) => {
+            if (isAnswerCorrect) return;
+
+            if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+              window.SoundSystem.playClick();
+            }
+
+            if (selectedOrder[cardId] !== undefined) {
+              // Deselect
+              delete selectedOrder[cardId];
+              updateCardVisuals(cardId);
+            } else {
+              // Find smallest unassigned step number 1..4
+              const used = Object.values(selectedOrder);
+              let nextNum = 1;
+              while (used.includes(nextNum) && nextNum <= 4) nextNum++;
+              if (nextNum <= 4) {
+                selectedOrder[cardId] = nextNum;
+                updateCardVisuals(cardId);
+              }
+            }
+          };
+
+          // Build clickable hotspots and number badges for the 4 images
+          cards.forEach(card => {
+            // Hotspot covering the image card
+            const cardEl = document.createElement('div');
+            cardEl.id = 'j8-card-' + card.id;
+            cardEl.style.position = 'absolute';
+            cardEl.style.left = card.left + '%';
+            cardEl.style.top = card.top + '%';
+            cardEl.style.width = card.width + '%';
+            cardEl.style.height = card.height + '%';
+            cardEl.style.cursor = 'pointer';
+            cardEl.style.borderRadius = '14px';
+            cardEl.style.border = '3px solid transparent';
+            cardEl.style.backgroundColor = 'transparent';
+            cardEl.style.transition = 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            cardEl.style.zIndex = '25';
+            cardEl.title = 'Cliquer pour numéroter cette image (1 à 4)';
+
+            cardEl.onmouseenter = () => {
+              if (!selectedOrder[card.id] && !isAnswerCorrect) {
+                cardEl.style.borderColor = 'rgba(2, 132, 199, 0.5)';
+                cardEl.style.backgroundColor = 'rgba(2, 132, 199, 0.06)';
+                cardEl.style.transform = 'scale(1.015)';
               }
             };
+            cardEl.onmouseleave = () => {
+              if (!selectedOrder[card.id] && !isAnswerCorrect) {
+                cardEl.style.borderColor = 'transparent';
+                cardEl.style.backgroundColor = 'transparent';
+                cardEl.style.transform = 'scale(1)';
+              }
+            };
+            cardEl.onclick = () => handleCardClick(card.id);
 
-            imgContainer.appendChild(el);
+            // Floating circular badge at top-left of image
+            const badgeEl = document.createElement('div');
+            badgeEl.id = 'j8-badge-' + card.id;
+            badgeEl.style.position = 'absolute';
+            badgeEl.style.top = '8px';
+            badgeEl.style.left = '8px';
+            badgeEl.style.width = '32px';
+            badgeEl.style.height = '32px';
+            badgeEl.style.borderRadius = '50%';
+            badgeEl.style.background = 'linear-gradient(135deg, #0284c7, #0369a1)';
+            badgeEl.style.color = '#ffffff';
+            badgeEl.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
+            badgeEl.style.fontSize = '17px';
+            badgeEl.style.fontWeight = '900';
+            badgeEl.style.display = 'none';
+            badgeEl.style.alignItems = 'center';
+            badgeEl.style.justifyContent = 'center';
+            badgeEl.style.boxShadow = '0 3px 8px rgba(0,0,0,0.3)';
+            badgeEl.style.border = '2px solid #ffffff';
+            badgeEl.style.pointerEvents = 'none';
+            badgeEl.style.zIndex = '26';
+            cardEl.appendChild(badgeEl);
+
+            cardElements[card.id] = cardEl;
+            badgeElements[card.id] = badgeEl;
+            imgContainer.appendChild(cardEl);
+
+            // Clickable square box below each image (matching sheet's white square)
+            const boxBadgeEl = document.createElement('div');
+            boxBadgeEl.id = 'j8-box-badge-' + card.id;
+            boxBadgeEl.style.position = 'absolute';
+            boxBadgeEl.style.left = card.boxLeft + '%';
+            boxBadgeEl.style.top = card.boxTop + '%';
+            boxBadgeEl.style.width = card.boxW + '%';
+            boxBadgeEl.style.height = card.boxH + '%';
+            boxBadgeEl.style.cursor = 'pointer';
+            boxBadgeEl.style.borderRadius = '8px';
+            boxBadgeEl.style.display = 'flex';
+            boxBadgeEl.style.alignItems = 'center';
+            boxBadgeEl.style.justifyContent = 'center';
+            boxBadgeEl.style.zIndex = '26';
+            boxBadgeEl.title = 'Cliquer pour numéroter cette image';
+            boxBadgeEl.onclick = () => handleCardClick(card.id);
+
+            boxBadgeElements[card.id] = boxBadgeEl;
+            imgContainer.appendChild(boxBadgeEl);
           });
 
-          // Text lines for sentence completion
-          activity.sentences.forEach(s => {
-            const inputEl = document.createElement('input');
-            inputEl.type = 'text';
-            inputEl.placeholder = 'Complète: ' + s.defaultText;
-            inputEl.value = s.defaultText; // pre-filled for convenience, editable by student
-            connectorTexts[s.order] = s.defaultText;
-            inputEl.style.position = 'absolute';
-            inputEl.style.left = s.left + '%';
-            inputEl.style.top = (s.lineTop - 2.5) + '%';
-            inputEl.style.width = s.width + '%';
-            inputEl.style.height = '3.5%';
-            inputEl.style.background = 'rgba(255, 255, 255, 0.88)';
-            inputEl.style.border = '1.8px solid rgba(2, 132, 199, 0.35)';
-            inputEl.style.borderRadius = '9999px';
-            inputEl.style.padding = '0 14px';
-            inputEl.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-            inputEl.style.fontSize = 'calc(var(--img-width) * 0.014)';
-            inputEl.style.fontWeight = '700';
-            inputEl.style.color = '#0f172a';
-            inputEl.style.outline = 'none';
-            inputEl.style.zIndex = '22';
-            inputEl.style.transition = 'all 0.18s ease';
-
-            inputEl.onfocus = () => {
-              inputEl.style.borderColor = '#0284c7';
-              inputEl.style.background = '#ffffff';
-              inputEl.style.boxShadow = '0 0 10px rgba(2, 132, 199, 0.35)';
-            };
-            inputEl.onblur = () => {
-              inputEl.style.borderColor = 'rgba(2, 132, 199, 0.35)';
-              inputEl.style.background = 'rgba(255, 255, 255, 0.88)';
-              inputEl.style.boxShadow = 'none';
-            };
-            inputEl.oninput = (e) => {
-              connectorTexts[s.order] = e.target.value.trim();
-            };
-
-            imgContainer.appendChild(inputEl);
-          });
-
-          // Valider button at bottom with tip touching inside
+          // Valider button
           const btnWrapper = document.createElement('div');
+          btnWrapper.id = 'j8-act3-val-btn-wrapper';
           btnWrapper.style.position = 'absolute';
           btnWrapper.style.left = activity.valBtnPos.left + '%';
           btnWrapper.style.top = activity.valBtnPos.top + '%';
@@ -10395,6 +10444,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           btnWrapper.style.zIndex = '35';
 
           const vbtn = document.createElement('img');
+          vbtn.id = 'j8-act3-val-btn';
           vbtn.src = 'journe 1/valider.png';
           vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
@@ -10411,7 +10461,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
             }
 
             const fb = createFeedback(activity.valBtnPos.top - 5.5);
-            const assignedCount = Object.keys(userOrder).length;
+            const assignedCount = Object.keys(selectedOrder).length;
 
             if (assignedCount < 4) {
               fb.textContent = 'Numérote les 4 images de 1 à 4 pour organiser l\'histoire !';
@@ -10420,9 +10470,14 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
               return;
             }
 
+            // Check correctness:
+            // Card 4 (Arrival at school) -> 1
+            // Card 3 (In classroom meeting friend) -> 2
+            // Card 1 (Playing in courtyard) -> 3
+            // Card 2 (Walking home at sunset) -> 4
             let orderOk = true;
-            activity.checkboxes.forEach(cb => {
-              if (userOrder[cb.id] !== cb.correctNum) {
+            cards.forEach(c => {
+              if (selectedOrder[c.id] !== c.correctOrder) {
                 orderOk = false;
               }
             });
@@ -10435,10 +10490,26 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
                 { transform: 'scale(1.2)' },
                 { transform: 'scale(1)' }
               ], { duration: 320 });
-              fb.textContent = 'Bravo ! La chronologie de ton histoire est parfaite !';
+
+              // Green highlights on cards
+              cards.forEach(c => {
+                const el = cardElements[c.id];
+                if (el) {
+                  el.style.borderColor = '#16a34a';
+                  el.style.backgroundColor = 'rgba(22, 163, 74, 0.12)';
+                  el.style.boxShadow = '0 0 14px rgba(22, 163, 74, 0.4)';
+                }
+              });
+
+              fb.textContent = '⭐ Bravo ! L\'ordre chronologique de ton histoire est parfait !';
               fb.style.color = '#16a34a';
+
+              // Show encouragement modal from contiuer/ with audio and celebration!
+              setTimeout(() => {
+                this.showJourney8SuccessPopup();
+              }, 600);
             } else {
-              fb.textContent = 'L\'ordre des images n\'est pas tout à fait exact. Observe les étapes de la journée !';
+              fb.textContent = 'L\'ordre des images n\'est pas tout à fait exact. Observe bien les étapes de la journée !';
               fb.style.color = '#dc2626';
               if (window.j1GentleShake) window.j1GentleShake(fb);
             }
@@ -10530,6 +10601,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
           btnWrapper.style.zIndex = '35';
 
           const vbtn = document.createElement('img');
+          vbtn.id = 'j8-final-val-btn';
           vbtn.src = 'journe 1/valider.png';
           vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
@@ -10564,6 +10636,11 @@ Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en d
             ], { duration: 320 });
             fb.textContent = 'Félicitations ! Ton mini-projet d\'écriture est un grand succès !';
             fb.style.color = '#16a34a';
+
+            // Show encouragement modal from contiuer/ with audio and celebration!
+            setTimeout(() => {
+              this.showJourney8SuccessPopup();
+            }, 600);
           };
 
           btnWrapper.appendChild(vbtn);
@@ -19207,6 +19284,318 @@ showJourney2EndCelebration() {
             if (window.j1GentleShake) window.j1GentleShake(fb);
           }
         }
+      },
+
+      showJourney8SuccessPopup(onCustomContinue) {
+        if (this._j8ShowingSuccess) return;
+        this._j8ShowingSuccess = true;
+
+        const CONTINUER_IMAGES = [
+          'contiuer/bien joue.png',
+          'contiuer/excellent.png',
+          'contiuer/parfait.png',
+          'contiuer/super.png'
+        ];
+
+        // Shuffle deck: cycles through all 4 celebration photos in randomized order before repeating
+        if (!this.j8SuccessDeck || this.j8SuccessDeck.length === 0) {
+          const deck = [...CONTINUER_IMAGES];
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          if (deck[0] === this.lastJ8SuccessCard && deck.length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+          }
+          this.j8SuccessDeck = deck;
+        }
+
+        const chosenSrc = this.j8SuccessDeck.shift();
+        this.lastJ8SuccessCard = chosenSrc;
+
+        // Hide stray feedback and validation buttons
+        const fb = document.getElementById('j8-feedback');
+        if (fb) {
+          fb.textContent = '';
+          fb.style.display = 'none';
+        }
+        document.querySelectorAll('#j8-val-btn, #j8-act3-val-btn, #j8-final-val-btn, [id*="-val-btn"]').forEach(b => {
+          if (b) b.style.display = 'none';
+        });
+
+        // Web Audio synthesized sound generator for fireworks bursts and chimes
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            // Soft celebratory pop sound
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            // Twinkling spark chime
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        // Play specific celebration audio corresponding to the chosen photo
+        const AUDIO_MAP = {
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+          'contiuer/super.png': 'contiuer/super.mp3'
+        };
+
+        let cardAudio = null;
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+        if (targetAudioSrc) {
+          try {
+            if (window.j8CurrentAudio) {
+              window.j8CurrentAudio.pause();
+              window.j8CurrentAudio.currentTime = 0;
+            }
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+            window.j8CurrentAudio = cardAudio;
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+          } catch (e) {
+            console.warn('Card audio play error:', e);
+          }
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+          window.SoundSystem.playSuccess();
+        }
+
+        // Remove any pre-existing modal if present
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        // FULL SCREEN MODAL: attached to document.body so the blur covers the entire website!
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        // Background Fireworks Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        // Initial burst triplet
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        // Continuous festive bursts while card is showing
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Center Celebration Card
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-success-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = chosenSrc;
+        cardImg.alt = 'Bravo !';
+        cardImg.draggable = false;
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'j1-success-continue-btn';
+        continueBtn.setAttribute('title', 'Continuer vers la prochaine activité');
+        continueBtn.setAttribute('aria-label', 'Continuer');
+
+        let clicked = false;
+        continueBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+          this._j8ShowingSuccess = false;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (cardAudio) {
+            try {
+              cardAudio.pause();
+              cardAudio.currentTime = 0;
+            } catch (e) {}
+            cardAudio = null;
+          }
+          if (window.j8CurrentAudio) {
+            try {
+              window.j8CurrentAudio.pause();
+              window.j8CurrentAudio.currentTime = 0;
+            } catch (e) {}
+            window.j8CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            if (fb) fb.style.display = '';
+            if (typeof onCustomContinue === 'function') {
+              onCustomContinue();
+            } else {
+              this.handleJourney8Next();
+            }
+          }, 240);
+        };
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(continueBtn);
+        modal.appendChild(cardBox);
+
+        // Append to document.body for full-screen backdrop and blur across all elements!
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
       },
 
       showJourney5SuccessPopup() {
