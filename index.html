@@ -11748,17 +11748,17 @@ ${criteriaSchema}
             type: 'multiple-choice',
             options: [
               // Row 1 (Comment s'appelle la nouvelle élève ?) -> Caroline is correct
-              { id: 1, group: 1, left: 8.7, top: 30.5, width: 2.9, height: 2.5, box: { left: 6.2, top: 27.5, width: 28.0, height: 8.5 }, correct: false },
-              { id: 2, group: 1, left: 40.0, top: 30.4, width: 2.8, height: 2.5, box: { left: 37.0, top: 27.5, width: 28.0, height: 8.5 }, correct: true },
-              { id: 3, group: 1, left: 69.2, top: 30.4, width: 2.9, height: 3.0, box: { left: 67.0, top: 27.5, width: 28.0, height: 8.5 }, correct: false },
+              { id: 1, group: 1, left: 8.2, top: 30.0, width: 3.2, height: 3.1, box: { left: 6.2, top: 27.5, width: 28.0, height: 8.5 }, correct: false },
+              { id: 2, group: 1, left: 40.3, top: 30.4, width: 2.8, height: 2.7, box: { left: 37.0, top: 27.5, width: 28.0, height: 8.5 }, correct: true },
+              { id: 3, group: 1, left: 69.1, top: 30.4, width: 3.0, height: 2.9, box: { left: 67.0, top: 27.5, width: 28.0, height: 8.5 }, correct: false },
               // Row 2 (Pourquoi le directeur accompagne-t-il Caroline dans la classe ?) -> Pour la présenter aux élèves is correct
-              { id: 4, group: 2, left: 8.5, top: 52.7, width: 2.8, height: 2.7, box: { left: 6.2, top: 49.0, width: 31.0, height: 10.5 }, correct: true },
-              { id: 5, group: 2, left: 41.2, top: 52.8, width: 3.0, height: 2.6, box: { left: 38.5, top: 49.0, width: 28.5, height: 10.5 }, correct: false },
-              { id: 6, group: 2, left: 70.8, top: 53.2, width: 2.7, height: 2.2, box: { left: 68.5, top: 49.0, width: 27.0, height: 10.5 }, correct: false },
+              { id: 4, group: 2, left: 8.1, top: 52.5, width: 3.3, height: 3.2, box: { left: 6.2, top: 49.0, width: 31.0, height: 10.5 }, correct: true },
+              { id: 5, group: 2, left: 40.9, top: 52.5, width: 3.3, height: 3.2, box: { left: 38.5, top: 49.0, width: 28.5, height: 10.5 }, correct: false },
+              { id: 6, group: 2, left: 70.9, top: 52.5, width: 3.2, height: 3.1, box: { left: 68.5, top: 49.0, width: 27.0, height: 10.5 }, correct: false },
               // Row 3 (Que fait Caroline à la fin du texte ?) -> Elle se présente à ses camarades is correct
-              { id: 7, group: 3, left: 8.5, top: 72.4, width: 2.9, height: 3.0, box: { left: 6.2, top: 68.5, width: 28.0, height: 10.5 }, correct: false },
-              { id: 8, group: 3, left: 39.1, top: 72.4, width: 2.8, height: 2.7, box: { left: 36.5, top: 68.5, width: 32.0, height: 10.5 }, correct: true },
-              { id: 9, group: 3, left: 72.7, top: 72.4, width: 3.0, height: 2.6, box: { left: 70.5, top: 68.5, width: 25.0, height: 10.5 }, correct: false }
+              { id: 7, group: 3, left: 8.2, top: 72.1, width: 3.0, height: 2.9, box: { left: 6.2, top: 68.5, width: 28.0, height: 10.5 }, correct: false },
+              { id: 8, group: 3, left: 38.8, top: 72.4, width: 3.2, height: 3.1, box: { left: 36.5, top: 68.5, width: 32.0, height: 10.5 }, correct: true },
+              { id: 9, group: 3, left: 72.5, top: 72.3, width: 3.2, height: 3.1, box: { left: 70.5, top: 68.5, width: 25.0, height: 10.5 }, correct: false }
             ],
             needsValidation: true,
             valBtnPos: { left: 50, top: 96, width: 22 },
@@ -12063,6 +12063,9 @@ ${criteriaSchema}
             this.currentActivityState.optionElements[opt.id] = hotspot;
 
             const toggleOption = () => {
+              if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+                try { window.SoundSystem.playClick(); } catch (_) {}
+              }
               if (this.currentActivityState.selected.has(opt.id)) {
                 this.currentActivityState.selected.delete(opt.id);
                 hotspot.innerHTML = '';
@@ -12081,7 +12084,7 @@ ${criteriaSchema}
                 }
 
                 this.currentActivityState.selected.add(opt.id);
-                hotspot.innerHTML = '<div style="width: 85%; height: 85%; background: #4ade80; border-radius: 50%; box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);"></div>';
+                hotspot.innerHTML = '<div style="width: 82%; height: 82%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #22c55e 0%, #16a34a 100%); border-radius: 50%; box-shadow: 0 0 8px rgba(34, 197, 94, 0.65);"><svg viewBox="0 0 24 24" style="width: 65%; height: 65%;"><path d="M 4.5 12 L 9.5 17 L 19.5 7" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
                 hotspot.firstElementChild.animate([
                   { transform: 'scale(0)' },
                   { transform: 'scale(1.15)', offset: 0.7 },
