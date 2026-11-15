@@ -2347,6 +2347,18 @@ ${criteriaSchema}
       async evaluateJourney4Activity({ sentence1, sentence2, sentence3 }) {
         return await evaluateJourney4Activity({ sentence1, sentence2, sentence3 });
       },
+
+      buildJourney5Prompt(sentences) {
+        return buildJourney5Prompt(sentences);
+      },
+
+      normalizeJourney5Evaluation(rawText, sentences, usedImageContext = true) {
+        return normalizeJourney5Evaluation(rawText, sentences, usedImageContext, this.model);
+      },
+
+      async evaluateJourney5Activity({ sentences }) {
+        return await evaluateJourney5Activity({ sentences });
+      },
     };
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -2789,11 +2801,183 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
       return normalizeJourney4Evaluation(rawText, s1, s2, s3, Boolean(imagePart), window.GeminiAIService.model);
     }
 
+
+    function buildJourney5Prompt(sentences) {
+      const formattedSentences = (Array.isArray(sentences) ? sentences : []).map((s, idx) => `Phrase ${idx + 1} : """${s}"""`).join('\n');
+      return `Tu es un professeur de français de l'école primaire évaluant la production écrite d'un élève de 4ème année primaire (âgé de 9 à 10 ans) pour l'Activité 4 : « J'écris un petit texte ».
+
+CONSIGNE OFFICIELLE DE L'ACTIVITÉ :
+« Décris l'image en écrivant 4 à 5 phrases. Utilise le verbe être au présent. »
+
+OBJECTIF PÉDAGOGIQUE MAJEUR :
+Produire un court texte cohérent décrivant la salle de classe tout en utilisant correctement le verbe « être » au présent de l'indicatif.
+
+CONTEXTE VISUEL DE L'ILLUSTRATION DE LA CLASSE :
+L'image montre une salle de classe pendant une leçon :
+- Une maîtresse se tient debout au devant de la classe (devant le tableau).
+- La maîtresse porte une veste rose et tient un livre dans ses mains.
+- Plusieurs élèves sont assis à leurs bureaux ou tables.
+- Les élèves sont attentifs, ils écrivent ou regardent vers la maîtresse.
+- Un tableau vert se trouve derrière la maîtresse.
+- Une carte du monde est affichée sur le mur de la classe.
+- L'ambiance de la classe est studieuse, calme et agréable.
+
+BANQUE DE MOTS SUGGÉRÉS :
+la maîtresse, les élèves, la classe, au tableau, attentifs.
+(Ces mots sont de simples suggestions d'aide, non obligatoires).
+
+FORMES DU VERBE ÊTRE AU PRÉSENT PARTICULIÈREMENT PERTINENTES :
+je suis, tu es, il est, elle est, nous sommes, vous êtes, ils sont, elles sont (notamment : elle est, ils sont, la classe est, etc.).
+IMPORTANT : N'exige pas que l'élève utilise toutes les formes conjuguées. Évalue l'utilisation réelle du verbe être dans les phrases produites par l'élève. Ne force pas de structure rigide ni de réponse type : accepte différentes descriptions correctes et naturelles de l'illustration (la maîtresse, les élèves, les tables, le tableau, la classe...). Rejette les descriptions qui contredisent l'image (ex: les élèves sont dans la piscine ou au marché).
+
+PRODUCTION ÉCRITE DE L'ÉLÈVE (${sentences.length} PHRASES SOUMISES) :
+${formattedSentences}
+
+BARÈME OFFICIEL D'ÉVALUATION — STRICTEMENT 9 POINTS AU TOTAL :
+Évalue UNIQUEMENT les 3 critères officiels suivants selon le niveau de 4ème année primaire :
+
+1. C1 — Adéquation avec la situation (Maximum : 4.5 points) :
+   - L'élève produit-il le nombre de phrases requis (4 à 5 phrases) ?
+   - Comprend-il et réalise-t-il la tâche demandée (décrire la classe et les personnages/objets visibles dans l'illustration) ?
+   - Utilise-t-il un vocabulaire adéquat à la situation (la maîtresse, les élèves, le tableau, la classe, les tables/livres) ?
+   - Respecte-t-il la consigne de description sans contredire l'illustration ?
+   (Rappel : La correction grammaticale du verbe être relève de C3 et ne doit pas être pénalisée deux fois sous C1).
+   (Si l'élève produit moins de 4 phrases, pénalise C1 proportionnellement).
+
+2. C3 — Correction linguistique (Maximum : 3.0 points) :
+   - Agencement correct des mots dans chaque phrase (ordre sujet-verbe-complément).
+   - Respect des accords grammaticaux étudiés (accords en genre et nombre, accord sujet-verbe).
+   - ATTENTION PARTICULIÈRE : Conjugaison correcte du verbe « être » au présent de l'indicatif (ex: « La maîtresse est... », « Les élèves sont... », « La classe est... »).
+   - Respect de la ponctuation forte (majuscule en début de phrase, point à la fin).
+   (Prends en compte le niveau d'un élève d'école primaire).
+
+3. C6 — Richesse du vocabulaire (Maximum : 1.5 points) :
+   - Emploi d'un vocabulaire varié et adapté à l'école primaire.
+   - Utilisation d'adjectifs qualificatifs, compléments du nom ou phrases enrichies lorsque approprié.
+   (Rappel : ne pénalise pas excessivement un texte simple mais correct ; n'exige pas tous les mots de la banque).
+
+CRITÈRES EXCLUS (NE PAS ÉVALUER NI PÉNALISER) :
+- Ne pas évaluer C2, C4 ou C5. N'utilise pas C7.
+
+RÈGLE STRICTE SUR LE CHARABIA, LE VIDE OU LE HORS-SUJET :
+Si le texte est vide, constitué de lettres aléatoires ou charabia (ex: "zdzadz", "asdfgh"), ou totalement hors-sujet, attribue 0 point à chaque critère (C1: 0, C3: 0, C6: 0, Total = 0 / 9).
+
+FORMAT DE RÉPONSE JSON STRICTEMENT OBLIGATOIRE :
+Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en dehors de l'objet) :
+{
+  "criteria": {
+    "C1": { "name": "Adéquation avec la situation", "score": 0, "max": 4.5, "justification": "" },
+    "C3": { "name": "Correction linguistique", "score": 0, "max": 3.0, "justification": "" },
+    "C6": { "name": "Richesse du vocabulaire", "score": 0, "max": 1.5, "justification": "" }
+  },
+  "feedback": "Commentaire encourageant et bienveillant en français",
+  "suggestions": "Conseils pédagogiques constructifs pour progresser"
+}`;
+    }
+
+    function normalizeJourney5Evaluation(rawText, sentences, usedImageContext, modelName) {
+      if (!rawText || typeof rawText !== "string") {
+        throw new Error("Réponse vide reçue de Gemini pour la correction de l'activité 4.");
+      }
+      let clean = rawText.trim();
+      if (clean.startsWith("```json")) clean = clean.substring(7);
+      else if (clean.startsWith("```")) clean = clean.substring(3);
+      if (clean.endsWith("```")) clean = clean.substring(0, clean.length - 3);
+      clean = clean.trim();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(clean);
+      } catch (parseErr) {
+        throw new Error("Format JSON invalide retourné par Gemini : " + parseErr.message);
+      }
+
+      if (!parsed || typeof parsed !== "object" || !parsed.criteria || typeof parsed.criteria !== "object") {
+        throw new Error("Format de critères incomplet retourné par Gemini.");
+      }
+
+      const sList = Array.isArray(sentences) ? sentences.map(s => String(s || "").trim()).filter(Boolean) : [];
+      const isBlank = sList.length === 0;
+
+      const rawC1 = parsed.criteria.C1;
+      const rawC3 = parsed.criteria.C3;
+      const rawC6 = parsed.criteria.C6;
+
+      const c1Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(4.5, Number(rawC1 && rawC1.score) || 0)));
+      const c3Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(3.0, Number(rawC3 && rawC3.score) || 0)));
+      const c6Score = isBlank ? 0 : roundScore(Math.max(0, Math.min(1.5, Number(rawC6 && rawC6.score) || 0)));
+
+      // Application independently calculates total score strictly from C1 + C3 + C6
+      const totalScore = roundScore(c1Score + c3Score + c6Score);
+      // Passing condition: >= 5.0 (out of 9) accepts, < 5.0 rejects
+      const isAccepted = totalScore >= 5.0;
+
+      return {
+        activityId: "journey5_activity4",
+        sentences: sList,
+        score: totalScore,
+        maxScore: 9.0,
+        isAccepted,
+        criteria: {
+          C1: {
+            code: "C1",
+            name: "Adéquation avec la situation",
+            score: c1Score,
+            max: 4.5,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC1 && typeof rawC1.justification === "string" ? rawC1.justification.trim() : "")
+          },
+          C3: {
+            code: "C3",
+            name: "Correction linguistique",
+            score: c3Score,
+            max: 3.0,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC3 && typeof rawC3.justification === "string" ? rawC3.justification.trim() : "")
+          },
+          C6: {
+            code: "C6",
+            name: "Richesse du vocabulaire",
+            score: c6Score,
+            max: 1.5,
+            justification: isBlank ? "Aucune phrase fournie." : (rawC6 && typeof rawC6.justification === "string" ? rawC6.justification.trim() : "")
+          }
+        },
+        feedback: isBlank
+          ? "Écris 4 à 5 phrases pour décrire la classe avec le verbe être."
+          : (typeof parsed.feedback === "string" && parsed.feedback.trim() ? parsed.feedback.trim() : "Merci pour ton travail !"),
+        suggestions: typeof parsed.suggestions === "string" ? parsed.suggestions.trim() : "",
+        status: "evaluated",
+        evaluatedAt: new Date().toISOString(),
+        model: modelName,
+        usedImageContext: Boolean(usedImageContext)
+      };
+    }
+
+    async function evaluateJourney5Activity({ sentences }) {
+      const sList = Array.isArray(sentences) ? sentences.map(s => String(s || "").trim()).filter(Boolean) : [];
+
+      const model = await initFirebaseAiLogic();
+      const imagePart = await loadImageAsInlineData("journe 5/5.png");
+      const prompt = buildJourney5Prompt(sList);
+      const contentPayload = imagePart ? [prompt, imagePart] : prompt;
+
+      if (lastAiDiagnostics) {
+        lastAiDiagnostics.reachedGemini = true;
+      }
+      console.log(`[GeminiAIService] Evaluating Journey 5 Activity 4 (${sList.length} sentences, image attached: ${Boolean(imagePart)}, maxScore: 9, reachedGemini: true)...`);
+
+      const result = await model.generateContent(contentPayload);
+      const response = await result.response;
+      const rawText = response.text();
+      return normalizeJourney5Evaluation(rawText, sList, Boolean(imagePart), window.GeminiAIService.model);
+    }
+
     window.Journey2AiRequestManager = Journey2AiRequestManager;
     window.GeminiAIService.requestManager = new Journey2AiRequestManager(2, 30000);
 
     window.Journey4AiRequestManager = Journey2AiRequestManager;
     window.GeminiAIService.requestManagerJ4 = new Journey2AiRequestManager(2, 30000);
+
+    window.Journey5AiRequestManager = Journey2AiRequestManager;
   </script>
 </head>
 
@@ -18301,6 +18485,7 @@ showJourney2EndCelebration() {
         // Validation / Continuation button at bottom if needed
         if (activity.valBtnPos) {
           const btnWrapper = document.createElement('div');
+          btnWrapper.id = 'j5-val-btn-wrapper';
           btnWrapper.style.position = 'absolute';
           btnWrapper.style.left = activity.valBtnPos.left + '%';
           btnWrapper.style.top = activity.valBtnPos.top + '%';
@@ -18512,139 +18697,155 @@ showJourney2EndCelebration() {
           if (!fail && validsFound === totalValids && totalValids > 0) isCorrect = true;
         }
         else if (activity.type === 'writing') {
-          const normalize = (str) => {
-              return (str || '')
-                .toLowerCase()
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-z0-9]/g, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-            };
+          const rawInputs = activity.inputs.map(inp => {
+            const el = document.getElementById(inp.id);
+            return el ? el.value.trim() : '';
+          });
 
-            const userInputs = activity.inputs.map(inp => {
-              const el = document.getElementById(inp.id);
-              return el ? el.value.trim() : '';
-            });
+          const filledSentences = rawInputs.filter(s => s.length > 0);
 
-            // Flexible validation: accepting exact or close phrases using key sentence elements
-            const checkPhrase1 = (raw) => {
-              const c = normalize(raw);
-              if (c.length < 5) return false;
-              const hasSubject = c.includes('maitresse') || c.includes('maitres') || c.includes('prof') || c.includes('enseignante') || c.includes('dame') || c.includes('elle');
-              const hasVerb = c.includes('est') || c.includes('es');
-              const hasPlace = c.includes('classe') || c.includes('ecole') || c.includes('salle') || c.includes('dedans');
-              return (hasSubject && hasVerb && hasPlace) || (hasSubject && (hasVerb || hasPlace)) || c.includes('maitresse est');
-            };
+          const fb = document.getElementById('j5-feedback');
+          const hintEl = document.getElementById('j5-hints-area');
+          const valBtnWrapper = document.getElementById('j5-val-btn-wrapper');
+          const valBtn = document.getElementById('j5-val-btn');
 
-            const checkPhrase2 = (raw) => {
-              const c = normalize(raw);
-              if (c.length < 5) return false;
-              const hasSubject = c.includes('eleve') || c.includes('enfants') || c.includes('ils') || c.includes('garcon');
-              const hasVerb = c.includes('sont') || c.includes('son');
-              const hasDetail = c.includes('assis') || c.includes('table') || c.includes('bureau') || c.includes('place');
-              return (hasSubject && hasVerb && hasDetail) || (hasSubject && hasDetail) || (hasVerb && hasDetail);
-            };
+          // Empty check
+          if (filledSentences.length === 0) {
+            if (fb) {
+              fb.style.display = 'block';
+              fb.style.color = '#f59e0b';
+              fb.textContent = "Écris au moins 4 phrases avant de valider.";
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
+            return;
+          }
 
-            const checkPhrase3 = (raw) => {
-              const c = normalize(raw);
-              if (c.length < 5) return false;
-              const hasSubject = c.includes('maitresse') || c.includes('elle') || c.includes('prof');
-              const hasVerb = c.includes('est') || c.includes('es');
-              const hasPlace = c.includes('tableau') || c.includes('devant') || c.includes('milieu') || c.includes('livre');
-              return (hasSubject && hasPlace) || (hasVerb && hasPlace) || c.includes('devant le tableau');
-            };
+          // Sentence count check: require 4 to 5 sentences (Test E: Missing sentences)
+          if (filledSentences.length < 4) {
+            if (fb) {
+              fb.style.display = 'block';
+              fb.style.color = '#f59e0b';
+              fb.textContent = `Écris au moins 4 phrases pour décrire l'image (tu en as écrit ${filledSentences.length}).`;
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+            }
+            return;
+          }
 
-            const checkPhrase4 = (raw) => {
-              const c = normalize(raw);
-              if (c.length < 5) return false;
-              const hasSubject = c.includes('eleve') || c.includes('enfants') || c.includes('ils');
-              const hasVerb = c.includes('sont') || c.includes('son');
-              const hasDesc = c.includes('attentif') || c.includes('content') || c.includes('sage') || c.includes('ecoute') || c.includes('heureux') || c.includes('joyeux');
-              return (hasSubject && (hasVerb || hasDesc)) || (hasVerb && hasDesc);
-            };
-
-            const checkPhrase5 = (raw) => {
-              const c = normalize(raw);
-              if (c.length < 5) return false;
-              const hasSubject = c.includes('classe') || c.includes('salle') || c.includes('elle');
-              const hasVerb = c.includes('est') || c.includes('es');
-              const hasDesc = c.includes('propre') || c.includes('agreable') || c.includes('belle') || c.includes('jolie') || c.includes('grande');
-              return (hasSubject && (hasVerb || hasDesc)) || (hasVerb && hasDesc);
-            };
-
-            const results = [
-              checkPhrase1(userInputs[0]),
-              checkPhrase2(userInputs[1]),
-              checkPhrase3(userInputs[2]),
-              checkPhrase4(userInputs[3]),
-              checkPhrase5(userInputs[4])
-            ];
-
-            const validCount = results.filter(Boolean).length;
-            state.writingTrials = (state.writingTrials || 0) + 1;
-
-            // Allow 4 or 5 valid sentences as requested by the consign
-            if (validCount >= 4) {
-              isCorrect = true;
-            } else {
-              const hintEl = document.getElementById('j5-hints-area');
-              if (hintEl) {
-                if (state.writingTrials === 1) {
-                  hintEl.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-                      <span style="font-size: 0.90em; color: #9a3412; font-weight: 800;">💡 Pistes pour chaque phrase :</span>
-                      <button id="j5-speech-btn" type="button" title="Écouter" style="background: #3b82f6; border: none; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🔊</button>
-                    </div>
-                    <div style="font-size: 0.83em; color: #78350f; line-height: 1.3; font-weight: 600;">
-                      1. La maîtresse est dans...<br>
-                      2. Les élèves sont assis...<br>
-                      3. La maîtresse est devant...<br>
-                      4. Les élèves sont attentifs...<br>
-                      5. La classe est propre...
-                    </div>
-                  `;
-                } else {
-                  // Give model answers directly inside the box if student struggles
-                  hintEl.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-                      <span style="font-size: 0.88em; color: #15803d; font-weight: 800;">⭐ Réponses suggérées :</span>
-                      <button id="j5-speech-btn" type="button" title="Écouter" style="background: #16a34a; border: none; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">🔊</button>
-                    </div>
-                    <div style="font-size: 0.78em; color: #14532d; line-height: 1.25; font-weight: 600;">
-                      • <b>1.</b> La maîtresse est dans la classe.<br>
-                      • <b>2.</b> Les élèves sont assis à leurs tables.<br>
-                      • <b>3.</b> La maîtresse est devant le tableau.<br>
-                      • <b>4.</b> Les élèves sont attentifs et contents.<br>
-                      • <b>5.</b> La classe est propre et agréable.
-                    </div>
-                  `;
-                }
-
-                const speechBtn = hintEl.querySelector('#j5-speech-btn');
-                if (speechBtn) {
-                  speechBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    speechBtn.animate([
-                      { transform: 'scale(0.85)' },
-                      { transform: 'scale(1.2)', offset: 0.5 },
-                      { transform: 'scale(1)' }
-                    ], { duration: 250, easing: 'ease-out' });
-                    if ('speechSynthesis' in window) {
-                      window.speechSynthesis.cancel();
-                      const utter = new SpeechSynthesisUtterance("La maîtresse est dans la classe. Les élèves sont assis à leurs tables. La maîtresse est devant le tableau. Les élèves sont attentifs et contents. La classe est propre et agréable.");
-                      utter.lang = 'fr-FR';
-                      utter.rate = 0.9;
-                      window.speechSynthesis.speak(utter);
-                    }
-                  };
-                }
-
-                hintEl.animate([{ transform: 'scale(0.98)' }, { transform: 'scale(1)' }], { duration: 250, easing: 'ease-out' });
-              }
+          // Disable button and show loading state to prevent duplicate submissions
+          if (valBtnWrapper) {
+            valBtnWrapper.style.pointerEvents = 'none';
+            if (valBtn) {
+              valBtn.style.opacity = '0.65';
+              valBtn.style.filter = 'grayscale(0.3)';
             }
           }
 
+          if (fb) {
+            fb.style.display = 'block';
+            fb.style.color = '#38bdf8';
+            fb.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> Correction par l\'IA Gemini en cours...</span>';
+          }
+
+          const signature = `j5_act4_${filledSentences.join('__')}`;
+
+          const restoreButton = () => {
+            if (valBtnWrapper) {
+              valBtnWrapper.style.pointerEvents = 'auto';
+              if (valBtn) {
+                valBtn.style.opacity = '1';
+                valBtn.style.filter = 'none';
+              }
+            }
+          };
+
+          const evaluateTask = async () => {
+            return await window.GeminiAIService.evaluateJourney5Activity({
+              sentences: filledSentences
+            });
+          };
+
+          const reqManager = (window.GeminiAIService && (window.GeminiAIService.requestManagerJ5 || window.GeminiAIService.requestManager)) || window.Journey5AiRequestManager;
+
+          const evaluationPromise = reqManager
+            ? reqManager.enqueue(signature, evaluateTask, {
+                onQueued: ({ queuePos }) => {
+                  if (fb) {
+                    fb.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> En file d'attente (position ${queuePos})... Correction bientôt.</span>`;
+                  }
+                },
+                onStart: () => {
+                  if (fb) {
+                    fb.innerHTML = `<span style="display:inline-flex;align-items:center;gap:8px;"><span class="j2-ai-spinner"></span> Correction par l'IA Gemini en cours...</span>`;
+                  }
+                }
+              })
+            : evaluateTask();
+
+          evaluationPromise
+            .then(evalRes => {
+              restoreButton();
+
+              // Update the hints area with detailed official criteria breakdown
+              if (hintEl) {
+                const isPass = evalRes.isAccepted;
+                hintEl.style.background = '#fefce8';
+                hintEl.style.border = isPass ? '2px solid #86efac' : '2px solid #fed7aa';
+                hintEl.style.borderRadius = '14px';
+                hintEl.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.12)';
+                hintEl.style.padding = '8px 12px';
+                hintEl.style.zIndex = '35';
+                hintEl.innerHTML = `
+                  <div style="font-weight: 800; color: ${isPass ? '#15803d' : '#c2410c'}; font-size: 0.98em; margin-bottom: 3px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>${isPass ? '⭐ Bravo ! Validé par Gemini' : '✍️ Évaluation Gemini'}</span>
+                    <span style="background: ${isPass ? '#dcfce7' : '#ffedd5'}; color: ${isPass ? '#166534' : '#9a3412'}; padding: 2px 8px; border-radius: 9999px; font-size: 0.9em; font-weight: 800;">${evalRes.score} / 9</span>
+                  </div>
+                  <div style="font-size: 0.82em; color: #334155; line-height: 1.35; margin-bottom: 4px;">
+                    <div>• <b>C1 (Adéquation) :</b> ${evalRes.criteria.C1.score}/4.5</div>
+                    <div>• <b>C3 (Correction & verbe être) :</b> ${evalRes.criteria.C3.score}/3.0</div>
+                    <div>• <b>C6 (Vocabulaire) :</b> ${evalRes.criteria.C6.score}/1.5</div>
+                  </div>
+                  <div style="font-size: 0.78em; color: #1e293b; background: rgba(255,255,255,0.88); padding: 5px 8px; border-radius: 6px; border-left: 3px solid ${isPass ? '#22c55e' : '#f97316'}; line-height: 1.25;">
+                    ${evalRes.feedback || ''}
+                    ${evalRes.suggestions ? `<div style="margin-top: 3px; color: #475569;">💡 <i>${evalRes.suggestions}</i></div>` : ''}
+                  </div>
+                `;
+                hintEl.animate([{ transform: 'scale(0.97)' }, { transform: 'scale(1)' }], { duration: 250, easing: 'ease-out' });
+              }
+
+              if (evalRes.isAccepted) {
+                if (fb) {
+                  fb.style.display = 'block';
+                  fb.style.color = '#4ade80';
+                  fb.textContent = "⭐ Excellent travail ! Tu passes à l'étape suivante.";
+                }
+                setTimeout(() => {
+                  this.showJourney5SuccessPopup();
+                }, 1200);
+              } else {
+                if (fb) {
+                  fb.style.display = 'block';
+                  fb.style.color = '#f87171';
+                  fb.textContent = "Tu peux améliorer ton texte. Regarde les conseils ci-dessus et réessaie !";
+                  if (window.j1GentleShake) window.j1GentleShake(fb);
+                }
+              }
+            })
+            .catch(err => {
+              restoreButton();
+              if (err && err.message === 'DUPLICATE_SUBMISSION') {
+                return;
+              }
+              console.error("[Journey 5] Gemini evaluation error:", err);
+              if (fb) {
+                fb.style.display = 'block';
+                fb.style.color = '#f87171';
+                fb.textContent = "Une erreur est survenue lors de la correction par l'IA. Veuillez cliquer à nouveau sur Valider.";
+                if (window.j1GentleShake) window.j1GentleShake(fb);
+              }
+            });
+
+          return;
+        }
         if (isCorrect) {
           const fb = document.getElementById('j5-feedback');
           if (fb) {
