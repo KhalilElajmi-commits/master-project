@@ -2359,6 +2359,18 @@ ${criteriaSchema}
       async evaluateJourney5Activity({ sentences }) {
         return await evaluateJourney5Activity({ sentences });
       },
+
+      buildJourney8Prompt(q1, q2, q3, q4) {
+        return buildJourney8Prompt(q1, q2, q3, q4);
+      },
+
+      normalizeJourney8Evaluation(rawText, q1, q2, q3, q4, usedImageContext = true) {
+        return normalizeJourney8Evaluation(rawText, q1, q2, q3, q4, usedImageContext, this.model);
+      },
+
+      async evaluateJourney8Activity({ q1, q2, q3, q4 }) {
+        return await evaluateJourney8Activity({ q1, q2, q3, q4 });
+      },
     };
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -2971,6 +2983,228 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
       return normalizeJourney5Evaluation(rawText, sList, Boolean(imagePart), window.GeminiAIService.model);
     }
 
+    function buildJourney8Prompt(q1, q2, q3, q4) {
+      return `Tu es un professeur de français de l'école primaire évaluant un exercice de compréhension écrite pour des élèves de 4ème année primaire (âgés de 9 à 10 ans) : Activité 1 — « Je regarde et je comprends ».
+
+CONSIGNE OFFICIELLE DE L'ACTIVITÉ :
+« Observe bien les images et réponds aux questions. Ces images racontent une histoire. Trouve les informations principales. »
+
+CONTEXTE VISUEL DE L'HISTOIRE EN 4 IMAGES :
+L'histoire illustrée montre une journée d'école vécue par deux jeunes élèves :
+- Image 1 : Une jeune élève avec un sac à dos violet arrive devant le portail d'une école. Le panneau « ÉCOLE » est bien visible.
+- Image 2 : Dans la salle de classe, la jeune élève fait la connaissance d'une autre élève. Elles sont assises ou debout face à face devant une table d'école et interagissent amicalement.
+- Image 3 : Pendant la récréation ou la pause, les deux élèves sont ensemble dans la cour ou le jardin de l'école, assises sur un banc en bois. Elles discutent et partagent un goûter en souriant.
+- Image 4 : En fin de journée, une élève rentre chez elle, marchant sur un chemin bordé d'arbres et de maisons avec son sac à dos.
+
+NATURE DE L'EXERCICE :
+Il s'agit d'une activité de COMPRÉHENSION de l'histoire et non d'une rédaction de texte long. L'élève doit répondre à QUATRE questions distinctes.
+IMPORTANT : L'élève peut répondre par des phrases courtes ou des syntagmes nominaux/prépositionnels simples (ex: « Caroline et son amie », « À l'école », « Le matin », « Elles parlent et jouent ensemble »). Ne pénalise PAS un élève parce qu'il utilise des réponses concises et directes au lieu de longues phrases complexes !
+
+LES QUATRE QUESTIONS ET LEURS RÉPONSES ATTENDUES :
+
+Question 1 — Qui sont les personnages ?
+- Réponse de l'élève : """${q1}"""
+- Attendu : Deux jeunes élèves / écolières / Caroline et son amie / deux fillettes / une fille et sa camarade.
+- Règle : N'exige PAS le prénom spécifique Caroline si l'élève dit « deux élèves », « deux filles » ou « une fille et son amie ».
+
+Question 2 — Où se passe l'histoire ?
+- Réponse de l'élève : """${q2}"""
+- Attendu : À l'école, dans la classe, dans la cour de récréation, dans l'environnement scolaire.
+- Règle : Accepte « À l'école », « Dans la classe », « À l'école et dans la cour », etc.
+
+Question 3 — Quand se déroule l'histoire ?
+- Réponse de l'élève : """${q3}"""
+- Attendu : Pendant la journée scolaire, le matin, la journée, l'après-midi.
+- Règle : N'exige pas d'heure précise. Accepte les réponses temporelles raisonnables (« Le matin », « Pendant la journée », « La journée d'école »).
+
+Question 4 — Que font-ils ?
+- Réponse de l'élève : """${q4}"""
+- Attendu : Elles arrivent à l'école, se rencontrent, discutent / parlent, travaillent, jouent, passent du temps ensemble, rentrent chez elles.
+- Règle : Accepte toute description des actions principales observées sur les images sans exiger l'énumération de chaque détail.
+
+BARÈME OFFICIEL D'ÉVALUATION — STRICTEMENT 9 POINTS AU TOTAL :
+Évalue UNIQUEMENT les 3 critères officiels suivants selon le niveau de 4ème année primaire :
+
+1. C1 — Adéquation avec la situation (Maximum : 4.5 points) :
+   - C'est le critère PRINCIPAL de cette activité de compréhension.
+   - L'élève a-t-il bien compris les 4 questions et l'histoire racontée par les images ?
+   - A-t-il correctement identifié les personnages (Q1), le lieu (Q2), le moment (Q3) et les actions (Q4) ?
+   - Attribue le crédit de manière équitable pour chaque question correctement comprise (~1.125 point par question bien répondue).
+   - Ne rejette PAS une réponse correcte simplement parce qu'elle emploie des synonymes ou une formulation différente des exemples.
+
+2. C3 — Correction linguistique (Maximum : 3.0 points) :
+   - Agencement des mots et cohérence minimale des réponses.
+   - Respect des accords élémentaires et de l'orthographe usuelle au primaire.
+   - Rappel crucial : Les réponses courtes (« À l'école. », « Le matin. », « Deux élèves. ») sont totalement légitimes pour ce questionnaire et NE doivent PAS être pénalisées sous prétexte qu'elles ne forment pas une phrase complète avec sujet-verbe-complément.
+   - Sois bienveillant avec les coquilles ou fautes mineures d'orthographe si le sens est clair.
+
+3. C6 — Richesse du vocabulaire (Maximum : 1.5 points) :
+   - Emploi d'un vocabulaire approprié à l'univers scolaire et à la narration (école, amie, élèves, classe, discuter, récréation...).
+   - Ne pas exiger de vocabulaire littéraire ou complexe pour un questionnaire simple. Ne pénalise pas une réponse courte correcte.
+
+EXCLUSIONS STRICTES :
+Ne pas évaluer C2, C4 ou C5. N'utilise pas C7 ni aucun autre barème.
+NE JAMAIS noter sur 10 : le total doit être rigoureusement sur 9 points.
+
+RÈGLE DU SEUIL DE VALIDATION :
+Le seuil de réussite est de 5.0 / 9 (soit 5.0 points ou plus = validé / accepté).
+En dessous de 5.0 / 9 = non accepté, l'élève doit améliorer ses réponses.
+
+FORMAT DE SORTIE STRICT — JSON UNIQUEMENT :
+Fournis UNIQUEMENT un objet JSON valide, sans texte additionnel ni markdown en dehors du bloc JSON, respectant rigoureusement ce schéma :
+{
+  "questionFeedback": {
+    "Q1": {
+      "correct": true,
+      "feedback": "Explication brève et bienveillante pour la question 1."
+    },
+    "Q2": {
+      "correct": true,
+      "feedback": "Explication brève et bienveillante pour la question 2."
+    },
+    "Q3": {
+      "correct": true,
+      "feedback": "Explication brève et bienveillante pour la question 3."
+    },
+    "Q4": {
+      "correct": true,
+      "feedback": "Explication brève et bienveillante pour la question 4."
+    }
+  },
+  "criteria": {
+    "C1": {
+      "score": 4.0,
+      "max": 4.5,
+      "justification": "Justification précise pour C1."
+    },
+    "C3": {
+      "score": 2.5,
+      "max": 3.0,
+      "justification": "Justification précise pour C3."
+    },
+    "C6": {
+      "score": 1.0,
+      "max": 1.5,
+      "justification": "Justification précise pour C6."
+    }
+  },
+  "totalScore": 7.5,
+  "feedback": "Commentaire d'ensemble chaleureux, encourageant et adapté à un enfant du primaire.",
+  "suggestions": "Conseil d'amélioration pratique ou encouragement pour la suite."
+}`;
+    }
+
+    function normalizeJourney8Evaluation(rawText, q1, q2, q3, q4, usedImageContext = true, modelName = "gemini-2.5-flash") {
+      let parsed = null;
+      try {
+        const cleaned = String(rawText || "")
+          .replace(/^\`\`\`json\s*/i, "")
+          .replace(/^\`\`\`\s*/i, "")
+          .replace(/\s*\`\`\`$/i, "")
+          .trim();
+        parsed = JSON.parse(cleaned);
+      } catch (e) {
+        console.warn("[GeminiAIService] Failed to parse JSON for Journey 8, attempting regex extraction...", e);
+        try {
+          const match = String(rawText || "").match(/\{[\s\S]*\}/);
+          if (match) {
+            parsed = JSON.parse(match[0]);
+          }
+        } catch (e2) {
+          console.error("[GeminiAIService] JSON extraction completely failed for Journey 8:", e2, rawText);
+        }
+      }
+
+      if (!parsed || typeof parsed !== "object") {
+        parsed = {
+          questionFeedback: {
+            Q1: { correct: false, feedback: "Réponse à revoir." },
+            Q2: { correct: false, feedback: "Réponse à revoir." },
+            Q3: { correct: false, feedback: "Réponse à revoir." },
+            Q4: { correct: false, feedback: "Réponse à revoir." }
+          },
+          criteria: {
+            C1: { score: 2.0, max: 4.5, justification: "Évaluation automatique par défaut suite à une réponse non structurée." },
+            C3: { score: 1.5, max: 3.0, justification: "Correction linguistique par défaut." },
+            C6: { score: 0.5, max: 1.5, justification: "Vocabulaire par défaut." }
+          },
+          feedback: "Tu as répondu aux questions. Prends le temps de bien observer chaque image !",
+          suggestions: "Vérifie bien les personnages, le lieu et les actions."
+        };
+      }
+
+      const rawCrit = parsed.criteria || {};
+      const rawC1 = rawCrit.C1 || {};
+      const rawC3 = rawCrit.C3 || {};
+      const rawC6 = rawCrit.C6 || {};
+
+      const roundScore = (val) => Math.round((Number(val) || 0) * 10) / 10;
+      const c1Score = Math.min(4.5, Math.max(0, roundScore(rawC1.score)));
+      const c3Score = Math.min(3.0, Math.max(0, roundScore(rawC3.score)));
+      const c6Score = Math.min(1.5, Math.max(0, roundScore(rawC6.score)));
+
+      const totalScore = Math.min(9.0, Math.max(0, roundScore(c1Score + c3Score + c6Score)));
+      const isAccepted = totalScore >= 5.0;
+
+      const qf = parsed.questionFeedback || {};
+      const q1f = qf.Q1 || qf.q1 || {};
+      const q2f = qf.Q2 || qf.q2 || {};
+      const q3f = qf.Q3 || qf.q3 || {};
+      const q4f = qf.Q4 || qf.q4 || {};
+
+      return {
+        score: totalScore,
+        maxScore: 9.0,
+        isAccepted,
+        questionFeedback: {
+          Q1: { correct: Boolean(q1f.correct), feedback: String(q1f.feedback || "").trim() },
+          Q2: { correct: Boolean(q2f.correct), feedback: String(q2f.feedback || "").trim() },
+          Q3: { correct: Boolean(q3f.correct), feedback: String(q3f.feedback || "").trim() },
+          Q4: { correct: Boolean(q4f.correct), feedback: String(q4f.feedback || "").trim() }
+        },
+        criteria: {
+          C1: {
+            score: c1Score,
+            max: 4.5,
+            justification: String(rawC1.justification || rawC1.feedback || "").trim()
+          },
+          C3: {
+            score: c3Score,
+            max: 3.0,
+            justification: String(rawC3.justification || rawC3.feedback || "").trim()
+          },
+          C6: {
+            score: c6Score,
+            max: 1.5,
+            justification: String(rawC6.justification || rawC6.feedback || "").trim()
+          }
+        },
+        feedback: typeof parsed.feedback === "string" && parsed.feedback.trim() ? parsed.feedback.trim() : "Merci pour ton travail !",
+        suggestions: typeof parsed.suggestions === "string" && parsed.suggestions.trim() ? parsed.suggestions.trim() : (typeof parsed.suggestion === "string" ? parsed.suggestion.trim() : ""),
+        status: "evaluated",
+        evaluatedAt: new Date().toISOString(),
+        model: modelName,
+        usedImageContext: Boolean(usedImageContext)
+      };
+    }
+
+    async function evaluateJourney8Activity({ q1, q2, q3, q4 }) {
+      const model = await initFirebaseAiLogic();
+      const imagePart = await loadImageAsInlineData("journe 8/2.png");
+      const prompt = buildJourney8Prompt(q1, q2, q3, q4);
+      const contentPayload = imagePart ? [prompt, imagePart] : prompt;
+
+      if (lastAiDiagnostics) {
+        lastAiDiagnostics.reachedGemini = true;
+      }
+      console.log(`[GeminiAIService] Evaluating Journey 8 Activity 1 (4 questions, image attached: ${Boolean(imagePart)}, maxScore: 9, reachedGemini: true)...`);
+
+      const result = await model.generateContent(contentPayload);
+      const response = await result.response;
+      const rawText = response.text();
+      return normalizeJourney8Evaluation(rawText, q1, q2, q3, q4, Boolean(imagePart), window.GeminiAIService.model);
+    }
+
     window.Journey2AiRequestManager = Journey2AiRequestManager;
     window.GeminiAIService.requestManager = new Journey2AiRequestManager(2, 30000);
 
@@ -2978,6 +3212,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
     window.GeminiAIService.requestManagerJ4 = new Journey2AiRequestManager(2, 30000);
 
     window.Journey5AiRequestManager = Journey2AiRequestManager;
+    window.Journey8AiRequestManager = Journey2AiRequestManager;
   </script>
 </head>
 
@@ -9654,19 +9889,23 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
               inputEl.style.borderColor = '#0284c7';
               inputEl.style.background = '#ffffff';
               inputEl.style.boxShadow = '0 0 10px rgba(2, 132, 199, 0.35)';
-              // Show prompt hint in the Aide box when focusing a question
-              aideBox.innerHTML = `
-                <div style="font-size: calc(var(--img-width) * 0.015); font-weight: 800; color: #0284c7; margin-bottom: 3px;">
-                  ❓ Question ${q.id}
-                </div>
-                <div style="font-size: calc(var(--img-width) * 0.0135); font-weight: 700; color: #1e3a8a; line-height: 1.3;">
-                  ${q.label}
-                </div>
-              `;
+              // Only override Aide box if no evaluation card has been rendered yet
+              if (!aideBox.innerHTML.includes('Gemini')) {
+                aideBox.innerHTML = `
+                  <div style="font-size: calc(var(--img-width) * 0.015); font-weight: 800; color: #0284c7; margin-bottom: 3px;">
+                    ❓ Question ${q.id}
+                  </div>
+                  <div style="font-size: calc(var(--img-width) * 0.0135); font-weight: 700; color: #1e3a8a; line-height: 1.3;">
+                    ${q.label}
+                  </div>
+                `;
+              }
             };
 
             inputEl.onblur = () => {
-              inputEl.style.borderColor = 'rgba(2, 132, 199, 0.45)';
+              if (!inputEl.style.borderColor.includes('16a34a') && !inputEl.style.borderColor.includes('ef4444')) {
+                inputEl.style.borderColor = 'rgba(2, 132, 199, 0.45)';
+              }
               inputEl.style.background = 'rgba(255, 255, 255, 0.9)';
               inputEl.style.boxShadow = '0 2px 5px rgba(0,0,0,0.06)';
             };
@@ -9682,6 +9921,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
 
           // Valider button at bottom with tip touching inside
           const btnWrapper = document.createElement('div');
+          btnWrapper.id = 'j8-val-btn-wrapper';
           btnWrapper.style.position = 'absolute';
           btnWrapper.style.left = activity.valBtnPos.left + '%';
           btnWrapper.style.top = activity.valBtnPos.top + '%';
@@ -9689,6 +9929,7 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
           btnWrapper.style.zIndex = '35';
 
           const vbtn = document.createElement('img');
+          vbtn.id = 'j8-val-btn';
           vbtn.src = 'journe 1/valider.png';
           vbtn.style.width = (activity.valBtnPos && activity.valBtnPos.width) ? ('calc(var(--img-width) * ' + (activity.valBtnPos.width / 100) + ')') : 'calc(var(--img-width) * 0.18)';
           vbtn.style.height = 'auto';
@@ -9698,97 +9939,198 @@ Retourne UNIQUEMENT un objet JSON valide (aucun texte ni balise markdown en deho
           vbtn.onmouseenter = () => { vbtn.style.transform = 'scale(1.08) translateY(-2px)'; vbtn.style.filter = 'drop-shadow(0 8px 18px rgba(0,0,0,0.45)) brightness(1.1)'; };
           vbtn.onmouseleave = () => { vbtn.style.transform = 'scale(1)'; vbtn.style.filter = 'drop-shadow(0 6px 14px rgba(0,0,0,0.35))'; };
 
-          let validateAttempts = 0;
+          let isEvaluating = false;
+
+          const restoreButton = () => {
+            isEvaluating = false;
+            vbtn.style.pointerEvents = 'auto';
+            vbtn.style.opacity = '1';
+            vbtn.style.cursor = 'pointer';
+          };
 
           vbtn.onclick = () => {
             if (isAnswerCorrect) {
-              this.handleJourney8Next();
+              if (this.currentExIndex + 1 < JOURNEY_8_POPUPS.length) {
+                this.handleJourney8Next();
+              } else {
+                this.close();
+                if (MapSystem.state.unlockedLevel === 8) {
+                  MapSystem.state.unlockedLevel = 9;
+                  MapSystem.saveProgress();
+                }
+                setTimeout(() => { MapSystem.init(); }, 100);
+              }
               return;
             }
 
+            if (isEvaluating) return;
+
+            const q1 = (inputElements[1]?.value || '').trim();
+            const q2 = (inputElements[2]?.value || '').trim();
+            const q3 = (inputElements[3]?.value || '').trim();
+            const q4 = (inputElements[4]?.value || '').trim();
+
+            const answers = [
+              { id: 1, val: q1, el: inputElements[1] },
+              { id: 2, val: q2, el: inputElements[2] },
+              { id: 3, val: q3, el: inputElements[3] },
+              { id: 4, val: q4, el: inputElements[4] }
+            ];
+
+            const emptyAnswers = answers.filter(a => !a.val);
             const fb = createFeedback(activity.valBtnPos.top - 5.5);
-            const incorrectQuestions = [];
-            const emptyQuestions = [];
 
-            activity.questions.forEach(q => {
-              const val = (inputValues[q.id] || '').toLowerCase();
-              const el = inputElements[q.id];
-
-              if (!val || val.length < 2) {
-                emptyQuestions.push(q);
-                if (el) el.style.borderColor = '#ea580c';
+            if (emptyAnswers.length > 0) {
+              fb.style.display = 'block';
+              fb.style.color = '#f59e0b';
+              if (emptyAnswers.length === 4) {
+                fb.textContent = "Réponds aux 4 questions avant de valider.";
               } else {
-                // Check if user answer includes any keyword
-                const isMatch = q.keywords.some(k => val.includes(k.toLowerCase()));
-                if (!isMatch) {
-                  incorrectQuestions.push(q);
-                  if (el) el.style.borderColor = '#ef4444';
-                } else {
-                  if (el) el.style.borderColor = '#16a34a';
+                fb.textContent = `Réponds à la question ${emptyAnswers.map(a => a.id).join(', ')} avant de valider.`;
+              }
+              emptyAnswers.forEach(a => {
+                if (a.el) {
+                  a.el.style.borderColor = '#f59e0b';
+                  a.animate([
+                    { transform: 'translateX(-4px)' },
+                    { transform: 'translateX(4px)' },
+                    { transform: 'translateX(0)' }
+                  ], { duration: 240 });
+                }
+              });
+              if (window.j1GentleShake) window.j1GentleShake(fb);
+              return;
+            }
+
+            // Set loading state
+            isEvaluating = true;
+            vbtn.style.pointerEvents = 'none';
+            vbtn.style.opacity = '0.7';
+            vbtn.style.cursor = 'wait';
+
+            fb.style.display = 'block';
+            fb.style.color = '#0284c7';
+            fb.innerHTML = `
+              <span class="j2-ai-spinner" style="display:inline-block; width:14px; height:14px; border:2px solid #0284c7; border-top-color:transparent; border-radius:50%; animation:j2-spin 0.8s linear infinite; vertical-align:middle; margin-right:6px;"></span>
+              Correction par l'IA Gemini en cours...
+            `;
+
+            const signature = `j8_1_${q1}_${q2}_${q3}_${q4}`;
+            const reqManager = window.GeminiAIService?.requestManager || new (window.Journey2AiRequestManager || window.Journey8AiRequestManager)(2, 30000);
+
+            reqManager.enqueue(
+              signature,
+              () => window.GeminiAIService.evaluateJourney8Activity({ q1, q2, q3, q4 }),
+              {
+                onQueued: () => {
+                  if (fb) fb.textContent = "En attente du service d'évaluation Gemini...";
+                },
+                onStart: () => {
+                  if (fb) {
+                    fb.innerHTML = `
+                      <span class="j2-ai-spinner" style="display:inline-block; width:14px; height:14px; border:2px solid #0284c7; border-top-color:transparent; border-radius:50%; animation:j2-spin 0.8s linear infinite; vertical-align:middle; margin-right:6px;"></span>
+                      Correction par l'IA Gemini en cours...
+                    `;
+                  }
                 }
               }
-            });
+            )
+            .then(evalRes => {
+              restoreButton();
+              if (!evalRes) throw new Error("Réponse d'évaluation vide.");
 
-            // If everything is already completely correct
-            if (emptyQuestions.length === 0 && incorrectQuestions.length === 0) {
-              isAnswerCorrect = true;
-              vbtn.src = 'journe 1/continuer.png';
-              vbtn.animate([
-                { transform: 'scale(0.85)' },
-                { transform: 'scale(1.2)' },
-                { transform: 'scale(1)' }
-              ], { duration: 320 });
-              fb.textContent = 'Bravo ! Tu as répondu avec succès à toutes les questions !';
-              fb.style.color = '#16a34a';
+              // Populate Aide box with detailed Gemini feedback card
+              if (aideBox) {
+                const badgeColor = evalRes.isAccepted ? '#16a34a' : '#ef4444';
+                const badgeBg = evalRes.isAccepted ? '#dcfce7' : '#fee2e2';
+                const headerText = evalRes.isAccepted ? '⭐ Validé par Gemini' : '📝 Évaluation Gemini';
 
-              aideBox.innerHTML = `
-                <div style="font-size: calc(var(--img-width) * 0.016); font-weight: 800; color: #16a34a; margin-bottom: 3px;">
-                  🎉 Excellent travail !
-                </div>
-                <div style="font-size: calc(var(--img-width) * 0.0135); font-weight: 700; color: #15803d; line-height: 1.3;">
-                  Tu as bien identifié tous les éléments clés de l'histoire. Clique sur Continuer !
-                </div>
-              `;
-              return;
-            }
+                const qf = evalRes.questionFeedback || {};
+                const qItems = [1, 2, 3, 4].map(num => {
+                  const item = qf[`Q${num}`] || {};
+                  const isOk = Boolean(item.correct);
+                  const icon = isOk ? '✅' : '⚠️';
+                  const clr = isOk ? '#15803d' : '#b91c1c';
+                  const inputEl = inputElements[num];
+                  if (inputEl) {
+                    inputEl.style.borderColor = isOk ? '#16a34a' : '#ef4444';
+                    inputEl.style.background = isOk ? '#f0fdf4' : '#fef2f2';
+                  }
+                  return `
+                    <div style="display:flex; align-items:flex-start; gap:4px; font-size:calc(var(--img-width) * 0.0115); margin-bottom:2px; text-align:left;">
+                      <span>${icon}</span>
+                      <span style="color:${clr}; font-weight:700;">Q${num}:</span>
+                      <span style="color:#334155; line-height:1.2;">${item.feedback || ''}</span>
+                    </div>
+                  `;
+                }).join('');
 
-            // User answered wrong or left empty: immediately show directly the right answers!
-            activity.questions.forEach(q => {
-              const el = inputElements[q.id];
-              if (el) {
-                el.value = q.answer;
-                el.style.borderColor = '#16a34a';
-                el.style.background = '#f0fdf4';
-                el.style.color = '#15803d';
-                inputValues[q.id] = q.answer;
+                aideBox.style.pointerEvents = 'auto';
+                aideBox.style.justifyContent = 'flex-start';
+                aideBox.style.background = 'rgba(255, 255, 255, 0.96)';
+                aideBox.style.borderRadius = '14px';
+                aideBox.style.boxShadow = '0 4px 14px rgba(0,0,0,0.08)';
+                aideBox.style.overflowY = 'auto';
+                aideBox.style.maxHeight = (activity.aideBox ? activity.aideBox.height : 24.2) + '%';
+                aideBox.style.padding = '8px 10px';
+                aideBox.innerHTML = `
+                  <div style="width:100%; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #cbd5e1; padding-bottom:3px; margin-bottom:4px;">
+                    <span style="font-size:calc(var(--img-width) * 0.013); font-weight:800; color:${badgeColor};">${headerText}</span>
+                    <span style="background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:calc(var(--img-width) * 0.0125); padding:1px 6px; border-radius:9999px;">${evalRes.score} / 9</span>
+                  </div>
+                  <div style="width:100%; display:flex; justify-content:space-around; font-size:calc(var(--img-width) * 0.011); font-weight:700; color:#475569; margin-bottom:4px; background:#f8fafc; padding:2px 4px; border-radius:4px;">
+                    <span>C1: ${evalRes.criteria.C1.score}/4.5</span>
+                    <span>C3: ${evalRes.criteria.C3.score}/3.0</span>
+                    <span>C6: ${evalRes.criteria.C6.score}/1.5</span>
+                  </div>
+                  <div style="width:100%; margin-bottom:4px;">
+                    ${qItems}
+                  </div>
+                  <div style="font-size:calc(var(--img-width) * 0.0115); font-weight:600; color:#1e293b; line-height:1.25; background:rgba(255,255,255,0.7); border-radius:4px; padding:3px 5px; text-align:left;">
+                    ${evalRes.feedback || ''}
+                    ${evalRes.suggestions ? `<div style="color:#0284c7; font-weight:700; margin-top:2px;">💡 ${evalRes.suggestions}</div>` : ''}
+                  </div>
+                `;
+                aideBox.animate([
+                  { transform: 'scale(0.97)' },
+                  { transform: 'scale(1)' }
+                ], { duration: 250, easing: 'ease-out' });
+              }
+
+              if (evalRes.isAccepted) {
+                isAnswerCorrect = true;
+                vbtn.src = 'journe 1/continuer.png';
+                vbtn.animate([
+                  { transform: 'scale(0.85)' },
+                  { transform: 'scale(1.15)' },
+                  { transform: 'scale(1)' }
+                ], { duration: 320 });
+
+                fb.style.display = 'block';
+                fb.style.color = '#16a34a';
+                fb.textContent = "⭐ Excellent travail ! Tu as réussi l'activité. Clique sur Continuer !";
+
+                if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+                  window.SoundSystem.playSuccess();
+                }
+              } else {
+                fb.style.display = 'block';
+                fb.style.color = '#ef4444';
+                fb.textContent = "Tu peux améliorer tes réponses. Regarde les conseils ci-dessus et réessaie !";
+                if (window.j1GentleShake) window.j1GentleShake(fb);
+              }
+            })
+            .catch(err => {
+              restoreButton();
+              if (err && err.message === 'DUPLICATE_SUBMISSION') return;
+              console.error("[Journey 8] Gemini evaluation error:", err);
+              if (fb) {
+                fb.style.display = 'block';
+                fb.style.color = '#ef4444';
+                fb.textContent = "Une erreur est survenue lors de la correction par l'IA. Veuillez cliquer à nouveau sur Valider.";
+                if (window.j1GentleShake) window.j1GentleShake(fb);
               }
             });
-
-            isAnswerCorrect = true;
-            vbtn.src = 'journe 1/continuer.png';
-            vbtn.animate([
-              { transform: 'scale(0.85)' },
-              { transform: 'scale(1.2)' },
-              { transform: 'scale(1)' }
-            ], { duration: 320 });
-
-            fb.textContent = 'Voici les bonnes réponses directes ! Tu peux maintenant continuer.';
-            fb.style.color = '#0284c7';
-
-            aideBox.innerHTML = `
-              <div style="font-size: calc(var(--img-width) * 0.016); font-weight: 800; color: #0284c7; margin-bottom: 3px;">
-                ✨ Réponses affichées !
-              </div>
-              <div style="font-size: calc(var(--img-width) * 0.0135); font-weight: 700; color: #1e3a8a; line-height: 1.35;">
-                Voici les bonnes réponses complètes. Retiens-les bien et clique sur <strong>Continuer</strong> !
-              </div>
-            `;
-            aideBox.animate([
-              { transform: 'scale(0.95)' },
-              { transform: 'scale(1.05)' },
-              { transform: 'scale(1)' }
-            ], { duration: 240 });
-            return;
           };
 
           btnWrapper.appendChild(vbtn);
