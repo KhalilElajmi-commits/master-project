@@ -83,7 +83,7 @@
       const step = (now) => {
         const p = Math.min(1, (now - start) / durationMs);
         if (this.musicAudio && !this.isMusicMuted && !this.isDucked) {
-          this.musicAudio.volume = initial + (targetVol - initial) * p;
+          this.musicAudio.volume = Math.max(0, Math.min(1, initial + (targetVol - initial) * p));
           if (p < 1) requestAnimationFrame(step);
         }
       };
