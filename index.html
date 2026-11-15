@@ -14231,20 +14231,20 @@ showJourney2EndCelebration() {
             src: 'JOURNE 3/4.png',
             type: 'match',
             left: [
-              { id: 'l0', text: 'pa', left: 18, top: 23.9, width: 14.2, height: 6.8, resBox: { left: 68.1, top: 23.6, width: 17.9, height: 7.3 } },
-              { id: 'l1', text: 'co', left: 18.1, top: 34.4, width: 13.7, height: 6.9, resBox: { left: 68.3, top: 33.8, width: 17.8, height: 7.8 } },
-              { id: 'l2', text: 'cas', left: 18, top: 44.4, width: 13.9, height: 6.3, resBox: { left: 68.6, top: 44.2, width: 16.9, height: 6.8 } },
-              { id: 'l3', text: 'mos', left: 18, top: 54.7, width: 14.3, height: 6.5, resBox: { left: 69.2, top: 53.9, width: 16.7, height: 7.6 } },
-              { id: 'l4', text: 'bar', left: 17.5, top: 65, width: 13.8, height: 6.2, resBox: { left: 70, top: 64.1, width: 15.1, height: 6.8 } },
-              { id: 'l5', text: 'ki', left: 17.5, top: 74.7, width: 14.4, height: 6.7, resBox: { left: 69.3, top: 74.3, width: 15.8, height: 6.9 } }
+              { id: 'l0', text: 'pa', left: 17.5, top: 23.8, width: 14.5, height: 7.4, dotX: 29.62, dotY: 27.61, resBox: { left: 65.5, top: 24.0, width: 20.0, height: 7.2 }, word: 'paquet', colorIdx: 0 },
+              { id: 'l1', text: 'co', left: 17.5, top: 33.8, width: 14.5, height: 7.4, dotX: 29.62, dotY: 37.61, resBox: { left: 65.5, top: 34.0, width: 20.0, height: 7.2 }, word: 'coquille', colorIdx: 1 },
+              { id: 'l2', text: 'cas', left: 17.5, top: 43.8, width: 14.5, height: 7.4, dotX: 29.62, dotY: 47.62, resBox: { left: 65.5, top: 44.0, width: 20.0, height: 7.2 }, word: 'casquette', colorIdx: 2 },
+              { id: 'l3', text: 'mos', left: 17.5, top: 53.8, width: 14.5, height: 7.4, dotX: 29.62, dotY: 57.72, resBox: { left: 65.5, top: 54.1, width: 20.0, height: 7.2 }, word: 'mosquée', colorIdx: 3 },
+              { id: 'l4', text: 'bar', left: 17.5, top: 63.8, width: 14.5, height: 7.4, dotX: 29.62, dotY: 67.76, resBox: { left: 65.5, top: 64.1, width: 20.0, height: 7.2 }, word: 'barque', colorIdx: 4 },
+              { id: 'l5', text: 'ki', left: 17.5, top: 73.8, width: 14.5, height: 7.4, dotX: 29.62, dotY: 77.66, resBox: { left: 65.5, top: 74.1, width: 20.0, height: 7.2 }, word: 'kilo', colorIdx: 5 }
             ],
             right: [
-              { id: 'r0', text: 'quée', left: 40.1, top: 24.1, width: 14.9, height: 7.1 },
-              { id: 'r1', text: 'quille', left: 41.2, top: 33.6, width: 13.7, height: 7.5 },
-              { id: 'r2', text: 'que', left: 40.6, top: 44.1, width: 15, height: 6.8 },
-              { id: 'r3', text: 'quet', left: 40.7, top: 54.1, width: 15, height: 6.8 },
-              { id: 'r4', text: 'lo', left: 40.4, top: 64.9, width: 15.1, height: 6.3 },
-              { id: 'r5', text: 'quette', left: 40.7, top: 74.1, width: 14.7, height: 7 }
+              { id: 'r0', text: 'quée', left: 39.5, top: 23.8, width: 15.5, height: 7.4, dotX: 41.83, dotY: 27.68 },
+              { id: 'r1', text: 'quille', left: 39.5, top: 33.8, width: 15.5, height: 7.4, dotX: 41.83, dotY: 37.67 },
+              { id: 'r2', text: 'que', left: 39.5, top: 43.8, width: 15.5, height: 7.4, dotX: 41.83, dotY: 47.68 },
+              { id: 'r3', text: 'quet', left: 39.5, top: 53.8, width: 15.5, height: 7.4, dotX: 41.83, dotY: 57.73 },
+              { id: 'r4', text: 'lo', left: 39.5, top: 63.8, width: 15.5, height: 7.4, dotX: 41.83, dotY: 67.77 },
+              { id: 'r5', text: 'quette', left: 39.5, top: 73.8, width: 15.5, height: 7.4, dotX: 41.83, dotY: 77.70 }
             ],
             matches: { 'l0': 'r3', 'l1': 'r1', 'l2': 'r5', 'l3': 'r0', 'l4': 'r2', 'l5': 'r4' },
             needsValidation: true,
@@ -14310,6 +14310,7 @@ showJourney2EndCelebration() {
         wrapper.style.flexDirection = 'column';
 
         const imgContainer = document.createElement('div');
+        imgContainer.id = 'j3-img-container';
         imgContainer.style.position = 'relative';
         imgContainer.style.display = 'inline-block';
         imgContainer.style.maxWidth = '95vw';
@@ -14653,21 +14654,235 @@ showJourney2EndCelebration() {
         }
 
         if (activity.type === 'match') {
+          const PALETTES = [
+            { id: 0, from: '#0284c7', to: '#0ea5e9', shadow: '#0284c7', arrow: '#0ea5e9' }, // 0: Sky Blue (pa -> quet)
+            { id: 1, from: '#059669', to: '#10b981', shadow: '#059669', arrow: '#10b981' }, // 1: Emerald (co -> quille)
+            { id: 2, from: '#e11d48', to: '#f43f5e', shadow: '#e11d48', arrow: '#f43f5e' }, // 2: Rose Pink (cas -> quette)
+            { id: 3, from: '#d97706', to: '#f59e0b', shadow: '#d97706', arrow: '#f59e0b' }, // 3: Amber Gold (mos -> quée)
+            { id: 4, from: '#7c3aed', to: '#8b5cf6', shadow: '#7c3aed', arrow: '#8b5cf6' }, // 4: Violet (bar -> que)
+            { id: 5, from: '#ea580c', to: '#f97316', shadow: '#ea580c', arrow: '#f97316' }  // 5: Tangerine (ki -> lo)
+          ];
+
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', '0 0 100 100');
+          svg.setAttribute('preserveAspectRatio', 'none');
           svg.style.position = 'absolute';
           svg.style.top = '0';
           svg.style.left = '0';
           svg.style.width = '100%';
           svg.style.height = '100%';
           svg.style.pointerEvents = 'none';
-          svg.style.zIndex = '15';
+          svg.style.zIndex = '22';
+
+          let defsHtml = '<defs>';
+          PALETTES.forEach(p => {
+            defsHtml += `
+              <linearGradient id="j3-grad-${p.id}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${p.from}" />
+                <stop offset="100%" stop-color="${p.to}" />
+              </linearGradient>
+              <filter id="j3-shadow-${p.id}" filterUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+                <feDropShadow dx="0" dy="1.4" stdDeviation="1.4" flood-color="${p.shadow}" flood-opacity="0.45"/>
+              </filter>
+              <marker id="j3-arrow-${p.id}" viewBox="0 0 10 10" refX="6.5" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto">
+                <path d="M 1 2 L 8 5 L 1 8 Q 3 5 1 2" fill="${p.arrow}" stroke="#ffffff" stroke-width="0.6"/>
+              </marker>
+            `;
+          });
+          defsHtml += `
+            <marker id="j3-arrow-prev" viewBox="0 0 10 10" refX="6.5" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto">
+              <path d="M 1 2 L 8 5 L 1 8 Q 3 5 1 2" fill="#38bdf8" stroke="#ffffff" stroke-width="0.6"/>
+            </marker>
+            <filter id="j3-shadow-prev" filterUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+              <feDropShadow dx="0" dy="1.2" stdDeviation="1.2" flood-color="#0284c7" flood-opacity="0.4"/>
+            </filter>
+          </defs>`;
+          svg.innerHTML = defsHtml;
           imgContainer.appendChild(svg);
           this.currentActivityState.svg = svg;
 
-          let currentLeft = null;
+          // Drag preview path
+          const previewPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          previewPath.setAttribute('fill', 'none');
+          previewPath.setAttribute('stroke', '#38bdf8');
+          previewPath.setAttribute('stroke-width', '0.72');
+          previewPath.setAttribute('stroke-dasharray', '2.2, 1.4');
+          previewPath.setAttribute('stroke-linecap', 'round');
+          previewPath.setAttribute('filter', 'url(#j3-shadow-prev)');
+          previewPath.setAttribute('marker-end', 'url(#j3-arrow-prev)');
+          previewPath.style.display = 'none';
+          svg.appendChild(previewPath);
+
+          let activeSelection = null; // { opt, isLeft, el }
+          let dragInfo = null;
+          const pillEntries = [];
+
+          const getContainerPct = e => {
+            const r = imgContainer.getBoundingClientRect();
+            const x = Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
+            const y = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
+            return { x, y };
+          };
+
+          const updatePreview = (ox, oy, cx, cy, isLeft) => {
+            const x1 = isLeft ? ox : cx;
+            const y1 = isLeft ? oy : cy;
+            const x2 = isLeft ? cx : ox;
+            const y2 = isLeft ? cy : oy;
+            const distY = Math.abs(y2 - y1);
+            const curve = Math.max(3.0, Math.min(6.5, distY * 0.18 + 2.5));
+            const cx1 = x1 + curve;
+            const cx2 = x2 - curve;
+            previewPath.setAttribute('d', `M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`);
+            previewPath.style.display = 'block';
+          };
+
+          const hidePreview = () => {
+            previewPath.style.display = 'none';
+            previewPath.removeAttribute('d');
+          };
+
+          const drawConnection = (leftOpt, rightOpt, leftEl, rightEl) => {
+            if (this.currentActivityState.selected.has(leftOpt.id) || this.currentActivityState.selected.has(rightOpt.id)) return;
+
+            this.currentActivityState.selected.add(leftOpt.id);
+            this.currentActivityState.selected.add(rightOpt.id);
+            this.currentActivityState.lines.push({ l: leftOpt.id, r: rightOpt.id });
+
+            // Reset selection visuals
+            [leftEl, rightEl].forEach(el => {
+              if (el) {
+                el.style.border = 'none';
+                el.style.boxShadow = 'none';
+                el.style.background = 'transparent';
+                el.style.cursor = 'default';
+                el.style.pointerEvents = 'none';
+              }
+            });
+            activeSelection = null;
+
+            const p = PALETTES[leftOpt.colorIdx ?? 0];
+            const x1 = leftOpt.dotX;
+            const y1 = leftOpt.dotY;
+            const x2 = rightOpt.dotX;
+            const y2 = rightOpt.dotY;
+            const distY = Math.abs(y2 - y1);
+            const curve = Math.max(3.2, Math.min(6.5, distY * 0.18 + 2.5));
+            const cx1 = x1 + curve;
+            const cx2 = x2 - curve;
+            const d = `M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`;
+
+            // Permanent Bezier path
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', `url(#j3-grad-${p.id})`);
+            path.setAttribute('stroke-width', '0.72');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('filter', `url(#j3-shadow-${p.id})`);
+            path.setAttribute('marker-end', `url(#j3-arrow-${p.id})`);
+            svg.appendChild(path);
+
+            // Left anchor circle dot
+            const startDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            startDot.setAttribute('cx', x1);
+            startDot.setAttribute('cy', y1);
+            startDot.setAttribute('r', '0.85');
+            startDot.setAttribute('fill', p.from);
+            startDot.setAttribute('stroke', '#ffffff');
+            startDot.setAttribute('stroke-width', '0.3');
+            svg.appendChild(startDot);
+
+            // Right anchor circle dot
+            const endDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            endDot.setAttribute('cx', x2);
+            endDot.setAttribute('cy', y2);
+            endDot.setAttribute('r', '0.85');
+            endDot.setAttribute('fill', p.to);
+            endDot.setAttribute('stroke', '#ffffff');
+            endDot.setAttribute('stroke-width', '0.3');
+            svg.appendChild(endDot);
+
+            // Animate stroke draw-in
+            const len = path.getTotalLength();
+            path.style.strokeDasharray = len;
+            path.style.strokeDashoffset = len;
+            path.animate(
+              [{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
+              { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' }
+            );
+
+            // Pop completed word into the corresponding result box
+            const targetResBox = leftOpt.resBox || rightOpt.resBox;
+            if (targetResBox) {
+              const resWord = document.createElement('div');
+              resWord.style.position = 'absolute';
+              resWord.style.left = targetResBox.left + '%';
+              resWord.style.top = targetResBox.top + '%';
+              resWord.style.width = targetResBox.width + '%';
+              resWord.style.height = targetResBox.height + '%';
+              resWord.style.display = 'flex';
+              resWord.style.alignItems = 'center';
+              resWord.style.justifyContent = 'center';
+              resWord.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
+              resWord.style.fontSize = 'calc(var(--img-width) * 0.024)';
+              resWord.style.fontWeight = '800';
+              resWord.style.color = '#1e3a8a';
+              resWord.style.letterSpacing = '0.5px';
+              resWord.style.textShadow = '0 1px 2px rgba(255,255,255,0.85)';
+              resWord.style.pointerEvents = 'none';
+              resWord.style.zIndex = '24';
+              resWord.textContent = leftOpt.word || (leftOpt.text + rightOpt.text);
+              imgContainer.appendChild(resWord);
+
+              resWord.animate([
+                { transform: 'scale(0.5) translateY(4px)', opacity: 0 },
+                { transform: 'scale(1.15) translateY(-2px)', opacity: 0.95, offset: 0.7 },
+                { transform: 'scale(1) translateY(0)', opacity: 1 }
+              ], { duration: 450, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'forwards' });
+
+              // Sparkle burst
+              const sparkle = document.createElement('div');
+              sparkle.style.position = 'absolute';
+              sparkle.style.left = (targetResBox.left + targetResBox.width / 2) + '%';
+              sparkle.style.top = (targetResBox.top + targetResBox.height / 2) + '%';
+              sparkle.style.transform = 'translate(-50%, -50%)';
+              sparkle.style.pointerEvents = 'none';
+              sparkle.style.zIndex = '35';
+              sparkle.style.fontSize = 'calc(var(--img-width) * 0.022)';
+              sparkle.textContent = '✨';
+              imgContainer.appendChild(sparkle);
+              sparkle.animate([
+                { transform: 'translate(-50%, -50%) scale(0.2) rotate(0deg)', opacity: 1 },
+                { transform: 'translate(-50%, -130%) scale(1.3) rotate(45deg)', opacity: 1, offset: 0.6 },
+                { transform: 'translate(-50%, -180%) scale(0.8) rotate(90deg)', opacity: 0 }
+              ], { duration: 600, easing: 'ease-out' }).onfinish = () => sparkle.remove();
+            }
+
+            // Sound feedback
+            if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+              try { window.SoundSystem.playClick(); } catch (_) {}
+            }
+
+            const fb = document.getElementById('j3-feedback');
+            if (fb) fb.textContent = '';
+
+            // Check if all pairs are solved
+            if (this.currentActivityState.lines.length === Object.keys(activity.matches).length) {
+              if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+                try { window.SoundSystem.playSuccess(); } catch (_) {}
+              }
+              setTimeout(() => {
+                this.validateJourney3Activity(activity);
+              }, 700);
+            }
+          };
 
           const setupMatchBtn = (opt, isLeft) => {
             const btn = document.createElement('div');
+            btn.className = 'j3-match-pill-btn';
+            btn.dataset.id = opt.id;
+            btn.dataset.isLeft = isLeft ? 'true' : 'false';
             btn.style.position = 'absolute';
             btn.style.left = opt.left + '%';
             btn.style.top = opt.top + '%';
@@ -14677,198 +14892,132 @@ showJourney2EndCelebration() {
             btn.style.borderRadius = '12px';
             btn.style.zIndex = '20';
             btn.style.background = 'rgba(255, 255, 255, 0.01)';
-            btn.style.transition = 'transform 0.18s ease, box-shadow 0.18s ease';
+            btn.style.transition = 'transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease';
+
+            pillEntries.push({ opt, isLeft, el: btn });
 
             btn.onmouseenter = () => {
-              if (!btn.classList.contains('match-left-active') && !this.currentActivityState.selected.has(opt.id)) {
-                btn.style.transform = 'scale(1.04)';
+              if (!this.currentActivityState.selected.has(opt.id) && activeSelection?.el !== btn) {
+                btn.style.transform = 'scale(1.03)';
+                btn.style.background = 'rgba(255, 255, 255, 0.15)';
               }
             };
             btn.onmouseleave = () => {
-              if (!btn.classList.contains('match-left-active')) {
+              if (!this.currentActivityState.selected.has(opt.id) && activeSelection?.el !== btn) {
                 btn.style.transform = 'scale(1)';
+                btn.style.background = 'rgba(255, 255, 255, 0.01)';
               }
             };
 
-            btn.onclick = (e) => {
-              e.stopPropagation();
-              if (isLeft) {
-                // If already matched, do nothing
-                if (this.currentActivityState.selected.has(opt.id)) return;
+            btn.addEventListener('pointerdown', e => {
+              if (this.currentActivityState.selected.has(opt.id)) return;
+              dragInfo = {
+                opt,
+                isLeft,
+                el: btn,
+                startX: e.clientX,
+                startY: e.clientY,
+                isDragging: false
+              };
+              try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+            });
 
-                // Deselect previous left selection
-                document.querySelectorAll('.match-left-active').forEach(el => {
-                  el.style.border = 'none';
-                  el.style.boxShadow = 'none';
-                  el.classList.remove('match-left-active');
-                  el.style.transform = 'scale(1)';
+            btn.addEventListener('pointermove', e => {
+              if (!dragInfo || dragInfo.opt.id !== opt.id) return;
+              const dist = Math.hypot(e.clientX - dragInfo.startX, e.clientY - dragInfo.startY);
+              if (dist > 7) {
+                dragInfo.isDragging = true;
+                const pt = getContainerPct(e);
+                updatePreview(opt.dotX, opt.dotY, pt.x, pt.y, isLeft);
+              }
+            });
+
+            btn.addEventListener('pointerup', e => {
+              if (!dragInfo || dragInfo.opt.id !== opt.id) return;
+              const wasDragging = dragInfo.isDragging;
+              hidePreview();
+
+              if (wasDragging) {
+                // Find dropped pill target
+                const targetEntry = pillEntries.find(p => {
+                  if (p.isLeft === isLeft || this.currentActivityState.selected.has(p.opt.id)) return false;
+                  const rect = p.el.getBoundingClientRect();
+                  return e.clientX >= rect.left && e.clientX <= rect.right &&
+                         e.clientY >= rect.top && e.clientY <= rect.bottom;
                 });
 
-                // Highlight this left selection with a vibrant blue glow outline
-                btn.style.border = '3px solid #0284c7';
-                btn.style.boxShadow = '0 0 10px rgba(2, 132, 199, 0.45)';
-                btn.style.transform = 'scale(1.04)';
-                btn.classList.add('match-left-active');
-                currentLeft = opt;
+                if (targetEntry) {
+                  const leftOpt = isLeft ? opt : targetEntry.opt;
+                  const rightOpt = isLeft ? targetEntry.opt : opt;
+                  const leftEl = isLeft ? btn : targetEntry.el;
+                  const rightEl = isLeft ? targetEntry.el : btn;
 
-                const fb = document.getElementById('j3-feedback');
-                if (fb) fb.textContent = '';
-              } else {
-                // Right side syllable clicked
-                if (this.currentActivityState.selected.has(opt.id) || !currentLeft) return;
-
-                if (activity.matches[currentLeft.id] === opt.id) {
-                  // CORRECT MATCH!
-                  this.currentActivityState.selected.add(currentLeft.id);
-                  this.currentActivityState.selected.add(opt.id);
-                  this.currentActivityState.lines.push({ l: currentLeft.id, r: opt.id });
-
-                  // Calculate start & end coordinates for SVG arrow
-                  const x1 = currentLeft.left + currentLeft.width;
-                  const y1 = currentLeft.top + currentLeft.height / 2;
-                  const x2 = opt.left;
-                  const y2 = opt.top + opt.height / 2;
-                  const dx = (x2 - x1) * 0.45;
-                  const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
-
-                  // Ensure defs (gradient, glow, arrowhead marker) exist
-                  if (!svg.querySelector('#match-glow')) {
-                    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-                    defs.innerHTML = `
-                      <filter id="match-glow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0284c7" flood-opacity="0.35"/>
-                      </filter>
-                      <linearGradient id="match-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="#0ea5e9"/>
-                        <stop offset="50%" stop-color="#38bdf8"/>
-                        <stop offset="100%" stop-color="#2563eb"/>
-                      </linearGradient>
-                      <marker id="match-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2563eb" />
-                      </marker>
-                    `;
-                    svg.insertBefore(defs, svg.firstChild);
-                  }
-
-                  // Path element (the connecting arrow)
-                  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                  path.setAttribute('d', pathD);
-                  path.setAttribute('fill', 'none');
-                  path.setAttribute('stroke', 'url(#match-grad)');
-                  path.setAttribute('stroke-width', '4.5');
-                  path.setAttribute('stroke-linecap', 'round');
-                  path.setAttribute('filter', 'url(#match-glow)');
-                  path.setAttribute('marker-end', 'url(#match-arrow)');
-                  svg.appendChild(path);
-
-                  // Start dot
-                  const startDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                  startDot.setAttribute('cx', x1 + '%');
-                  startDot.setAttribute('cy', y1 + '%');
-                  startDot.setAttribute('r', '4');
-                  startDot.setAttribute('fill', '#0284c7');
-                  svg.appendChild(startDot);
-
-                  // Animate the path stroke
-                  const len = path.getTotalLength();
-                  path.style.strokeDasharray = len;
-                  path.style.strokeDashoffset = len;
-                  path.animate(
-                    [{ strokeDashoffset: len }, { strokeDashoffset: 0 }],
-                    { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' }
-                  ).onfinish = () => {
-                    path.style.strokeDashoffset = 0;
-                  };
-
-                  // Write the assembled word in the corresponding 3rd column result box!
-                  const targetResBox = currentLeft.resBox || opt.resBox;
-                  if (targetResBox) {
-                    const resBox = document.createElement('div');
-                    resBox.style.position = 'absolute';
-                    resBox.style.left = targetResBox.left + '%';
-                    resBox.style.top = targetResBox.top + '%';
-                    resBox.style.width = targetResBox.width + '%';
-                    resBox.style.height = targetResBox.height + '%';
-                    resBox.style.display = 'flex';
-                    resBox.style.alignItems = 'center';
-                    resBox.style.justifyContent = 'center';
-                    resBox.style.color = '#1e3a8a';
-                    resBox.style.fontFamily = "'Quicksand', 'Nunito', sans-serif";
-                    resBox.style.fontSize = 'calc(var(--img-width) * 0.026)';
-                    resBox.style.fontWeight = '700';
-                    resBox.style.letterSpacing = '0.5px';
-                    resBox.style.textShadow = '0 1px 2px rgba(255,255,255,0.8)';
-                    resBox.style.pointerEvents = 'none';
-                    resBox.textContent = currentLeft.text + opt.text;
-                    imgContainer.appendChild(resBox);
-
-                    resBox.animate([
-                      { transform: 'scale(0.5) translateY(4px)', opacity: 0, filter: 'blur(3px)' },
-                      { transform: 'scale(1.12) translateY(-2px)', opacity: 0.9, filter: 'blur(0px)', offset: 0.7 },
-                      { transform: 'scale(1) translateY(0)', opacity: 1 }
-                    ], { duration: 450, delay: 180, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)', fill: 'both' });
-
-                    // Confetti sparkle ✨
-                    try {
-                      const conf = document.createElement('div');
-                      conf.style.position = 'absolute';
-                      conf.style.left = (targetResBox.left + targetResBox.width / 2) + '%';
-                      conf.style.top = (targetResBox.top + targetResBox.height / 2) + '%';
-                      conf.style.pointerEvents = 'none';
-                      conf.style.zIndex = '35';
-                      conf.innerHTML = '✨';
-                      conf.style.fontSize = 'calc(var(--img-width) * 0.02)';
-                      imgContainer.appendChild(conf);
-                      conf.animate([
-                        { transform: 'translate(-50%, -50%) scale(0.2) rotate(0deg)', opacity: 1 },
-                        { transform: 'translate(-50%, -120%) scale(1.4) rotate(45deg)', opacity: 1, offset: 0.6 },
-                        { transform: 'translate(-50%, -160%) scale(0.8) rotate(90deg)', opacity: 0 }
-                      ], { duration: 600, delay: 300, easing: 'ease-out' }).onfinish = () => conf.remove();
-                    } catch (e) {}
-                  }
-
-                  // Gentle bounce animation on completed syllables
-                  [btn, document.querySelector('.match-left-active')].forEach(el => {
-                    if (el) {
-                      el.animate([
-                        { transform: 'scale(1.08)', filter: 'brightness(1.15)' },
-                        { transform: 'scale(1)', filter: 'brightness(1)' }
-                      ], { duration: 320, easing: 'ease-out' });
+                  if (activity.matches[leftOpt.id] === rightOpt.id) {
+                    drawConnection(leftOpt, rightOpt, leftEl, rightEl);
+                  } else {
+                    if (window.j1GentleShake) {
+                      window.j1GentleShake(btn);
+                      window.j1GentleShake(targetEntry.el);
                     }
-                  });
-
-                  // Clear active state
-                  document.querySelectorAll('.match-left-active').forEach(el => {
-                    el.style.border = 'none';
-                    el.style.boxShadow = 'none';
-                    el.classList.remove('match-left-active');
-                    el.style.transform = 'scale(1)';
-                  });
-                  currentLeft = null;
-
-                  const fb = document.getElementById('j3-feedback');
-                  if (fb) fb.textContent = '';
-                } else {
-                  // WRONG MATCH
-                  const fb = document.getElementById('j3-feedback');
-                  if (fb) {
-                    fb.textContent = "Essaie encore ! Ce n'est pas la bonne syllabe.";
-                    fb.style.color = '#f87171';
-                    if (window.j1GentleShake) window.j1GentleShake(fb);
+                    const fb = document.getElementById('j3-feedback');
+                    if (fb) {
+                      fb.textContent = 'Essaie encore !';
+                      fb.style.color = '#f87171';
+                      if (window.j1GentleShake) window.j1GentleShake(fb);
+                    }
                   }
-                  if (window.j1GentleShake) window.j1GentleShake(btn);
+                }
+              } else {
+                // Click interaction
+                if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+                  try { window.SoundSystem.playClick(); } catch (_) {}
+                }
 
-                  // Keep selection or reset
-                  document.querySelectorAll('.match-left-active').forEach(el => {
-                    el.style.border = 'none';
-                    el.style.boxShadow = 'none';
-                    el.classList.remove('match-left-active');
-                    el.style.transform = 'scale(1)';
-                  });
-                  currentLeft = null;
+                if (!activeSelection) {
+                  // Select first pill
+                  activeSelection = { opt, isLeft, el: btn };
+                  btn.style.boxShadow = '0 0 0 3px #0284c7, 0 4px 14px rgba(2, 132, 199, 0.45)';
+                  btn.style.background = 'rgba(2, 132, 199, 0.12)';
+                  btn.style.transform = 'scale(1.04)';
+                } else if (activeSelection.isLeft === isLeft) {
+                  // Switch selection on same side
+                  activeSelection.el.style.boxShadow = 'none';
+                  activeSelection.el.style.background = 'rgba(255, 255, 255, 0.01)';
+                  activeSelection.el.style.transform = 'scale(1)';
+                  activeSelection = { opt, isLeft, el: btn };
+                  btn.style.boxShadow = '0 0 0 3px #0284c7, 0 4px 14px rgba(2, 132, 199, 0.45)';
+                  btn.style.background = 'rgba(2, 132, 199, 0.12)';
+                  btn.style.transform = 'scale(1.04)';
+                } else {
+                  // Opposing side clicked!
+                  const leftOpt = isLeft ? opt : activeSelection.opt;
+                  const rightOpt = isLeft ? activeSelection.opt : opt;
+                  const leftEl = isLeft ? btn : activeSelection.el;
+                  const rightEl = isLeft ? activeSelection.el : btn;
+
+                  if (activity.matches[leftOpt.id] === rightOpt.id) {
+                    drawConnection(leftOpt, rightOpt, leftEl, rightEl);
+                  } else {
+                    if (window.j1GentleShake) {
+                      window.j1GentleShake(btn);
+                      window.j1GentleShake(activeSelection.el);
+                    }
+                    activeSelection.el.style.boxShadow = 'none';
+                    activeSelection.el.style.background = 'rgba(255, 255, 255, 0.01)';
+                    activeSelection.el.style.transform = 'scale(1)';
+                    activeSelection = null;
+
+                    const fb = document.getElementById('j3-feedback');
+                    if (fb) {
+                      fb.textContent = 'Essaie encore !';
+                      fb.style.color = '#f87171';
+                      if (window.j1GentleShake) window.j1GentleShake(fb);
+                    }
+                  }
                 }
               }
-            };
+              dragInfo = null;
+            });
 
             imgContainer.appendChild(btn);
           };
@@ -14876,7 +15025,6 @@ showJourney2EndCelebration() {
           activity.left.forEach(opt => setupMatchBtn(opt, true));
           activity.right.forEach(opt => setupMatchBtn(opt, false));
         }
-
         if (activity.type === 'drawing' || activity.type === 'mixed') {
           this.currentActivityState.drawings = {};
 
