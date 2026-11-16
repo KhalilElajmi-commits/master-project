@@ -926,6 +926,7 @@
       align-items: center;
       justify-content: center;
       transition: transform 0.2s;
+      z-index: 50;
     }
 
     .popup-close-btn:hover {
@@ -5211,52 +5212,35 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
         const btn = popup.querySelector('.popup-commencer-btn');
         const closeBtn = popup.querySelector('.popup-close-btn');
         if (closeBtn) {
-          if (levelId === 10) {
-            closeBtn.style.top = '19.9%';
-            closeBtn.style.left = '78.7%';
-            closeBtn.style.right = 'auto';
-            closeBtn.style.bottom = 'auto';
-            closeBtn.style.width = '12%';
-            closeBtn.style.height = '18%';
-            closeBtn.style.transform = 'translate(-50%, -50%)';
-            closeBtn.style.borderRadius = '50%';
-            closeBtn.style.opacity = '0';
-            closeBtn.style.border = 'none';
-            closeBtn.style.boxShadow = 'none';
-            closeBtn.style.cursor = 'pointer';
-          } else if (levelId === 7) {
-            closeBtn.style.top = '18.5%';
-            closeBtn.style.left = '85.8%';
-            closeBtn.style.right = 'auto';
-            closeBtn.style.bottom = 'auto';
-            closeBtn.style.width = '10%';
-            closeBtn.style.height = '15%';
-            closeBtn.style.transform = 'translate(-50%, -50%)';
-            closeBtn.style.borderRadius = '50%';
-            closeBtn.style.opacity = '0';
-            closeBtn.style.border = 'none';
-            closeBtn.style.boxShadow = 'none';
-            closeBtn.style.cursor = 'pointer';
-          } else {
-            closeBtn.style.top = '-15px';
-            closeBtn.style.right = '-15px';
-            closeBtn.style.left = 'auto';
-            closeBtn.style.bottom = 'auto';
-            closeBtn.style.width = '45px';
-            closeBtn.style.height = '45px';
-            closeBtn.style.transform = 'none';
-            closeBtn.style.borderRadius = '50%';
-            closeBtn.style.opacity = '1';
-            closeBtn.style.border = '3px solid white';
-            closeBtn.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
-            closeBtn.style.cursor = 'pointer';
-            closeBtn.style.background = '#ff4757';
-            closeBtn.style.color = 'white';
-          }
+          closeBtn.textContent = '✖';
+          closeBtn.style.top = '-15px';
+          closeBtn.style.right = '-15px';
+          closeBtn.style.left = 'auto';
+          closeBtn.style.bottom = 'auto';
+          closeBtn.style.width = '45px';
+          closeBtn.style.height = '45px';
+          closeBtn.style.transform = 'none';
+          closeBtn.style.borderRadius = '50%';
+          closeBtn.style.opacity = '1';
+          closeBtn.style.visibility = 'visible';
+          closeBtn.style.display = 'flex';
+          closeBtn.style.border = '3px solid white';
+          closeBtn.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
+          closeBtn.style.cursor = 'pointer';
+          closeBtn.style.background = '#ff4757';
+          closeBtn.style.color = 'white';
+          closeBtn.style.zIndex = '50';
+          closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            closeLevelPopup(false);
+          };
         }
 
-        if (levelId === 2 || levelId === 3 || levelId === 4 || levelId === 5 || levelId === 6 || levelId === 7 || levelId === 8 || levelId === 10) {
-          if (levelId === 2) {
+        if (levelId === 1 || levelId === 2 || levelId === 3 || levelId === 4 || levelId === 5 || levelId === 6 || levelId === 7 || levelId === 8 || levelId === 10) {
+          if (levelId === 1) {
+            imgEl.src = 'journe 1/first pop up';
+            imgEl.onerror = () => { imgEl.src = 'journe 1/first pop up.png'; };
+          } else if (levelId === 2) {
             imgEl.src = 'journe 2/pop for journe 2.png';
           } else if (levelId === 3) {
             imgEl.src = 'JOURNE 3/pop for jouene 3.png';
@@ -5287,7 +5271,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
           bubbleText.style.display = 'block';
           titleEl.style.display = 'block';
           descEl.style.display = 'block';
-          titleEl.textContent = levelId === 1 ? 'Tunis' : 'NIVEAU ' + levelId;
+          titleEl.textContent = 'NIVEAU ' + levelId;
           // Reset button to defaults
           btn.style.left = '33%';
           btn.style.bottom = '6%';
@@ -5319,6 +5303,7 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
       document.getElementById('level-popup-overlay').classList.remove('active');
       const closeBtn = document.querySelector('#level-popup-overlay .popup-close-btn');
       if (closeBtn) {
+        closeBtn.textContent = '✖';
         closeBtn.style.top = '-15px';
         closeBtn.style.right = '-15px';
         closeBtn.style.left = 'auto';
@@ -5328,11 +5313,14 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
         closeBtn.style.transform = 'none';
         closeBtn.style.borderRadius = '50%';
         closeBtn.style.opacity = '1';
+        closeBtn.style.visibility = 'visible';
+        closeBtn.style.display = 'flex';
         closeBtn.style.border = '3px solid white';
         closeBtn.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
         closeBtn.style.cursor = 'pointer';
         closeBtn.style.background = '#ff4757';
         closeBtn.style.color = 'white';
+        closeBtn.style.zIndex = '50';
       }
       if (startLevel) {
         let levelId = window.currentSelectedLevel;
@@ -9089,7 +9077,25 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
         finishBtn.onclick = doFinish;
         cardBox.onclick = doFinish;
 
+        // Visible wooden continuer button at bottom of card
+        const btnImg = document.createElement('img');
+        btnImg.src = 'journe 1/continuer.png';
+        btnImg.alt = 'Continuer';
+        btnImg.style.position = 'absolute';
+        btnImg.style.left = '52%';
+        btnImg.style.bottom = '2%';
+        btnImg.style.transform = 'translateX(-50%)';
+        btnImg.style.width = '24%';
+        btnImg.style.height = 'auto';
+        btnImg.style.cursor = 'pointer';
+        btnImg.style.filter = 'drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45))';
+        btnImg.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+        btnImg.onmouseenter = () => { btnImg.style.transform = 'translateX(-50%) scale(1.08) translateY(-2px)'; btnImg.style.filter = 'drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55)) brightness(1.1)'; };
+        btnImg.onmouseleave = () => { btnImg.style.transform = 'translateX(-50%) scale(1)'; btnImg.style.filter = 'drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45))'; };
+        btnImg.onclick = doFinish;
+
         cardBox.appendChild(cardImg);
+        cardBox.appendChild(btnImg);
         cardBox.appendChild(finishBtn);
         modal.appendChild(cardBox);
 
@@ -9600,18 +9606,13 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
         const container = document.getElementById('exercise-content-area');
         container.innerHTML = '';
 
-        if (this.currentExIndex >= JOURNEY_7_POPUPS.length) {
-          this.close();
-          if (MapSystem.state.unlockedLevel === 7) {
-            MapSystem.state.unlockedLevel = 8;
-            MapSystem.saveProgress();
-          }
-          setTimeout(() => { MapSystem.init(); }, 100);
+        const activity = JOURNEY_7_POPUPS[this.currentExIndex];
+
+        // When the final Journey 7 end card (end pop up.png) is reached, trigger the full fireworks & Felicitation celebration!
+        if (!activity || this.currentExIndex >= JOURNEY_7_POPUPS.length - 1 || (activity && activity.src === 'journe 7/end pop up.png')) {
+          this.showJourney7EndCelebration();
           return;
         }
-
-        const activity = JOURNEY_7_POPUPS[this.currentExIndex];
-        if (!activity) return;
 
         const wrapper = document.createElement('div');
         wrapper.style.position = 'relative';
@@ -9655,6 +9656,9 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
             onSuccess: (vbtn, fb, successMessage) => {
               fb.textContent = successMessage;
               fb.style.color = '#16a34a';
+              setTimeout(() => {
+                this.showJourney7SuccessPopup();
+              }, 600);
             }
           });
           handled = true;
@@ -9666,6 +9670,9 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
             onSuccess: (vbtn, fb, successMessage) => {
               fb.textContent = successMessage;
               fb.style.color = '#16a34a';
+              setTimeout(() => {
+                this.showJourney7SuccessPopup();
+              }, 600);
             }
           });
         }
@@ -9778,6 +9785,576 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
       handleJourney7Next() {
         this.currentExIndex++;
         this.loadJourney7Activity();
+      },
+
+      finishJourney7() {
+        this.close();
+        MapSystem.advanceAfterCompletion(7);
+      },
+
+      showJourney7EndCelebration() {
+        if (window.j7CurrentAudio) {
+          try {
+            window.j7CurrentAudio.pause();
+            window.j7CurrentAudio.currentTime = 0;
+          } catch (e) {}
+          window.j7CurrentAudio = null;
+        }
+
+        try {
+          const felicitationAudio = new Audio(encodeURI("contiuer/Felicitation.mp3"));
+          window.j7CurrentAudio = felicitationAudio;
+          felicitationAudio.play().catch(err => console.log('Felicitation audio playback deferred or blocked:', err));
+        } catch (err) {
+          console.warn('Felicitation audio error:', err);
+        }
+
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ffd700', '#ffeb3b', '#ffa726', '#ffffff'],
+          ['#ff4081', '#ff80ab', '#f50057', '#ffffff'],
+          ['#00e5ff', '#18ffff', '#00b0ff', '#ffffff'],
+          ['#76ff03', '#b2ff59', '#64dd17', '#ffffff'],
+          ['#d500f9', '#e040fb', '#aa00ff', '#ffffff']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 40 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.5 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3.5,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.014 + Math.random() * 0.016,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 550 + Math.random() * 400);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-end-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = 'journe 7/end pop up.png';
+        cardImg.alt = 'Félicitations !';
+        cardImg.draggable = false;
+
+        const finishBtn = document.createElement('button');
+        finishBtn.className = 'j1-end-finish-btn';
+        finishBtn.setAttribute('title', 'Retourner à la carte');
+        finishBtn.setAttribute('aria-label', 'Terminer la journée');
+
+        let clicked = false;
+        const doFinish = (e) => {
+          if (e) e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (window.j7CurrentAudio) {
+            try {
+              window.j7CurrentAudio.pause();
+              window.j7CurrentAudio.currentTime = 0;
+            } catch (err) {}
+            window.j7CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            this.finishJourney7();
+          }, 240);
+        };
+
+        finishBtn.onclick = doFinish;
+        cardBox.onclick = doFinish;
+
+        // Visible wooden continuer button at bottom of card
+        const btnImg = document.createElement('img');
+        btnImg.src = 'journe 1/continuer.png';
+        btnImg.alt = 'Continuer';
+        btnImg.style.position = 'absolute';
+        btnImg.style.left = '52%';
+        btnImg.style.bottom = '2%';
+        btnImg.style.transform = 'translateX(-50%)';
+        btnImg.style.width = '24%';
+        btnImg.style.height = 'auto';
+        btnImg.style.cursor = 'pointer';
+        btnImg.style.zIndex = '15';
+        btnImg.style.filter = 'drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45))';
+        btnImg.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+        btnImg.onmouseenter = () => { btnImg.style.transform = 'translateX(-50%) scale(1.08) translateY(-2px)'; btnImg.style.filter = 'drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55)) brightness(1.1)'; };
+        btnImg.onmouseleave = () => { btnImg.style.transform = 'translateX(-50%) scale(1)'; btnImg.style.filter = 'drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45))'; };
+        btnImg.onclick = doFinish;
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(btnImg);
+        cardBox.appendChild(finishBtn);
+        modal.appendChild(cardBox);
+
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
+      },
+
+      showJourney7SuccessPopup(onCustomContinue) {
+        if (this._j7ShowingSuccess) return;
+        this._j7ShowingSuccess = true;
+
+        const CONTINUER_IMAGES = [
+          'contiuer/bien joue.png',
+          'contiuer/excellent.png',
+          'contiuer/parfait.png',
+          'contiuer/super.png'
+        ];
+
+        if (!this.j7SuccessDeck || this.j7SuccessDeck.length === 0) {
+          const deck = [...CONTINUER_IMAGES];
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          if (deck[0] === this.lastJ7SuccessCard && deck.length > 1) {
+            const swapIdx = 1 + Math.floor(Math.random() * (deck.length - 1));
+            [deck[0], deck[swapIdx]] = [deck[swapIdx], deck[0]];
+          }
+          this.j7SuccessDeck = deck;
+        }
+
+        const chosenSrc = this.j7SuccessDeck.shift();
+        this.lastJ7SuccessCard = chosenSrc;
+
+        const fb = document.getElementById('j7-feedback');
+        if (fb) {
+          fb.textContent = '';
+          fb.style.display = 'none';
+        }
+        document.querySelectorAll('#j7-val-btn, [id*="-val-btn"]').forEach(b => {
+          if (b) b.style.display = 'none';
+        });
+
+        const playFireworkBurstSound = () => {
+          try {
+            const ctx = (window.SoundSystem && window.SoundSystem.ctx) || (window.j1AudioCtx = window.j1AudioCtx || new (window.AudioContext || window.webkitAudioContext)());
+            if (!ctx) return;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(260 + Math.random() * 90, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.14);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+
+            const chime = ctx.createOscillator();
+            const chimeGain = ctx.createGain();
+            chime.type = 'sine';
+            const notes = [784, 880, 1046.5, 1174.6, 1318.5, 1567.98, 1760];
+            chime.frequency.setValueAtTime(notes[Math.floor(Math.random() * notes.length)], now + 0.03);
+            chimeGain.gain.setValueAtTime(0.05, now + 0.03);
+            chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+            chime.connect(chimeGain);
+            chimeGain.connect(ctx.destination);
+            chime.start(now + 0.03);
+            chime.stop(now + 0.32);
+          } catch (e) {}
+        };
+
+        const AUDIO_MAP = {
+          'contiuer/bien joue.png': 'contiuer/bien joue.mp3',
+          'contiuer/excellent.png': 'contiuer/excellent.mp3',
+          'contiuer/parfait.png': 'contiuer/parfait.mp3',
+          'contiuer/super.png': 'contiuer/super.mp3'
+        };
+
+        let cardAudio = null;
+        const targetAudioSrc = AUDIO_MAP[chosenSrc];
+        if (targetAudioSrc) {
+          try {
+            if (window.j7CurrentAudio) {
+              window.j7CurrentAudio.pause();
+              window.j7CurrentAudio.currentTime = 0;
+            }
+            cardAudio = new Audio(encodeURI(targetAudioSrc));
+            window.j7CurrentAudio = cardAudio;
+            cardAudio.play().catch(err => console.log('Card celebration audio playback deferred or blocked:', err));
+          } catch (e) {
+            console.warn('Card audio play error:', e);
+          }
+        } else if (window.SoundSystem && typeof window.SoundSystem.playSuccess === 'function') {
+          window.SoundSystem.playSuccess();
+        }
+
+        const oldModal = document.getElementById('j1-success-modal');
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'j1-success-modal';
+        modal.className = 'j1-success-modal';
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'j1-fireworks-canvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1';
+        modal.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        const resizeCanvas = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        let particles = [];
+        let animId = null;
+        let burstTimer = null;
+        let isRunning = true;
+        let isTabVisible = !document.hidden;
+        const MAX_PARTICLES = 250;
+
+        const palettes = [
+          ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#ffffff', '#ffd32a'],
+          ['#e056fd', '#f0932b', '#6ab04c', '#22a6b3', '#ffffff', '#ffbe76'],
+          ['#ff3838', '#ff9f1a', '#fff200', '#17c0eb', '#ffffff', '#c56cf0']
+        ];
+
+        const createBurst = (x, y) => {
+          if (!isRunning || !isTabVisible) return;
+          if (particles.length > MAX_PARTICLES) return;
+
+          const palette = palettes[Math.floor(Math.random() * palettes.length)];
+          const particleCount = 38 + Math.floor(Math.random() * 20);
+          for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.2 + Math.random() * 6.5;
+            particles.push({
+              x: x,
+              y: y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              size: 2 + Math.random() * 3,
+              color: palette[Math.floor(Math.random() * palette.length)],
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.018,
+              sparkle: Math.random() > 0.4
+            });
+          }
+          playFireworkBurstSound();
+        };
+
+        const loop = () => {
+          if (!isRunning) return;
+          if (!isTabVisible) {
+            animId = null;
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.06;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.alpha -= p.decay;
+
+            if (p.alpha <= 0) {
+              particles.splice(i, 1);
+              continue;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = p.sparkle ? p.alpha * (0.6 + 0.4 * Math.sin(Date.now() * 0.03 + i)) : p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+          animId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        setTimeout(() => createBurst(canvas.width * 0.22, canvas.height * 0.30), 80);
+        setTimeout(() => createBurst(canvas.width * 0.78, canvas.height * 0.30), 280);
+        setTimeout(() => createBurst(canvas.width * 0.50, canvas.height * 0.18), 480);
+
+        const scheduleBurst = () => {
+          if (!isRunning) return;
+          if (isTabVisible && particles.length < MAX_PARTICLES) {
+            const x = canvas.width * (0.15 + Math.random() * 0.70);
+            const y = canvas.height * (0.15 + Math.random() * 0.40);
+            createBurst(x, y);
+          }
+          burstTimer = setTimeout(scheduleBurst, 600 + Math.random() * 450);
+        };
+        burstTimer = setTimeout(scheduleBurst, 900);
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            isTabVisible = false;
+            particles = [];
+            if (animId) {
+              cancelAnimationFrame(animId);
+              animId = null;
+            }
+          } else {
+            isTabVisible = true;
+            particles = [];
+            if (isRunning && !animId) {
+              animId = requestAnimationFrame(loop);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        const cardBox = document.createElement('div');
+        cardBox.className = 'j1-success-card-box';
+
+        const cardImg = document.createElement('img');
+        cardImg.className = 'j1-success-card-img';
+        cardImg.src = chosenSrc;
+        cardImg.alt = 'Bravo !';
+        cardImg.draggable = false;
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'j1-success-continue-btn';
+        continueBtn.setAttribute('title', "Continuer l'activité");
+        continueBtn.setAttribute('aria-label', "Continuer l'activité");
+
+        let clicked = false;
+        continueBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (clicked) return;
+          clicked = true;
+          this._j7ShowingSuccess = false;
+
+          if (window.SoundSystem && typeof window.SoundSystem.playClick === 'function') {
+            window.SoundSystem.playClick();
+          }
+
+          modal.classList.remove('show');
+          cardBox.style.transform = 'scale(0.85)';
+          cardBox.style.opacity = '0';
+          cardBox.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+
+          if (cardAudio) {
+            try {
+              cardAudio.pause();
+              cardAudio.currentTime = 0;
+            } catch (e) {}
+            cardAudio = null;
+          }
+          if (window.j7CurrentAudio) {
+            try {
+              window.j7CurrentAudio.pause();
+              window.j7CurrentAudio.currentTime = 0;
+            } catch (e) {}
+            window.j7CurrentAudio = null;
+          }
+
+          isRunning = false;
+          window.removeEventListener('resize', resizeCanvas);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (animId) cancelAnimationFrame(animId);
+          if (burstTimer) clearTimeout(burstTimer);
+          particles = [];
+
+          setTimeout(() => {
+            modal.remove();
+            if (fb) fb.style.display = '';
+            if (typeof onCustomContinue === 'function') {
+              onCustomContinue();
+            } else {
+              this.handleJourney7Next();
+            }
+          }, 240);
+        };
+
+        cardBox.appendChild(cardImg);
+        cardBox.appendChild(continueBtn);
+        modal.appendChild(cardBox);
+
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('show');
+        });
       },
 
       loadJourney8Activity() {
@@ -11459,7 +12036,26 @@ Fournis UNIQUEMENT un objet JSON valide, sans balises markdown ni texte en dehor
         finishBtn.onclick = doFinish;
         cardBox.onclick = doFinish;
 
+        // Visible wooden continuer button at bottom of card
+        const btnImg8 = document.createElement('img');
+        btnImg8.src = 'journe 1/continuer.png';
+        btnImg8.alt = 'Continuer';
+        btnImg8.style.position = 'absolute';
+        btnImg8.style.left = '52%';
+        btnImg8.style.bottom = '2%';
+        btnImg8.style.transform = 'translateX(-50%)';
+        btnImg8.style.width = '24%';
+        btnImg8.style.height = 'auto';
+        btnImg8.style.cursor = 'pointer';
+        btnImg8.style.zIndex = '15';
+        btnImg8.style.filter = 'drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45))';
+        btnImg8.style.transition = 'transform 0.15s ease, filter 0.15s ease';
+        btnImg8.onmouseenter = () => { btnImg8.style.transform = 'translateX(-50%) scale(1.08) translateY(-2px)'; btnImg8.style.filter = 'drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55)) brightness(1.1)'; };
+        btnImg8.onmouseleave = () => { btnImg8.style.transform = 'translateX(-50%) scale(1)'; btnImg8.style.filter = 'drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45))'; };
+        btnImg8.onclick = doFinish;
+
         cardBox.appendChild(cardImg);
+        cardBox.appendChild(btnImg8);
         cardBox.appendChild(finishBtn);
         modal.appendChild(cardBox);
 
